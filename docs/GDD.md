@@ -49,6 +49,9 @@ dodge + shoot (R1) → kill aliens → score and pickups → stronger gun / more
 1. **M1, greybox on the PS3:** boxes for ship, bullets, rocket and enemies; low-res scaling, music playback and button mapping proven · done when: [prototypes/ship-feel/BRIEF.md](../prototypes/ship-feel/BRIEF.md) has a RESULT line.
 2. **M2, core loop:** ship controls, rocket, enemy waves, lives and score, music and sound, pixel art · done when: a run goes from wave 1 to game over on the PS3 at 60 fps.
 3. **M3, full game:** bosses, weapon upgrades, screens, high score save, game feel · done when: title → run → game over → title works on the PS3 and the high score survives a reboot.
+4. **M4, release polish:** game name and icon, balancing to wave 20, controller unplug handling, 30-minute stability run, install guide · done when: a fresh player installs the pkg from the guide and plays a full run without help.
+
+The task-by-task plan for each milestone is in the [work plan](work-plan/nameGame-work-plan.pdf) (source: [make_work_plan.py](work-plan/make_work_plan.py)).
 
 ## Screens and flow
 `Boot → Title → Game ⇄ Pause → Game over → Title`
