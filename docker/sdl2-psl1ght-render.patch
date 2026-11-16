@@ -1,0 +1,179 @@
+--- a/src/render/psl1ght/SDL_PSL1GHTrender.c	2026-11-16 20:10:17
++++ b/src/render/psl1ght/SDL_PSL1GHTrender.c	2026-11-16 20:18:52
+@@ -59,14 +59,14 @@
+ static int PSL1GHT_QueueSetDrawColor(SDL_Renderer * renderer, SDL_RenderCommand *cmd);
+ static void PSL1GHT_SetTextureScaleMode(SDL_Renderer * renderer, SDL_Texture * texture, SDL_ScaleMode scaleMode);
+ static int PSL1GHT_UpdateViewport(SDL_Renderer * renderer);
+-static int PSL1GHT_RenderClear(SDL_Renderer * renderer);
++static int PSL1GHT_RenderClear(SDL_Renderer * renderer, const SDL_RenderCommand *cmd);
+ static int PSL1GHT_QueueDrawPoints(SDL_Renderer * renderer, SDL_RenderCommand *cmd, const SDL_FPoint * points, int count);
+-static int PSL1GHT_RenderDrawPoints(SDL_Renderer * renderer,
++static int PSL1GHT_RenderDrawPoints(SDL_Renderer * renderer, const SDL_RenderCommand *cmd,
+                                const SDL_Point * points, int count);
+-static int PSL1GHT_RenderDrawLines(SDL_Renderer * renderer,
++static int PSL1GHT_RenderDrawLines(SDL_Renderer * renderer, const SDL_RenderCommand *cmd,
+                               const SDL_Point * points, int count);
+ static int PSL1GHT_QueueFillRects(SDL_Renderer * renderer, SDL_RenderCommand *cmd, const SDL_FRect * rects, int count);
+-static int PSL1GHT_RenderFillRects(SDL_Renderer * renderer,
++static int PSL1GHT_RenderFillRects(SDL_Renderer * renderer, const SDL_RenderCommand *cmd,
+                               const SDL_Rect * rects, int count);
+ static int PSL1GHT_QueueCopy(SDL_Renderer * renderer, SDL_RenderCommand *cmd, SDL_Texture * texture,
+                 const SDL_Rect * srcrect, const SDL_FRect * dstrect);
+@@ -389,7 +389,7 @@
+ }
+ 
+ static int
+-PSL1GHT_RenderClear(SDL_Renderer * renderer)
++PSL1GHT_RenderClear(SDL_Renderer * renderer, const SDL_RenderCommand *cmd)
+ {
+     SDL_Surface *surface = PSL1GHT_ActivateRenderer(renderer);
+     Uint32 color;
+@@ -400,7 +400,7 @@
+     }
+ 
+     color = SDL_MapRGBA(surface->format,
+-                        renderer->r, renderer->g, renderer->b, renderer->a);
++                        cmd->data.color.r, cmd->data.color.g, cmd->data.color.b, cmd->data.color.a);
+ 
+     /* By definition the clear ignores the clip rect */
+     clip_rect = surface->clip_rect;
+@@ -428,7 +428,7 @@
+ }
+ 
+ static int
+-PSL1GHT_RenderDrawPoints(SDL_Renderer * renderer, const SDL_Point * points,
++PSL1GHT_RenderDrawPoints(SDL_Renderer * renderer, const SDL_RenderCommand *cmd, const SDL_Point * points,
+                     int count)
+ {
+     SDL_Surface *surface = PSL1GHT_ActivateRenderer(renderer);
+@@ -453,17 +453,17 @@
+     }
+ 
+     /* Draw the points! */
+-    if (renderer->blendMode == SDL_BLENDMODE_NONE) {
++    if (cmd->data.draw.blend == SDL_BLENDMODE_NONE) {
+         Uint32 color = SDL_MapRGBA(surface->format,
+-                                   renderer->r, renderer->g, renderer->b,
+-                                   renderer->a);
++                                   cmd->data.draw.r, cmd->data.draw.g, cmd->data.draw.b,
++                                   cmd->data.draw.a);
+ 
+         status = SDL_DrawPoints(surface, points, count, color);
+     } else {
+         status = SDL_BlendPoints(surface, points, count,
+-                                renderer->blendMode,
+-                                renderer->r, renderer->g, renderer->b,
+-                                renderer->a);
++                                cmd->data.draw.blend,
++                                cmd->data.draw.r, cmd->data.draw.g, cmd->data.draw.b,
++                                cmd->data.draw.a);
+     }
+ 
+     if (temp) {
+@@ -473,7 +473,7 @@
+ }
+ 
+ static int
+-PSL1GHT_RenderDrawLines(SDL_Renderer * renderer, const SDL_Point * points,
++PSL1GHT_RenderDrawLines(SDL_Renderer * renderer, const SDL_RenderCommand *cmd, const SDL_Point * points,
+                    int count)
+ {
+     SDL_Surface *surface = PSL1GHT_ActivateRenderer(renderer);
+@@ -498,17 +498,17 @@
+     }
+ 
+     /* Draw the lines! */
+-    if (renderer->blendMode == SDL_BLENDMODE_NONE) {
++    if (cmd->data.draw.blend == SDL_BLENDMODE_NONE) {
+         Uint32 color = SDL_MapRGBA(surface->format,
+-                                   renderer->r, renderer->g, renderer->b,
+-                                   renderer->a);
++                                   cmd->data.draw.r, cmd->data.draw.g, cmd->data.draw.b,
++                                   cmd->data.draw.a);
+ 
+         status = SDL_DrawLines(surface, points, count, color);
+     } else {
+         status = SDL_BlendLines(surface, points, count,
+-                                renderer->blendMode,
+-                                renderer->r, renderer->g, renderer->b,
+-                                renderer->a);
++                                cmd->data.draw.blend,
++                                cmd->data.draw.r, cmd->data.draw.g, cmd->data.draw.b,
++                                cmd->data.draw.a);
+     }
+ 
+     if (temp) {
+@@ -535,13 +535,12 @@
+         outRects[i].h = rects[i].h;
+     }
+     
+-    SDL_memcpy(outRects, rects, outLen);
+ 
+     return 0;
+ }
+ 
+ static int
+-PSL1GHT_RenderFillRects(SDL_Renderer * renderer, const SDL_Rect * rects, int count)
++PSL1GHT_RenderFillRects(SDL_Renderer * renderer, const SDL_RenderCommand *cmd, const SDL_Rect * rects, int count)
+ {
+     SDL_Surface *surface = PSL1GHT_ActivateRenderer(renderer);
+     SDL_Rect *temp = NULL;
+@@ -566,16 +565,16 @@
+         rects = temp;
+     }
+ 
+-    if (renderer->blendMode == SDL_BLENDMODE_NONE) {
++    if (cmd->data.draw.blend == SDL_BLENDMODE_NONE) {
+         Uint32 color = SDL_MapRGBA(surface->format,
+-                                   renderer->r, renderer->g, renderer->b,
+-                                   renderer->a);
++                                   cmd->data.draw.r, cmd->data.draw.g, cmd->data.draw.b,
++                                   cmd->data.draw.a);
+         status = SDL_FillRects(surface, rects, count, color);
+     } else {
+         status = SDL_BlendFillRects(surface, rects, count,
+-                                    renderer->blendMode,
+-                                    renderer->r, renderer->g, renderer->b,
+-                                    renderer->a);
++                                    cmd->data.draw.blend,
++                                    cmd->data.draw.r, cmd->data.draw.g, cmd->data.draw.b,
++                                    cmd->data.draw.a);
+     }
+ 
+     if (temp) {
+@@ -691,7 +690,7 @@
+             }
+ 
+             case SDL_RENDERCMD_CLEAR: {
+-                PSL1GHT_RenderClear(renderer);
++                PSL1GHT_RenderClear(renderer, cmd);
+                 break;
+             }
+ 
+@@ -699,7 +698,7 @@
+                 const size_t count = cmd->data.draw.count;
+                 const size_t first = cmd->data.draw.first;
+                 const SDL_Point *points = (SDL_Point *) (((Uint8 *) vertices) + first);
+-                PSL1GHT_RenderDrawPoints(renderer, points, count);
++                PSL1GHT_RenderDrawPoints(renderer, cmd, points, count);
+                 break;
+             }
+ 
+@@ -708,7 +707,7 @@
+                 const size_t first = cmd->data.draw.first;
+                 const SDL_Point *points = (SDL_Point *) (((Uint8 *) vertices) + first);
+ 
+-                PSL1GHT_RenderDrawLines(renderer, points, count);
++                PSL1GHT_RenderDrawLines(renderer, cmd, points, count);
+                 break;
+             }
+ 
+@@ -717,7 +716,7 @@
+                 const size_t first = cmd->data.draw.first;
+                 const SDL_Rect *rects = (SDL_Rect *) (((Uint8 *) vertices) + first);
+ 
+-                PSL1GHT_RenderFillRects(renderer, rects, count);
++                PSL1GHT_RenderFillRects(renderer, cmd, rects, count);
+                 break;
+             }
+ 
