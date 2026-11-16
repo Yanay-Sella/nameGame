@@ -19,18 +19,28 @@ Full setup history, debugging toolkit and new-project checklist: `docs/ps3-new-p
   The user then launches nameGame from the PS3's Game menu; webMAN can't start installed hdd0 games remotely.
 - `make log` — print the game's UDP log lines (port 18195). Run it before the user launches the game.
   `make ps3` deletes `build/`, so don't redirect the log into `build/`.
+- `make deploy SOURCES=prototypes/<idea>` — build and install a throwaway prototype instead of `source/` (same app ID).
+- `make music MUSIC_SRC=<song>` — convert a song to `pkgfiles/USRDIR/music.ogg` (gitignored), packaged next to EBOOT.BIN.
 
 ## Code
-- `source/*.cpp` — game code. `ps3.mk` — PSL1GHT build rules (runs inside Docker). `Makefile` — host commands.
+- `source/*.cpp` — game code. Design docs: `docs/GDD.md` and `docs/features/`. `ps3.mk` — PSL1GHT build rules (runs inside Docker). `Makefile` — host commands.
 - Log with `debugNetPrintf(INFO, ...)`; the Mac's IP is baked in at build time (`LOG_HOST`).
 - Poll SDL events every frame: SDL turns the PS button menu's "Quit Game" into `SDL_QUIT`.
 - A watchdog thread logs where the main loop is stuck (and RSX state) after 5 s without a frame, then exits to the XMB.
 - Debug freezes from the logs (watchdog line), not by guessing; a "hang" may be a crashed main thread.
 - Available libraries: see `$PS3DEV/portlibs/ppu/lib` in the image (SDL2, SDL2_mixer, freetype, libpng, libjpeg, zlib, curl...).
+  No SDL2_image or SDL2_ttf (only SDL 1.2 versions).
+- SDL2_mixer plays OGG Vorbis, WAV and MikMod modules only (no FLAC/MP3); it links with `-lmikmod -lvorbisfile -lvorbis -logg`.
 
 ## PS3 SDL2 port quirks (shagkur/SDL_PSL1GHT)
 - Upstream render bugs fixed by our patch (keep using our image): `SDL_RenderFillRect` wrote outside the framebuffer,
   and every clear/draw used the last-set draw color instead of its own.
 - Create the window at `SDL_GetDesktopDisplayMode` size (the PS3's output, e.g. 1920x1080), without `SDL_WINDOW_FULLSCREEN`.
-- `SDL_RenderCopyEx` (rotation/flip) is a no-op in this port. Logical size/scaling is untested; verify on the PS3 before relying on it.
-- Controller buttons arrive as `SDL_JOYBUTTONDOWN` with indices 0–15 (mapping not yet documented).
+- No-ops in this port: `SDL_RenderCopyEx` (rotation/flip), `SDL_SetRenderTarget`, texture scale modes.
+- `SDL_RenderCopy` is a hardware scaled blit (nearest-neighbour) with no alpha blending: transparent pixels come out opaque.
+  So the game draws into a CPU pixel buffer and copies it to the screen scaled once per frame (`docs/GDD.md` D-008).
+- `SDL_RenderClear`/`FillRect` are CPU writes to the framebuffer: avoid full-screen clears every frame.
+- Audio device is 48 kHz stereo float; open the mixer at 48000 Hz to avoid resampling.
+- Controller (from the port's `SDL_sysjoystick.c`): buttons 0 left, 1 down, 2 right, 3 up, 4 start, 5 R3, 6 L3, 7 select,
+  8 square, 9 cross, 10 circle, 11 triangle, 12 R1, 13 L1, 14 R2, 15 L2; axes 0/1 left stick x/y, 2/3 right stick x/y.
+  Confirmed on the PS3: 0, 2, 12; the rest is from the source.

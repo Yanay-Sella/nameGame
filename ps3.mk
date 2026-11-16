@@ -4,7 +4,7 @@ include $(PSL1GHT)/ppu_rules
 
 TARGET    := nameGame
 BUILD     := build
-SOURCES   := source
+SOURCES   ?= source
 INCLUDES  := include
 
 TITLE     := nameGame
@@ -18,11 +18,13 @@ CFLAGS    = -O2 -Wall -mcpu=cell $(MACHDEP) $(INCLUDE) -I$(PORTLIBS)/include/SDL
             -DLOG_HOST=\"$(LOG_HOST)\" -DLOG_PORT=$(LOG_PORT)
 CXXFLAGS  = $(CFLAGS)
 LDFLAGS   = $(MACHDEP) -Wl,-Map,$(notdir $@).map
-LIBS      := -lSDL2 -ldebugnet -lnet -lsysmodule -lgcm_sys -lrsx -lsysutil -lio -laudio -lrt -llv2 -lm
+LIBS      := -lSDL2_mixer -lmikmod -lvorbisfile -lvorbis -logg -lSDL2 -ldebugnet -lnet -lsysmodule -lgcm_sys -lrsx -lsysutil -lio -laudio -lrt -llv2 -lm
 
 ifneq ($(BUILD),$(notdir $(CURDIR)))
 
 export OUTPUT   := $(CURDIR)/$(BUILD)/$(TARGET)
+# Copied into the package root: pkgfiles/USRDIR/* lands next to EBOOT.BIN.
+export PKGFILES := $(CURDIR)/pkgfiles
 export VPATH    := $(foreach dir,$(SOURCES),$(CURDIR)/$(dir))
 export DEPSDIR  := $(CURDIR)/$(BUILD)
 export BUILDDIR := $(CURDIR)/$(BUILD)
