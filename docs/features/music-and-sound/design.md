@@ -5,7 +5,7 @@
 The user's song drives the action, and short 8-bit sound effects confirm every hit, kill and pickup without drowning it. Effects are synthesized in code at startup, so the only audio file is the song (D-005, D-006).
 
 ## Rules
-1. The song (`music.ogg` next to EBOOT.BIN) starts when a run starts, loops, and stops at game over; it keeps playing while paused. The title screen (M3) is silent.
+1. The song (`music.ogg` next to EBOOT.BIN) starts when a run starts, only if music is enabled in settings, loops, and stops at game over or when returning to the main menu; it keeps playing while paused. The main menu is silent. Turning music off stops it at once; turning it on while paused starts it from the beginning.
 2. The mixer opens at 48 kHz stereo, the PS3's native rate.
 3. Each game event plays at most one sound per frame (ten aliens dying in one rocket blast play one death sound and one explosion).
 4. The shoot sound has its own mixer channel so rapid fire never cuts off other sounds; the other sounds share the remaining channels.

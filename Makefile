@@ -32,7 +32,7 @@ deploy: ps3
 # Build and run the game-rule tests on the Mac (game.cpp and screen.cpp have no SDL or PS3 code).
 test:
 	mkdir -p build/tests
-	c++ -std=c++14 -Wall -Wextra -Isource tests/game_tests.cpp source/game.cpp source/screen.cpp -o build/tests/game_tests
+	c++ -std=c++14 -Wall -Wextra -Isource tests/game_tests.cpp source/game.cpp source/screen.cpp source/settings.cpp -o build/tests/game_tests
 	build/tests/game_tests
 
 # Print the game's UDP log output (Ctrl+C to stop).

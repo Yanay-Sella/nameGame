@@ -217,7 +217,7 @@ inline int fontGlyph(char c) {
         case 'U': return 055557; case 'V': return 055552; case 'W': return 055775; case 'X': return 055255;
         case 'Y': return 055222; case 'Z': return 071247;
         case '.': return 000002; case ':': return 002020; case '-': return 000700; case '!': return 022202;
-        case '/': return 011244; case '+': return 002720; case '%': return 051245;
+        case '/': return 011244; case '+': return 002720; case '%': return 051245; case '>': return 042124;
         default: return 0;
     }
 }

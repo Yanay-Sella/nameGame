@@ -1,4 +1,4 @@
-// nameGame: startup, the main loop (fixed 60 Hz game steps), pause, and copying the picture to the TV.
+// nameGame: startup, the scenes (menus, play, pause), the main loop (fixed 60 Hz game steps), and copying the picture to the TV.
 #include <SDL.h>
 #include <debugnet.h>
 #include <net/net.h>
@@ -11,9 +11,15 @@
 #include "game.h"
 #include "input.h"
 #include "screen.h"
+#include "settings.h"
 
 const float STEP = 1.0f / 60;   // s per game update
 const int MAX_STEPS_PER_FRAME = 4;
+
+enum Scene { SCENE_MAIN_MENU, SCENE_SETTINGS, SCENE_PLAYING, SCENE_PAUSED };
+const char* const SCENE_NAMES[] = {"main menu", "settings", "playing", "paused"};
+const char* const MAIN_ITEMS[] = {"CLASSIC", "SETTINGS"};          // game modes are added above SETTINGS
+const char* const PAUSE_ITEMS[] = {"RESUME", "SETTINGS", "RETURN TO MENU"};
 
 // Progress markers the main loop updates, read by the watchdog thread.
 static volatile unsigned frame = 0;
@@ -91,12 +97,21 @@ int main(int argc, char** argv) {
 
     stage = "audio";
     std::string exePath = argc > 0 ? argv[0] : "/dev_hdd0/game/NMGM00001/USRDIR/EBOOT.BIN";
-    audioOpen(exePath.substr(0, exePath.find_last_of('/')).c_str());
+    std::string exeFolder = exePath.substr(0, exePath.find_last_of('/'));
+    audioOpen(exeFolder.c_str());
+    std::string settingsPath = exeFolder + "/settings.txt";
+    Settings settings = settingsLoad(settingsPath.c_str());
+    debugNetPrintf(INFO, "settings: music %s\n", settings.music ? "on" : "off");
 
     Game game;
-    startGame(game, 1, (uint32_t)SDL_GetPerformanceCounter());   // a second player joins with Start (co-op)
-    audioStartMusic();
-    bool paused = false, running = true;
+    startGame(game, 1, (uint32_t)SDL_GetPerformanceCounter());   // gives the menu its stars; a second player joins with Start (co-op)
+    Scene scene = SCENE_MAIN_MENU, settingsBack = SCENE_MAIN_MENU;
+    int selected = 0;
+    bool running = true;
+    auto setScene = [&](Scene next) {
+        scene = next;
+        debugNetPrintf(INFO, "scene: %s\n", SCENE_NAMES[next]);
+    };
 
     const double counterHz = (double)SDL_GetPerformanceFrequency();
     Uint64 lastCounter = SDL_GetPerformanceCounter();
@@ -117,34 +132,95 @@ int main(int argc, char** argv) {
         }
         Actions actions[MAX_PLAYERS];
         for (int p = 0; p < MAX_PLAYERS; p++) actions[p] = inputRead(p);
-        for (int p = 0; p < MAX_PLAYERS; p++) {
-            // A controller without a ship joins the running game with Start or X (co-op/design.md).
-            if (p >= (int)game.players.size()) {
-                if (actions[p].confirm && p == (int)game.players.size() && !game.over && !paused) {
-                    joinGame(game);
-                    debugNetPrintf(INFO, "player %d joined at wave %d\n", p + 1, game.wave);
+        // Every controller drives the menus.
+        Actions menu = {};
+        for (const Actions& a : actions) {
+            menu.up |= a.up; menu.down |= a.down; menu.left |= a.left; menu.right |= a.right;
+            menu.confirm |= a.confirm; menu.back |= a.back; menu.pause |= a.pause;
+        }
+        int itemCount = scene == SCENE_PAUSED ? 3 : 2;
+        if (scene != SCENE_PLAYING) {
+            if (menu.up) selected = (selected + itemCount - 1) % itemCount;
+            if (menu.down) selected = (selected + 1) % itemCount;
+        }
+
+        switch (scene) {
+        case SCENE_MAIN_MENU:
+            if (menu.confirm && selected == 0) {
+                startGame(game, 1, (uint32_t)SDL_GetPerformanceCounter());
+                if (settings.music) audioStartMusic();
+                setScene(SCENE_PLAYING);
+            } else if (menu.confirm && selected == 1) {
+                settingsBack = SCENE_MAIN_MENU;
+                selected = 0;
+                setScene(SCENE_SETTINGS);
+            }
+            break;
+        case SCENE_SETTINGS:
+            if (menu.back || (menu.confirm && selected == 1)) {
+                selected = 1;   // the SETTINGS item in both menus
+                setScene(settingsBack);
+            } else if (selected == 0 && (menu.confirm || menu.left || menu.right)) {
+                settings.music = !settings.music;
+                if (!settings.music) audioStopMusic();
+                else if (settingsBack == SCENE_PAUSED) audioStartMusic();
+                bool saved = settingsSave(settingsPath.c_str(), settings);
+                debugNetPrintf(INFO, "settings: music %s (%s)\n", settings.music ? "on" : "off", saved ? "saved" : "SAVE FAILED");
+            }
+            break;
+        case SCENE_PAUSED:
+            if (menu.pause || menu.back || (menu.confirm && selected == 0)) {
+                setScene(SCENE_PLAYING);
+            } else if (menu.confirm && selected == 1) {
+                settingsBack = SCENE_PAUSED;
+                selected = 0;
+                setScene(SCENE_SETTINGS);
+            } else if (menu.confirm && selected == 2) {
+                audioStopMusic();
+                selected = 0;
+                setScene(SCENE_MAIN_MENU);
+            }
+            break;
+        case SCENE_PLAYING:
+            for (int p = 0; p < MAX_PLAYERS; p++) {
+                // A controller without a ship joins the running game with Start or X (co-op/design.md).
+                if (p >= (int)game.players.size()) {
+                    if (actions[p].confirm && p == (int)game.players.size() && !game.over) {
+                        joinGame(game);
+                        debugNetPrintf(INFO, "player %d joined at wave %d\n", p + 1, game.wave);
+                    }
+                    continue;
                 }
-                continue;
+                if (actions[p].pause && !game.over) {
+                    for (Player& player : game.players) player.rocketPressedAt = -1;   // a buffered R2 doesn't survive a pause
+                    selected = 0;
+                    setScene(SCENE_PAUSED);
+                    break;   // a second Start in the same frame can't act
+                }
+                if (actions[p].stress) addStressLoad(game);
+                // Game over: after the input lock, X or Start begins a new run and Circle goes to the main menu.
+                if (game.over && game.time - game.overTime > GAME_OVER_INPUT_LOCK) {
+                    if (actions[p].confirm) {
+                        startGame(game, (int)game.players.size(), (uint32_t)SDL_GetPerformanceCounter());   // co-op runs stay co-op
+                        Uint64 musicStart = SDL_GetPerformanceCounter();
+                        if (settings.music) audioStartMusic();
+                        debugNetPrintf(INFO, "new run (music restart took %.0f ms)\n", (SDL_GetPerformanceCounter() - musicStart) * 1000.0 / counterHz);
+                    } else if (actions[p].back) {
+                        selected = 0;
+                        setScene(SCENE_MAIN_MENU);
+                        break;
+                    }
+                }
             }
-            if (actions[p].pause && !game.over) {
-                paused = !paused;
-                for (Player& player : game.players) player.rocketPressedAt = -1;   // a buffered R2 doesn't survive a pause
-            }
-            if (actions[p].stress && !paused) addStressLoad(game);
-            // Game over: X or Start begins a new run once the input lock has passed (M3's screens replace this).
-            if (actions[p].confirm && game.over && game.time - game.overTime > GAME_OVER_INPUT_LOCK) {
-                startGame(game, (int)game.players.size(), (uint32_t)SDL_GetPerformanceCounter());   // co-op runs stay co-op
-                Uint64 musicStart = SDL_GetPerformanceCounter();
-                audioStartMusic();
-                debugNetPrintf(INFO, "new run (music restart took %.0f ms)\n", (SDL_GetPerformanceCounter() - musicStart) * 1000.0 / counterHz);
-            }
+            break;
         }
         bool wasOver = game.over;
 
         stage = "update";
         int steps = 0;
         while (accumulator >= STEP && steps < MAX_STEPS_PER_FRAME) {
-            if (!paused) updateGame(game, actions, STEP);
+            if (scene == SCENE_PLAYING) updateGame(game, actions, STEP);
+            else if (scene == SCENE_MAIN_MENU || (scene == SCENE_SETTINGS && settingsBack == SCENE_MAIN_MENU)) updateBackground(game, STEP);
             for (Actions& a : actions) a.rocket = false;   // a press counts once, in the first step
             accumulator -= STEP;
             steps++;
@@ -155,14 +231,26 @@ int main(int argc, char** argv) {
             for (size_t p = 0; p < game.players.size(); p++)
                 debugNetPrintf(INFO, "game over: player %d score %d, wave %d\n", (int)p + 1, game.players[p].score, game.wave);
         }
-        for (int s = 0; s < SOUND_COUNT; s++) {
-            if (game.soundRequested[s]) audioPlay((Sound)s);
-            game.soundRequested[s] = false;
+        if (scene == SCENE_PLAYING) {
+            for (int s = 0; s < SOUND_COUNT; s++) {
+                if (game.soundRequested[s]) audioPlay((Sound)s);
+                game.soundRequested[s] = false;
+            }
         }
 
         stage = "draw";
-        drawGame(game);
-        if (paused) drawText((SCREEN_W - textWidth("PAUSED", 2)) / 2, 84, "PAUSED", 0xFFFFFFFF, 2);
+        if (scene == SCENE_MAIN_MENU) {
+            drawBackground(game);
+            drawMenu("NAMEGAME", MAIN_ITEMS, 2, selected, "X SELECT");
+        } else if (scene == SCENE_SETTINGS) {
+            if (settingsBack == SCENE_PAUSED) drawGame(game);
+            else drawBackground(game);
+            const char* settingsItems[] = {settings.music ? "MUSIC: ON" : "MUSIC: OFF", "BACK"};
+            drawMenu("SETTINGS", settingsItems, 2, selected, "X CHANGE  O BACK");
+        } else {
+            drawGame(game);
+            if (scene == SCENE_PAUSED) drawMenu("PAUSED", PAUSE_ITEMS, 3, selected, "X SELECT  O RESUME");
+        }
 
         stage = "present";
         SDL_UpdateTexture(picture, NULL, screenPixels, SCREEN_W * sizeof(uint32_t));

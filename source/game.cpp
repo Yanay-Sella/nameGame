@@ -320,11 +320,7 @@ static void startDive(Game& game) {
     diver->vx = 0;
 }
 
-void updateGame(Game& game, const Actions* actions, float dt) {
-    game.time += dt;
-    bool anyPlayerAlive = false;
-    for (const Player& p : game.players) anyPlayerAlive |= p.alive;
-
+void updateBackground(Game& game, float dt) {
     for (Star& star : game.stars) {
         star.y += STAR_SPEEDS[star.layer] * dt;
         if (star.y >= SCREEN_H) {
@@ -332,6 +328,14 @@ void updateGame(Game& game, const Actions* actions, float dt) {
             star.x = randomUnit(game) * SCREEN_W;
         }
     }
+}
+
+void updateGame(Game& game, const Actions* actions, float dt) {
+    game.time += dt;
+    bool anyPlayerAlive = false;
+    for (const Player& p : game.players) anyPlayerAlive |= p.alive;
+
+    updateBackground(game, dt);
 
     for (size_t i = 0; i < game.players.size(); i++) updatePlayer(game, game.players[i], (int)i, actions[i], dt);
 
@@ -464,9 +468,13 @@ static void drawExplosion(const Explosion& e) {
         }
 }
 
-void drawGame(const Game& game) {
+void drawBackground(const Game& game) {
     fillRect(0, 0, SCREEN_W, SCREEN_H, paletteColor('k'));
     for (const Star& star : game.stars) fillRect((int)star.x, (int)star.y, 1, 1, paletteColor(STAR_COLORS[star.layer]));
+}
+
+void drawGame(const Game& game) {
+    drawBackground(game);
 
     int frame = (int)(game.time / ANIMATION_FRAME) % 2;
     for (const Alien& alien : game.aliens) {
@@ -510,7 +518,7 @@ void drawGame(const Game& game) {
         if (coOp) snprintf(text, sizeof text, "1P %d   2P %d   WAVE %d", game.players[0].score, game.players[1].score, game.wave);
         else snprintf(text, sizeof text, "SCORE %d   WAVE %d", game.players[0].score, game.wave);
         drawCentredText(86, text, paletteColor('w'), 1);
-        if (game.time - game.overTime > GAME_OVER_INPUT_LOCK) drawCentredText(100, "PRESS X TO PLAY AGAIN", paletteColor('y'), 1);
+        if (game.time - game.overTime > GAME_OVER_INPUT_LOCK) drawCentredText(100, "X PLAY AGAIN   O MENU", paletteColor('y'), 1);
     } else if (game.bannerTimer > 0) {
         snprintf(text, sizeof text, "WAVE %d", game.wave);
         drawCentredText(84, text, paletteColor('y'), 2);

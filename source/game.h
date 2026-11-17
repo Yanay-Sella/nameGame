@@ -11,6 +11,8 @@ struct Actions {
     bool pause;           // Start pressed
     bool confirm;         // X or Start pressed
     bool stress;          // Triangle pressed: dev stress test (main.cpp)
+    bool up, down, left, right;   // D-pad pressed or left stick flicked (menus)
+    bool back;                    // Circle pressed
 };
 
 // Sounds the game asks for during a step; main.cpp plays each requested one once.
@@ -83,6 +85,8 @@ void startGame(Game& game, int playerCount, uint32_t seed);
 void joinGame(Game& game);   // adds the next player to a running game, arriving like a respawn
 void updateGame(Game& game, const Actions* actions, float dt);   // actions: one per player
 void drawGame(const Game& game);
+void updateBackground(Game& game, float dt);   // scrolls the starfield
+void drawBackground(const Game& game);         // navy fill and stars
 
 int formationRows(int wave);        // rows of 8 aliens in a wave
 float shotChance(int wave);         // enemy shots per alien per second

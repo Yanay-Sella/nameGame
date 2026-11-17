@@ -8,7 +8,7 @@ One hit kills, so every death comes from a visible shot or alien; three lives ma
 1. A run starts with 3 lives, 0 points and 3 rockets.
 2. An enemy shot or an alien's body touching the ship's hitbox destroys the ship (large explosion) and costs a life.
 3. After a death the ship returns at the bottom centre after the respawn delay, then blinks and can't be hit for the invincibility time; it can move and shoot while blinking.
-4. Dying with no lives left ends the run: "GAME OVER" with the final score and wave. After the input lock, X or Start starts a new run (the M3 screens replace this).
+4. Dying with no lives left ends the run: "GAME OVER" with the final score and wave. After the input lock, X or Start starts a new run and Circle goes to the main menu.
 5. Points come from killing aliens (see [enemy waves](../enemy-waves/design.md)) and wave clear bonuses.
 6. Every 50,000 points gives an extra life, up to the maximum; crossing two thresholds at once gives both.
 7. The HUD shows the wave at the top centre and, on each player's side (player 1 left, player 2 right), the score at the top, one ship icon per spare life below it and the rockets at the bottom ([co-op](../co-op/design.md)).

@@ -5,6 +5,7 @@
 #include "game.h"
 #include "input.h"
 #include "screen.h"
+#include "settings.h"
 #include "sprites.h"
 
 static int failures = 0;
@@ -324,8 +325,29 @@ static void waveBonusSkipsAPlayerWhoIsOut() {
     CHECK(game.players[0].score == 1000 && game.players[1].score == 0);
 }
 
+static void settingsDefaultToMusicOn() {
+    CHECK(settingsLoad("build/tests/missing.txt").music == true);
+}
+
+static void settingsSurviveASave() {
+    Settings settings;
+    settings.music = false;
+    CHECK(settingsSave("build/tests/settings.txt", settings));
+    CHECK(settingsLoad("build/tests/settings.txt").music == false);
+    settings.music = true;
+    CHECK(settingsSave("build/tests/settings.txt", settings));
+    CHECK(settingsLoad("build/tests/settings.txt").music == true);
+}
+
+static void menuCursorHasAGlyph() {
+    CHECK(fontGlyph('>') != 0);
+}
+
 int main() {
     spritesHaveTheirSize();
+    settingsDefaultToMusicOn();
+    settingsSurviveASave();
+    menuCursorHasAGlyph();
     onlyEnemyShotsUseMagenta();
     deadzoneIsRadialAndRescaled();
     holdingFireShootsEvery012Seconds();

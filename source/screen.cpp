@@ -48,3 +48,17 @@ int textWidth(const char* text, int scale) {
     int length = (int)strlen(text);
     return length == 0 ? 0 : (length * 4 - 1) * scale;
 }
+
+void drawMenu(const char* title, const char* const* items, int count, int selected, const char* hint) {
+    int w = 150, h = 44 + 12 * (count - 1);
+    int x = (SCREEN_W - w) / 2, y = (SCREEN_H - h) / 2;
+    fillRect(x, y, w, h, paletteColor('n'));
+    fillRect(x + 1, y + 1, w - 2, h - 2, paletteColor('k'));
+    drawText((SCREEN_W - textWidth(title, 2)) / 2, y + 8, title, 0xFFFFFFFF, 2);
+    for (int i = 0; i < count; i++) {
+        int textX = (SCREEN_W - textWidth(items[i])) / 2, textY = y + 28 + 12 * i;
+        drawText(textX, textY, items[i], i == selected ? paletteColor('y') : 0xFFFFFFFF);
+        if (i == selected) drawText(textX - 8, textY, ">", paletteColor('y'));
+    }
+    drawText((SCREEN_W - textWidth(hint)) / 2, y + 28 + 12 * (count - 1) + 8, hint, paletteColor('s'));
+}

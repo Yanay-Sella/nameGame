@@ -13,3 +13,4 @@ void drawSprite(const Sprite& sprite, int x, int y);
 void drawSpriteSolid(const Sprite& sprite, int x, int y, uint32_t color);   // silhouette, for hit flashes
 void drawText(int x, int y, const char* text, uint32_t color, int scale = 1);
 int textWidth(const char* text, int scale = 1);
+void drawMenu(const char* title, const char* const* items, int count, int selected, const char* hint);   // centred panel

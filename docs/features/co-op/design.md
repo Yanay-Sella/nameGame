@@ -10,7 +10,7 @@ A friend can pick up a second controller and drop into a run already going, arca
 3. Each player has their own lives, rockets, score and extra lives. Bullet and rocket kills score for the player who fired. Pickups go to whoever touches them.
 4. A player with no lives left is out until the run ends. The run ends when every player is out.
 5. The wave clear bonus goes to every player still in the run.
-6. Either player's Start pauses. At game over, X or Start from either player starts a new run with the same number of players.
+6. Either player's Start pauses. At game over, X or Start from either player starts a new run with the same number of players, and Circle goes to the main menu.
 7. HUD: player 1's score, spare lives and rockets on the left, player 2's on the right, the wave in the centre. Scores read "1P"/"2P" in co-op and "SCORE" alone. With one player, "2P PRESS START" shows dimly at the top right.
 8. Player 2's ship has the same shape with an orange cockpit and blue stripes.
 

@@ -41,7 +41,7 @@ dodge + shoot (R1) → kill aliens → score and pickups → stronger gun / more
 | Bosses | idea | MVP | A boss on every 5th wave, stronger each time | — |
 | Music and sound | implemented | MVP | Your song looped during gameplay; synthesized retro SFX | [design](features/music-and-sound/design.md) |
 | Pixel art | implemented | MVP | 320×180 palette art: sprites, font and starfield as text grids in code | [design](features/pixel-art/design.md) |
-| Screens | idea | MVP | Title, pause (Start), game over | — |
+| Screens | in progress | MVP | Main menu (Classic, Settings), pause menu, settings with music on/off, game over | [design](features/screens/design.md) |
 | High score save | idea | MVP | Best score saved on the PS3, shown on the title | — |
 | Game feel | idea | MVP | Shake, hit-stop, flashes, particles by event tier; shake and flash options | — |
 | Co-op | in progress | MVP | A second player drops in with Start on a second controller | [design](features/co-op/design.md) |
@@ -55,18 +55,23 @@ dodge + shoot (R1) → kill aliens → score and pickups → stronger gun / more
 The task-by-task plan for each milestone is in the [work plan](work-plan/nameGame-work-plan.pdf) (source: [make_work_plan.py](work-plan/make_work_plan.py)).
 
 ## Screens and flow
-`Boot → Title → Game ⇄ Pause → Game over → Title`
-- **Title:** game name, high score, "Press X or Start". No music.
-- **Game:** the HUD shows score, wave, lives and rockets. Music loops.
-- **Pause:** Start toggles it; resume or quit to the title. Music keeps playing.
-- **Game over:** final score and wave, "new high score" when it is one; any button goes back to the title.
+```
+Boot → MAIN MENU ─ CLASSIC ──→ PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN MENU
+           └─ SETTINGS ⇄           │                  └─ SETTINGS ⇄
+                                   └─ game over: X/Start = play again, Circle = MAIN MENU
+```
+- **Main menu:** title "NAMEGAME" and the items Classic and Settings. Silent. Classic is the only game mode for now.
+- **Settings:** music on/off, saved to settings.txt. Circle or Back returns to the menu that opened it.
+- **Game:** the HUD shows score, wave, lives and rockets. Music loops if enabled.
+- **Pause:** Start opens it (Resume, Settings, Return to menu); the music keeps playing.
+- **Game over:** final score and wave; X or Start plays again, Circle goes to the main menu.
 
 ## Direction
 - **Art:** pixel art drawn at 320×180 and scaled up by a whole number (×6 at 1080p, ×4 at 720p) with no smoothing. A small fixed palette; enemy shots are the only magenta/pink objects. Dark starfield background that scrolls slowly.
 - **Audio:** the user's song (an OGG copy of the FLAC) loops during gameplay only. Short square-wave and noise SFX for shooting, hits, explosions, pickups and death, mixed under the music.
 - **Game feel:** the [game-feel](../.claude/skills/game-feel/SKILL.md) tiers: bullet hits are small, kills and pickups medium, rocket explosions, boss hits and the player's death large. Shooting itself gets almost no feedback so held R1 doesn't buzz.
-- **Controls:** left stick or D-pad moves, R1 fires (hold), R2 rocket, Start pauses, X confirms in menus. Button numbers are measured in M1.
-- **Accessibility:** shake strength 0–100 % and reduce flashing in the pause menu; large flashes at most 3 per second.
+- **Controls:** left stick or D-pad moves, R1 fires (hold), R2 rocket, Start pauses, X confirms in menus, Circle backs out in menus. Button numbers are measured in M1.
+- **Accessibility:** shake strength 0–100 % and reduce flashing in the settings screen; large flashes at most 3 per second.
 
 ## Game-level acceptance
 - 60 fps on the PS3 with 60 enemies, 100 bullets and 2 explosions on screen. *(PS3 stress test 2026-11-17 with Triangle: 60 fps held up to 60 aliens, 1,900 bullets and 8 explosions; slowest frame 11 ms of 16.7)*
@@ -84,6 +89,7 @@ The task-by-task plan for each milestone is in the [work plan](work-plan/nameGam
 | D-007 | 2026-11-17 | Single player, but players are an array with their own controller | hard-coded single ship; co-op now | user wants co-op to be easy to add later without extra work now | [ship controls](features/ship-controls/design.md) |
 | D-008 | 2026-11-17 | Draw the 320×180 picture in a CPU pixel buffer, then one scaled `SDL_RenderCopy` to the screen | SDL render target; scaled sprite textures | the port's `SDL_SetRenderTarget` is a no-op and `SDL_RenderCopy` has no alpha blending (read in SDL_PSL1GHT's renderer source); the scaled copy is a hardware blit with nearest-neighbour | all drawing |
 | D-009 | 2026-11-17 | Co-op as drop-in join: runs start with one player, player 2 presses Start on a second controller to join | two players by default; a player-count menu | the user wanted to add co-op now, with a player joining instead of two players by default | [co-op](features/co-op/design.md), [lives and score](features/lives-and-score/design.md) |
+| D-010 | 2026-11-17 | A main menu with game modes (only Classic for now) and a Settings screen reachable from the main and pause menus; music on/off saved to settings.txt | title screen with "press X" only | the user wanted room for more modes and settings | [screens](features/screens/design.md), [music and sound](features/music-and-sound/design.md), [co-op](features/co-op/design.md) |
 
 ## Open questions
 - **Assumptions to confirm:** working title "nameGame"; sprites as text grids in code (D-006); every number marked `[ASSUMPTION]` in the feature notes.
@@ -99,3 +105,4 @@ The task-by-task plan for each milestone is in the [work plan](work-plan/nameGam
 **0.5 (2026-11-17):** M2 done: six features implemented with implementation and testing notes; stress test passed; the song now plays from memory (restart freeze fix to confirm).
 **0.6 (2026-11-17):** co-op built as drop-in join (D-009); Co-op moves from later to MVP.
 **0.7 (2026-11-17):** restart freeze fixed on the PS3 (music restart 1 ms, was ~350 ms); co-op join confirmed with a second controller.
+**0.8 (2026-11-17):** main menu, pause menu and settings (D-010).
