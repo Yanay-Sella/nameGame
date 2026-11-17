@@ -18,7 +18,7 @@ from reportlab.platypus.tableofcontents import TableOfContents
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "nameGame-work-plan.pdf")
-VERSION = "1.0"
+VERSION = "1.1"
 DATE = "17 November 2026"
 
 FONTS = "/System/Library/Fonts/Supplemental/"
@@ -254,10 +254,12 @@ def build():
                    "formation shooters and later wave-based shmups. You fly a small ship at the bottom of the screen, "
                    "hold R1 to spray bullets and fire a scarce, powerful rocket with R2. Waves get harder, every 5th "
                    "wave is a boss, and a run ends when the last life is lost."))
-    story.append(P("Milestone 1 is done: a throwaway grey-box prototype ran on the console and the verdict was "
-                   "<b>keep</b>.", "body"))
+    story.append(P("Milestones 1 and 2 are done. M1's throwaway grey-box prototype ran on the console and the verdict "
+                   "was <b>keep</b>. M2 built the real core loop: a full run from wave 1 to game over on the PS3 at "
+                   "60 fps with pixel art, the song and sound effects. Alongside it, drop-in co-op (D-009) and the XMB "
+                   "Game menu art were added.", "body"))
     story.append(table([
-        ["Question the prototype answered", "Result on the PS3 (17 Nov 2026)"],
+        ["M1: question the prototype answered", "Result on the PS3 (17 Nov 2026)"],
         ["Does flying and shooting feel tight?", "Yes: the player played it and said it feels good"],
         ["Steady 60 fps?", "60 fps every second; 1.0 ms of work per frame (max 2.0 ms) of a 16.7 ms budget"],
         ["Chunky 320×180 pixels scaled to the TV?", "1920×1080 output, scaled ×6 exactly, no borders"],
@@ -270,10 +272,21 @@ def build():
     story.append(table([
         ["Milestone", "Goal", "Status"],
         ["M1 Greybox on the PS3", "Prove controls, scaling, music and frame rate on the console", "Done, kept"],
-        ["M2 Core loop", "A full run from wave 1 to game over, real pixel art and sound", "Next (section 7)"],
-        ["M3 Full game", "Bosses, upgrades, screens, high score save, game feel", "Planned (section 8)"],
+        ["M2 Core loop", "A full run from wave 1 to game over, real pixel art and sound", "Done"],
+        ["M3 Full game", "Bosses, upgrades, screens, high score save, game feel", "Next (section 8)"],
         ["M4 Release polish", "Name, icon, balancing, stability, install guide", "Planned (section 8)"],
-    ], [42 * mm, FULL - 42 * mm - 32 * mm, 32 * mm], row_colors={1: DONE, 2: NOW}))
+    ], [42 * mm, FULL - 42 * mm - 32 * mm, 32 * mm], row_colors={1: DONE, 2: DONE, 3: NOW}))
+    story.append(Spacer(1, 8))
+    story.append(P("Milestone 2 results on the PS3", "h2"))
+    story.append(table([
+        ["Check", "Result (17 Nov 2026)"],
+        ["Full run", "Wave 1 to game over at wave 4 (13,900 points), then a new run; 60 fps throughout"],
+        ["Stress test (Triangle)", "60 fps held up to 60 aliens, 1,900 bullets and 8 explosions; slowest frame 11 ms"],
+        ["Controller", "Buttons 0–4, 9, 11, 12 and 14 confirmed in the log"],
+        ["Mac tests", "make test: all rule tests pass, and each fails when its rule is broken on purpose"],
+        ["Music restart", "Froze ~0.35 s when streaming the song from the hard drive; 1 ms once played from memory"],
+        ["Co-op", "Player 2 joined from a second controller; 60 fps held, including a stress press"],
+    ], [42 * mm, FULL - 42 * mm]))
 
     # 2. The game
     story += section("2. The game at a glance")
@@ -322,18 +335,18 @@ def build():
                    "designed → in progress → implemented (plus changed — code pending, and cut).", "note"))
     story.append(table([
         ["Feature", "Summary", "Milestone", "Status"],
-        ["Ship controls", "Free movement in the bottom zone; hold R1 to auto-fire", "M2", "designed"],
-        ["Rocket", "R2 fires a limited rocket that explodes in a 40 px radius", "M2", "designed"],
-        ["Enemy waves", "Formations that fly in, sway, shoot and dive; harder each wave", "M2", "designed"],
-        ["Lives and score", "3 lives, one hit kills, respawn invincibility, extra life every 50,000", "M2", "idea"],
-        ["Music and sound", "Song loops in gameplay; synthesized retro SFX", "M2", "idea"],
-        ["Pixel art", "Palette, sprites and font as text grids in code", "M2", "idea"],
+        ["Ship controls", "Free movement in the bottom zone; hold R1 to auto-fire", "M2", "implemented"],
+        ["Rocket", "R2 fires a limited rocket that explodes in a 40 px radius", "M2", "implemented"],
+        ["Enemy waves", "Formations that fly in, sway, shoot and dive; harder each wave", "M2", "implemented"],
+        ["Lives and score", "3 lives, one hit kills, respawn invincibility, extra life every 50,000", "M2", "implemented"],
+        ["Music and sound", "Song loops in gameplay; synthesized retro SFX", "M2", "implemented"],
+        ["Pixel art", "Palette, sprites and font as text grids in code", "M2", "implemented"],
         ["Bosses", "A boss on every 5th wave, stronger each time", "M3", "idea"],
         ["Weapon upgrades", "Pickups: single → double → spread → fast spread; death loses a level", "M3", "idea"],
         ["Screens", "Title, pause menu (with options), game over", "M3", "idea"],
         ["High score save", "Best score saved on the PS3, shown on the title", "M3", "idea"],
         ["Game feel", "Shake, hit-stop, flashes, particles by tier; shake and flash options", "M3", "idea"],
-        ["Co-op", "Second ship on a second controller", "later", "idea"],
+        ["Co-op", "Player 2 drops in with Start on a second controller (D-009)", "M2", "in progress"],
     ], [32 * mm, FULL - 32 * mm - 20 * mm - 24 * mm, 20 * mm, 24 * mm]))
     story.append(P("Starting numbers for the core features", "h2"))
     story.append(P("All values are first guesses marked [ASSUMPTION] in the feature notes, except those confirmed in the "
@@ -507,26 +520,27 @@ def build():
         ["Milestone", "Contents", "Done when"],
         ["M1 Greybox (done)", "Grey-box ship, bullets, rocket, formation; scaling, music and buttons proven",
          "BRIEF.md has a RESULT line: keep, 17 Nov 2026"],
-        ["M2 Core loop", "Ship controls, rocket, enemy waves, lives and score, music and sound, pixel art, Mac tests",
+        ["M2 Core loop (done)", "Ship controls, rocket, enemy waves, lives and score, music and sound, pixel art, Mac "
+         "tests; plus drop-in co-op and the XMB art",
          "A run from wave 1 to game over on the PS3 at 60 fps with real art and sound"],
         ["M3 Full game", "Bosses, weapon upgrades, screens, high score save, game feel and its options",
          "Title → run → game over → title works on the PS3; the high score survives a reboot"],
         ["M4 Release polish", "Name and icon, balancing to wave 20, unplug handling, stability run, install guide",
          "A fresh player installs from the guide and plays a full run without help"],
-        ["Later", "Co-op on a second controller; button remapping menu", "Only if wanted after M4"],
-    ], [34 * mm, FULL - 34 * mm - 62 * mm, 62 * mm], row_colors={1: DONE, 2: NOW}))
+        ["Later", "Button remapping menu", "Only if wanted after M4"],
+    ], [34 * mm, FULL - 34 * mm - 62 * mm, 62 * mm], row_colors={1: DONE, 2: DONE, 3: NOW}))
     story.append(Spacer(1, 8))
     story.append(P("Rules for every milestone", "h2"))
     story += bullets([
         "Each task ends in something that runs on the PS3; nothing waits until the end to be tried.",
-        "One branch per milestone (for example <font name='Mono'>m2/core-loop</font>), committed after each "
-        "working task, merged into main when the milestone's 'done when' is met.",
+        "All work happens directly on <font name='Mono'>main</font>, with no feature or milestone branches; "
+        "commit after each working task.",
         "Design notes come before code: a feature at 'idea' gets its design.md first.",
         "The milestone ends with a docs sync: statuses, implementation.md, testing.md, decisions, checker at exit 0.",
     ])
 
     # 7. M2
-    story += section("7. Milestone 2: the core loop")
+    story += section("7. Milestone 2: the core loop (done)")
     story.append(P("<b>Goal:</b> a complete run on the PS3, from wave 1 to game over, with real pixel art, the song "
                    "and sound effects, at 60 fps. The prototype is not copied: its lessons (pixel buffer + scaled "
                    "copy, button numbers, tuning values) are rewritten cleanly in <font name='Mono'>source/</font>."))
@@ -597,7 +611,7 @@ def build():
     story.append(P("Milestone 4: release polish", "h2"))
     story.append(table([
         ["#", "Task", "Done when"],
-        ["1", "Real game name; XMB icon (ICON0.PNG) and background (PIC1.PNG)", "shows correctly in the Game menu"],
+        ["1", "Real game name; rerun docs/xmb-art/make_xmb_art.py so ICON0.PNG and PIC1.PNG carry it", "shows correctly in the Game menu"],
         ["2", "Balancing pass to wave 20 with at least one other player", "difficulty curve tuned and logged"],
         ["3", "Controller unplug pauses; reconnect resumes", "checked on the PS3"],
         ["4", "Stability: a 30-minute run with no frame drops or memory growth", "log shows steady fps and no errors"],
@@ -666,6 +680,8 @@ def build():
          "co-op later without a rewrite"],
         ["D-008", "Draw into a CPU pixel buffer, then one scaled SDL_RenderCopy",
          "render targets are a no-op and copies have no blending; proven at 60 fps in M1"],
+        ["D-009", "Co-op as drop-in join: player 2 presses Start on a second controller",
+         "the user wanted co-op now, joining instead of two players by default"],
     ], [16 * mm, FULL - 16 * mm - 72 * mm, 72 * mm]))
 
     # 12. Open questions
@@ -676,7 +692,7 @@ def build():
         ["What is the game's real name?", "'nameGame' until M4"],
         ["Sprites as text grids in code, or PNG files drawn in an editor?", "text grids in code (D-006)"],
         ["Should there be a button-remapping menu?", "no; later only if wanted"],
-        ["Co-op after M4?", "later; code is ready for a second player"],
+        ["Should co-op get its own playtest before M3?", "yes, with two controllers"],
         ["Should the song also play on the title screen?", "no (your answer: gameplay only)"],
         ["Are the starting numbers right?", "tuned in M2 playtests; marked [ASSUMPTION] until then"],
     ], [FULL - 70 * mm, 70 * mm]))

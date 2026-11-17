@@ -3,7 +3,6 @@
 #include "game.h"
 #include <math.h>
 
-const int MAX_PLAYERS = 2;
 const float STICK_DEADZONE = 0.2f;   // ship-controls/design.md
 
 union SDL_Event;

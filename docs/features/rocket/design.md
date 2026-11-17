@@ -1,6 +1,6 @@
 # Rocket
 
-**Status:** designed · **Updated:** 2026-11-17 · [GDD](../../GDD.md)
+**Status:** implemented · **Updated:** 2026-11-17 · [GDD](../../GDD.md) · [Implementation](implementation.md) · [Testing](testing.md)
 
 R2 launches a big rocket that climbs, speeds up and explodes in a large blast on the first thing it touches. It's the panic button (pillar 2): rare, loud and decisive, so the player saves it for a crowded moment or a boss.
 
@@ -35,3 +35,4 @@ R2 launches a big rocket that climbs, speeds up and explodes in a large blast on
 
 ## History
 - 2026-11-17: designed.
+- 2026-11-17: implemented in M2.

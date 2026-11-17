@@ -25,7 +25,7 @@ deploy: ps3
 		|| { echo "webMAN didn't answer, so it can't check for a running game; try again."; exit 1; }; \
 	echo "$$status" | grep -io '[0-9A-F]\{8\}_[^<" ]*\.\(self\|bin\|elf\)' | grep -qv main_vsh \
 		&& { echo "An app or game is running on the PS3; quit it to the XMB first."; exit 1; } || true
-	curl -sS --fail -m 60 -T $(PKG) ftp://$(PS3_IP)/dev_hdd0/packages/nameGame.pkg
+	curl -sS --fail -m 600 -w "uploaded %{size_upload} bytes in %{time_total}s\n" -T $(PKG) ftp://$(PS3_IP)/dev_hdd0/packages/nameGame.pkg
 	curl -sS --fail -m 60 -o /dev/null "http://$(PS3_IP)/install.ps3/dev_hdd0/packages/nameGame.pkg"
 	@echo "Installed. Launch nameGame from the PS3's Game menu."
 

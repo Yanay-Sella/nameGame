@@ -1,6 +1,6 @@
 # Enemy waves
 
-**Status:** designed · **Updated:** 2026-11-17 · [GDD](../../GDD.md)
+**Status:** implemented · **Updated:** 2026-11-17 · [GDD](../../GDD.md) · [Implementation](implementation.md) · [Testing](testing.md)
 
 Aliens fly in, line up in a formation at the top of the screen, sway side to side and drop shots; from wave 3 some break off and dive at the ship. Clearing a wave brings a harder one, and every 5th wave is a boss (see Bosses in the GDD index). This is the core loop's minutes.
 
@@ -11,7 +11,7 @@ Aliens fly in, line up in a formation at the top of the screen, sway side to sid
 4. From wave 3, one alien at a time leaves formation and dives in a curve toward the ship, then exits the bottom and returns to its slot from the top.
 5. A wave is cleared when every alien is dead; the next starts after a short pause with a "WAVE n" banner.
 6. Alien types: green (1 HP), blue (2 HP, from wave 4), red armoured (4 HP, from wave 7).
-7. Every 5th wave is a boss instead of a formation.
+7. Every 5th wave is a boss instead of a formation (the Bosses feature, M3).
 
 ## Numbers
 | Name | Value | Unit | What to watch in playtests |
@@ -36,3 +36,4 @@ Aliens fly in, line up in a formation at the top of the screen, sway side to sid
 
 ## History
 - 2026-11-17: designed; alien size set to 12 × 10 with the pixel art.
+- 2026-11-17: implemented in M2.

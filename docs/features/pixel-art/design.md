@@ -1,6 +1,6 @@
 # Pixel art
 
-**Status:** designed · **Updated:** 2026-11-17 · [GDD](../../GDD.md)
+**Status:** implemented · **Updated:** 2026-11-17 · [GDD](../../GDD.md) · [Implementation](implementation.md) · [Testing](testing.md)
 
 Everything is chunky pixel art at 320×180, scaled by a whole number to the TV (D-004). Sprites, the font and the palette are text grids in `source/sprites.h`, one character per pixel (D-006), drawn into the CPU pixel buffer (D-008). It serves pillar 1 (readable at a glance).
 
@@ -32,3 +32,4 @@ Everything is chunky pixel art at 320×180, scaled by a whole number to the TV (
 
 ## History
 - 2026-11-17: designed.
+- 2026-11-17: implemented in M2.

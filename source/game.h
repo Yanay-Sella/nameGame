@@ -10,6 +10,7 @@ struct Actions {
     bool rocket;          // R2 pressed
     bool pause;           // Start pressed
     bool confirm;         // X or Start pressed
+    bool stress;          // Triangle pressed: dev stress test (main.cpp)
 };
 
 // Sounds the game asks for during a step; main.cpp plays each requested one once.
@@ -76,8 +77,10 @@ struct Game {
 };
 
 const float GAME_OVER_INPUT_LOCK = 1.5f;   // s before X or Start can start a new run
+const int MAX_PLAYERS = 2;                 // player 2 drops in from a second controller (co-op)
 
 void startGame(Game& game, int playerCount, uint32_t seed);
+void joinGame(Game& game);   // adds the next player to a running game, arriving like a respawn
 void updateGame(Game& game, const Actions* actions, float dt);   // actions: one per player
 void drawGame(const Game& game);
 

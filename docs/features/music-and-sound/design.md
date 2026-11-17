@@ -1,6 +1,6 @@
 # Music and sound
 
-**Status:** designed · **Updated:** 2026-11-17 · [GDD](../../GDD.md)
+**Status:** implemented · **Updated:** 2026-11-17 · [GDD](../../GDD.md) · [Implementation](implementation.md) · [Testing](testing.md)
 
 The user's song drives the action, and short 8-bit sound effects confirm every hit, kill and pickup without drowning it. Effects are synthesized in code at startup, so the only audio file is the song (D-005, D-006).
 
@@ -34,3 +34,4 @@ The user's song drives the action, and short 8-bit sound effects confirm every h
 
 ## History
 - 2026-11-17: designed.
+- 2026-11-17: implemented in M2.

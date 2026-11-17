@@ -48,14 +48,14 @@ static Alien parkedAlien(float x, float y) {
 }
 
 static void spritesHaveTheirSize() {
-    const Sprite* sprites[] = {&SHIP_A, &SHIP_B, &GREEN_ALIEN_A, &GREEN_ALIEN_B, &BLUE_ALIEN_A, &BLUE_ALIEN_B,
+    const Sprite* sprites[] = {&SHIP_A, &SHIP_B, &SHIP2_A, &SHIP2_B, &GREEN_ALIEN_A, &GREEN_ALIEN_B, &BLUE_ALIEN_A, &BLUE_ALIEN_B,
                                &RED_ALIEN_A, &RED_ALIEN_B, &BULLET, &ENEMY_SHOT, &ROCKET, &ROCKET_PICKUP,
                                &LIFE_ICON, &ROCKET_ICON};
     for (const Sprite* s : sprites) CHECK((int)strlen(s->pixels) == s->w * s->h);
 }
 
 static void onlyEnemyShotsUseMagenta() {
-    const Sprite* sprites[] = {&SHIP_A, &SHIP_B, &GREEN_ALIEN_A, &GREEN_ALIEN_B, &BLUE_ALIEN_A, &BLUE_ALIEN_B,
+    const Sprite* sprites[] = {&SHIP_A, &SHIP_B, &SHIP2_A, &SHIP2_B, &GREEN_ALIEN_A, &GREEN_ALIEN_B, &BLUE_ALIEN_A, &BLUE_ALIEN_B,
                                &RED_ALIEN_A, &RED_ALIEN_B, &BULLET, &ROCKET, &ROCKET_PICKUP, &LIFE_ICON, &ROCKET_ICON};
     for (const Sprite* s : sprites) CHECK(strchr(s->pixels, 'm') == NULL);
 }
@@ -241,10 +241,87 @@ static void nextWaveWaitsForALivingShip() {
     game.enemyShots.push_back(shot);
     updateGame(game, &NO_INPUT, DT);
     CHECK(!game.players[0].alive);
-    run(game, noInput(), 1.4f);   // the 2 s wave pause can't finish before the respawn at 1.5 s
-    CHECK(game.wave == 1);
-    run(game, noInput(), 2.2f);
+    game.players[0].respawnTimer = 4;   // longer than the 2 s wave pause
+    run(game, noInput(), 3);
+    CHECK(game.wave == 1);              // the 2 s pause only counts while a ship is alive
+    run(game, noInput(), 1.1f);
+    CHECK(game.players[0].alive && game.wave == 1);
+    run(game, noInput(), 2);
     CHECK(game.wave == 2);
+}
+
+static void alienBodyKillsTheShip() {
+    Game game;
+    startGame(game, 1, 7);
+    game.swayDirection = 0;
+    Player& p = game.players[0];
+    game.aliens.push_back(parkedAlien(p.x + 2, p.y + 2));
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(!game.players[0].alive && game.players[0].lives == 2);
+}
+
+static void pickupAddsARocketUpToNine() {
+    Game game;
+    startSafeGame(game);
+    Player& p = game.players[0];
+    Pickup pickup = {p.x + 4, p.y};
+    game.pickups.push_back(pickup);
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(game.players[0].rockets == 4 && game.pickups.empty() && game.soundRequested[SOUND_PICKUP]);
+    game.players[0].rockets = 9;
+    game.pickups.push_back(pickup);
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(game.players[0].rockets == 9);
+}
+
+static void secondPlayerJoinsBlinkingWithAFreshRun() {
+    Game game;
+    startSafeGame(game);
+    run(game, noInput(), 5);
+    CHECK(game.players.size() == 1);   // one player until someone joins
+    for (bool& s : game.soundRequested) s = false;
+    joinGame(game);
+    CHECK(game.players.size() == 2 && game.soundRequested[SOUND_EXTRA_LIFE]);
+    const Player& p2 = game.players[1];
+    CHECK(p2.alive && p2.lives == 3 && p2.rockets == 3 && p2.score == 0 && p2.invincibleTimer == 2);
+    CHECK(p2.x == (SCREEN_W - 16) / 2.0f + 40);   // 40 px right of player 1's start
+    Actions actions[2] = {};
+    actions[1].fire = true;
+    updateGame(game, actions, DT);
+    CHECK(game.bullets.size() == 1 && game.bullets[0].owner == 1);   // player 2's bullets score for player 2
+}
+
+static void coOpRunEndsWhenBothPlayersAreOut() {
+    Game game;
+    startGame(game, 1, 7);
+    joinGame(game);
+    game.aliens.clear();
+    game.aliens.push_back(parkedAlien(10, 20));   // keeps the wave from ending
+    game.swayDirection = 0;
+    Actions actions[2] = {};
+    game.players[0].lives = 1;
+    Shot shot = {game.players[0].x + 7, game.players[0].y + 5, 0, -1};
+    game.enemyShots.push_back(shot);
+    for (int step = 0; step < 3 * 60; step++) updateGame(game, actions, DT);
+    CHECK(game.players[0].lives == 0 && game.players[1].alive && !game.over);
+    game.players[1].lives = 1;
+    game.players[1].invincibleTimer = 0;
+    Shot shot2 = {game.players[1].x + 7, game.players[1].y + 5, 0, -1};
+    game.enemyShots.push_back(shot2);
+    for (int step = 0; step < 2 * 60; step++) updateGame(game, actions, DT);
+    CHECK(game.over);
+}
+
+static void waveBonusSkipsAPlayerWhoIsOut() {
+    Game game;
+    startSafeGame(game);
+    joinGame(game);
+    game.players[1].alive = false;
+    game.players[1].lives = 0;
+    for (Alien& alien : game.aliens) alien.alive = false;
+    Actions actions[2] = {};
+    updateGame(game, actions, DT);
+    CHECK(game.players[0].score == 1000 && game.players[1].score == 0);
 }
 
 int main() {
@@ -264,6 +341,11 @@ int main() {
     extraLivesAtEvery50000();
     threeDeathsEndTheRun();
     nextWaveWaitsForALivingShip();
+    alienBodyKillsTheShip();
+    pickupAddsARocketUpToNine();
+    secondPlayerJoinsBlinkingWithAFreshRun();
+    coOpRunEndsWhenBothPlayersAreOut();
+    waveBonusSkipsAPlayerWhoIsOut();
     printf(failures ? "%d check(s) failed\n" : "all tests passed\n", failures);
     return failures ? 1 : 0;
 }

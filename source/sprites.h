@@ -63,6 +63,38 @@ const Sprite SHIP_B = {16, 14,
     "....yo....oy...."
     "................"};
 
+// Player 2's ship: the same shape with an orange cockpit and blue stripes.
+const Sprite SHIP2_A = {16, 14,
+    ".......oo......."
+    "......owwo......"
+    "......owwo......"
+    ".....obwwbo....."
+    ".....bbbbbb....."
+    "..u..bbbbbb..u.."
+    "..u.bbbbbbbb.u.."
+    ".ub.bbboobbb.bu."
+    ".bbbbbboobbbbbb."
+    "bbbbbbbbbbbbbbbb"
+    "bbbubbbbbbbbubbb"
+    ".bb.uu....uu.bb."
+    "....oo....oo...."
+    ".....o....o....."};
+const Sprite SHIP2_B = {16, 14,
+    ".......oo......."
+    "......owwo......"
+    "......owwo......"
+    ".....obwwbo....."
+    ".....bbbbbb....."
+    "..u..bbbbbb..u.."
+    "..u.bbbbbbbb.u.."
+    ".ub.bbboobbb.bu."
+    ".bbbbbboobbbbbb."
+    "bbbbbbbbbbbbbbbb"
+    "bbbubbbbbbbbubbb"
+    ".bb.uu....uu.bb."
+    "....yo....oy...."
+    "................"};
+
 const Sprite GREEN_ALIEN_A = {12, 10,
     "..g......g.."
     "...g....g..."

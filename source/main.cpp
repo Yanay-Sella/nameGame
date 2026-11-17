@@ -14,7 +14,6 @@
 
 const float STEP = 1.0f / 60;   // s per game update
 const int MAX_STEPS_PER_FRAME = 4;
-const int PLAYER_COUNT = 1;
 
 // Progress markers the main loop updates, read by the watchdog thread.
 static volatile unsigned frame = 0;
@@ -36,6 +35,28 @@ static void watchdog(void* arg) {
             sysProcessExit(1);
         }
     }
+}
+
+// Dev aid (Triangle): tops the screen up to the 60 fps stress case of 60 aliens, 100 bullets and 2 explosions.
+static void addStressLoad(Game& game) {
+    for (int i = 0; i < 100; i++) {
+        Shot bullet = {(float)(i * 3 % SCREEN_W), (float)(SCREEN_H - 20 - i % 60), -40, 0};
+        game.bullets.push_back(bullet);
+    }
+    for (int i = (int)game.aliens.size(); i < 60; i++) {
+        Alien alien = {};
+        alien.type = (AlienType)(i % 3);
+        alien.state = ALIEN_IN_FORMATION;
+        alien.slotX = alien.x = 10.0f + (i % 20) * 15;
+        alien.slotY = alien.y = 88.0f - (i / 20) * 12;
+        alien.hp = 4;
+        alien.alive = true;
+        game.aliens.push_back(alien);
+    }
+    Explosion blasts[2] = {{100, 60, 0, 40}, {220, 60, 0, 40}};
+    game.explosions.insert(game.explosions.end(), blasts, blasts + 2);
+    debugNetPrintf(INFO, "stress: %d aliens, %d bullets, %d explosions\n", (int)game.aliens.size(),
+                   (int)game.bullets.size(), (int)game.explosions.size());
 }
 
 int main(int argc, char** argv) {
@@ -73,7 +94,7 @@ int main(int argc, char** argv) {
     audioOpen(exePath.substr(0, exePath.find_last_of('/')).c_str());
 
     Game game;
-    startGame(game, PLAYER_COUNT, (uint32_t)SDL_GetPerformanceCounter());
+    startGame(game, 1, (uint32_t)SDL_GetPerformanceCounter());   // a second player joins with Start (co-op)
     audioStartMusic();
     bool paused = false, running = true;
 
@@ -94,13 +115,25 @@ int main(int argc, char** argv) {
             if (event.type == SDL_QUIT) running = false;
             inputHandleEvent(event);
         }
-        Actions actions[PLAYER_COUNT];
-        for (int p = 0; p < PLAYER_COUNT; p++) actions[p] = inputRead(p);
-        for (int p = 0; p < PLAYER_COUNT; p++) {
-            if (actions[p].pause && !game.over) paused = !paused;
+        Actions actions[MAX_PLAYERS];
+        for (int p = 0; p < MAX_PLAYERS; p++) actions[p] = inputRead(p);
+        for (int p = 0; p < MAX_PLAYERS; p++) {
+            // A controller without a ship joins the running game with Start or X (co-op/design.md).
+            if (p >= (int)game.players.size()) {
+                if (actions[p].confirm && p == (int)game.players.size() && !game.over && !paused) {
+                    joinGame(game);
+                    debugNetPrintf(INFO, "player %d joined at wave %d\n", p + 1, game.wave);
+                }
+                continue;
+            }
+            if (actions[p].pause && !game.over) {
+                paused = !paused;
+                for (Player& player : game.players) player.rocketPressedAt = -1;   // a buffered R2 doesn't survive a pause
+            }
+            if (actions[p].stress && !paused) addStressLoad(game);
             // Game over: X or Start begins a new run once the input lock has passed (M3's screens replace this).
             if (actions[p].confirm && game.over && game.time - game.overTime > GAME_OVER_INPUT_LOCK) {
-                startGame(game, PLAYER_COUNT, (uint32_t)SDL_GetPerformanceCounter());
+                startGame(game, (int)game.players.size(), (uint32_t)SDL_GetPerformanceCounter());   // co-op runs stay co-op
                 Uint64 musicStart = SDL_GetPerformanceCounter();
                 audioStartMusic();
                 debugNetPrintf(INFO, "new run (music restart took %.0f ms)\n", (SDL_GetPerformanceCounter() - musicStart) * 1000.0 / counterHz);
@@ -119,7 +152,8 @@ int main(int argc, char** argv) {
         if (steps == MAX_STEPS_PER_FRAME) accumulator = 0;   // fell far behind: drop the backlog rather than spiral
         if (game.over && !wasOver) {
             audioStopMusic();
-            debugNetPrintf(INFO, "game over: score %d, wave %d\n", game.players[0].score, game.wave);
+            for (size_t p = 0; p < game.players.size(); p++)
+                debugNetPrintf(INFO, "game over: player %d score %d, wave %d\n", (int)p + 1, game.players[p].score, game.wave);
         }
         for (int s = 0; s < SOUND_COUNT; s++) {
             if (game.soundRequested[s]) audioPlay((Sound)s);

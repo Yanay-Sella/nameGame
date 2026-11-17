@@ -38,6 +38,8 @@ const int START_LIVES = 3, MAX_LIVES = 9;
 const float RESPAWN_DELAY = 1.5f, INVINCIBLE_TIME = 2, BLINK_PERIOD = 0.1f;   // s
 const int EXTRA_LIFE_EVERY = 50000, MAX_SCORE = 9999999;
 const float SHIP_EXPLOSION_RADIUS = 24;   // px
+// Co-op (co-op/design.md)
+const float CO_OP_SPAWN_OFFSET = 40;     // px right of the centre for player 2
 // Pixel art (pixel-art/design.md)
 const float ANIMATION_FRAME = 0.25f;   // s
 const float HIT_FLASH = 0.06f;         // s
@@ -105,32 +107,41 @@ static void startWave(Game& game, int wave) {
     game.soundRequested[SOUND_WAVE_START] = true;
 }
 
-static void placeShipAtStart(Game& game, Player& player, int index) {
-    int count = (int)game.players.size();
-    player.x = (SCREEN_W - SHIP_W) / 2.0f + (index - (count - 1) / 2.0f) * 40;
+// Player 1 starts at the bottom centre, player 2 to its right.
+static void placeShipAtStart(Player& player, int index) {
+    player.x = (SCREEN_W - SHIP_W) / 2.0f + index * CO_OP_SPAWN_OFFSET;
     player.y = SCREEN_H - SHIP_H - 6;
+}
+
+static Player newPlayer(int index) {
+    Player player = {};
+    placeShipAtStart(player, index);
+    player.alive = true;
+    player.rocketPressedAt = -1;
+    player.lives = START_LIVES;
+    player.rockets = START_ROCKETS;
+    player.nextExtraLife = EXTRA_LIFE_EVERY;
+    return player;
 }
 
 void startGame(Game& game, int playerCount, uint32_t seed) {
     game = Game();
     game.random = seed ? seed : 1;
     game.swayDirection = 1;
-    game.players.resize(playerCount);
-    for (int i = 0; i < playerCount; i++) {
-        Player& player = game.players[i];
-        placeShipAtStart(game, player, i);
-        player.alive = true;
-        player.rocketPressedAt = -1;
-        player.lives = START_LIVES;
-        player.rockets = START_ROCKETS;
-        player.nextExtraLife = EXTRA_LIFE_EVERY;
-    }
+    for (int i = 0; i < playerCount; i++) game.players.push_back(newPlayer(i));
     for (int layer = 0; layer < 3; layer++)
         for (int i = 0; i < STAR_COUNTS[layer]; i++) {
             Star star = {randomUnit(game) * SCREEN_W, randomUnit(game) * SCREEN_H, layer};
             game.stars.push_back(star);
         }
     startWave(game, 1);
+}
+
+void joinGame(Game& game) {
+    Player player = newPlayer((int)game.players.size());
+    player.invincibleTimer = INVINCIBLE_TIME;
+    game.players.push_back(player);
+    game.soundRequested[SOUND_EXTRA_LIFE] = true;
 }
 
 // Adds points and gives an extra life for every threshold crossed (lives-and-score rule 6).
@@ -198,7 +209,7 @@ static void updatePlayer(Game& game, Player& player, int index, const Actions& a
     if (!player.alive) {
         player.respawnTimer -= dt;
         if (player.respawnTimer <= 0 && player.lives > 0) {
-            placeShipAtStart(game, player, index);
+            placeShipAtStart(player, index);
             player.alive = true;
             player.invincibleTimer = INVINCIBLE_TIME;
             player.fireTimer = 0;
@@ -419,7 +430,8 @@ void updateGame(Game& game, const Actions* actions, float dt) {
     bool anyAlienAlive = std::any_of(game.aliens.begin(), game.aliens.end(), [](const Alien& a) { return a.alive; });
     if (!anyAlienAlive && game.nextWaveTimer == 0) {
         game.nextWaveTimer = WAVE_PAUSE;
-        for (Player& player : game.players) addScore(game, player, WAVE_CLEAR_BONUS * game.wave);
+        for (Player& player : game.players)
+            if (player.lives > 0) addScore(game, player, WAVE_CLEAR_BONUS * game.wave);
     } else if (!anyAlienAlive && anyPlayerAlive) {
         game.nextWaveTimer -= dt;
         if (game.nextWaveTimer <= 0) startWave(game, game.wave + 1);
@@ -466,29 +478,37 @@ void drawGame(const Game& game) {
     for (const Pickup& pickup : game.pickups) drawSprite(ROCKET_PICKUP, (int)pickup.x, (int)pickup.y);
     for (const Shot& bullet : game.bullets) drawSprite(BULLET, (int)bullet.x, (int)bullet.y);
     for (const Rocket& rocket : game.rockets) drawSprite(ROCKET, (int)rocket.x, (int)rocket.y);
-    for (const Player& player : game.players) {
+    for (size_t i = 0; i < game.players.size(); i++) {
+        const Player& player = game.players[i];
         bool blinkOff = player.invincibleTimer > 0 && fmodf(player.invincibleTimer, 2 * BLINK_PERIOD) < BLINK_PERIOD;
-        if (player.alive && !blinkOff) drawSprite(frame ? SHIP_B : SHIP_A, (int)player.x, (int)player.y);
+        const Sprite& ship = i == 0 ? (frame ? SHIP_B : SHIP_A) : (frame ? SHIP2_B : SHIP2_A);
+        if (player.alive && !blinkOff) drawSprite(ship, (int)player.x, (int)player.y);
     }
     for (const Shot& shot : game.enemyShots) drawSprite(ENEMY_SHOT, (int)shot.x, (int)shot.y);
     for (const Explosion& explosion : game.explosions) drawExplosion(explosion);
     for (const Particle& p : game.particles) fillRect((int)p.x, (int)p.y, 1, 1, p.color);
 
-    // HUD: score, wave, spare lives, rockets (player 1).
-    const Player& p1 = game.players[0];
+    // HUD: the wave at the top centre; each player's score, spare lives and rockets on their side (1P left, 2P right).
     char text[48];
-    snprintf(text, sizeof text, "SCORE %07d", p1.score);
-    drawText(2, 2, text, paletteColor('w'));
     snprintf(text, sizeof text, "WAVE %d", game.wave);
     drawCentredText(2, text, paletteColor('w'), 1);
-    for (int i = 0; i < p1.lives - 1; i++) drawSprite(LIFE_ICON, SCREEN_W - 9 - i * 9, 2);
-    for (int i = 0; i < p1.rockets; i++) drawSprite(ROCKET_ICON, SCREEN_W - 5 - i * 5, SCREEN_H - 7);
+    bool coOp = game.players.size() > 1;
+    for (size_t p = 0; p < game.players.size(); p++) {
+        const Player& player = game.players[p];
+        bool right = p == 1;
+        snprintf(text, sizeof text, "%s %07d", coOp ? (right ? "2P" : "1P") : "SCORE", player.score);
+        drawText(right ? SCREEN_W - 2 - textWidth(text) : 2, 2, text, paletteColor('w'));
+        for (int i = 0; i < player.lives - 1; i++) drawSprite(LIFE_ICON, right ? SCREEN_W - 9 - i * 9 : 2 + i * 9, 9);
+        for (int i = 0; i < player.rockets; i++) drawSprite(ROCKET_ICON, right ? SCREEN_W - 5 - i * 5 : 2 + i * 5, SCREEN_H - 7);
+    }
+    if (!coOp && !game.over) drawText(SCREEN_W - 2 - textWidth("2P PRESS START"), 2, "2P PRESS START", paletteColor('s'));
 
     if (game.over) {
         fillRect(SCREEN_W / 2 - 72, 58, 144, 54, paletteColor('n'));   // panel so passing aliens don't hide the text
         fillRect(SCREEN_W / 2 - 71, 59, 142, 52, paletteColor('k'));
         drawCentredText(66, "GAME OVER", paletteColor('r'), 2);
-        snprintf(text, sizeof text, "SCORE %d   WAVE %d", p1.score, game.wave);
+        if (coOp) snprintf(text, sizeof text, "1P %d   2P %d   WAVE %d", game.players[0].score, game.players[1].score, game.wave);
+        else snprintf(text, sizeof text, "SCORE %d   WAVE %d", game.players[0].score, game.wave);
         drawCentredText(86, text, paletteColor('w'), 1);
         if (game.time - game.overTime > GAME_OVER_INPUT_LOCK) drawCentredText(100, "PRESS X TO PLAY AGAIN", paletteColor('y'), 1);
     } else if (game.bannerTimer > 0) {

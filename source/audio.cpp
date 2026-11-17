@@ -80,9 +80,19 @@ void audioOpen(const char* folder) {
     Mix_ReserveChannels(1);   // channel 0 is SHOOT_CHANNEL
     Mix_VolumeMusic(MUSIC_VOLUME);
 
+    // The song is read into memory once (~190 ms at boot): restarting it after a game over took ~350 ms when it
+    // streamed from the hard drive and 1 ms from memory.
     std::string path = std::string(folder) + "/music.ogg";
-    music = Mix_LoadMUS(path.c_str());
-    if (!music) debugNetPrintf(ERROR, "audio: Mix_LoadMUS(%s) failed: %s\n", path.c_str(), Mix_GetError());
+    SDL_RWops* file = SDL_RWFromFile(path.c_str(), "rb");
+    Sint64 size = file ? SDL_RWsize(file) : -1;
+    void* songBytes = size > 0 ? SDL_malloc((size_t)size) : NULL;   // kept for the game's lifetime
+    if (songBytes && SDL_RWread(file, songBytes, (size_t)size, 1) == 1)   // one object of `size` bytes
+        music = Mix_LoadMUS_RW(SDL_RWFromConstMem(songBytes, (int)size), 1);
+    if (file) SDL_RWclose(file);
+    if (!music) {
+        debugNetPrintf(ERROR, "audio: loading %s failed: %s\n", path.c_str(), Mix_GetError());
+        SDL_free(songBytes);
+    }
 
     // Effects from music-and-sound/design.md: {start s, length s, start Hz, end Hz, volume, noise}.
     sounds[SOUND_SHOOT] = synthesize({{0, 0.05f, 1400, 900, 0.12f, false}});

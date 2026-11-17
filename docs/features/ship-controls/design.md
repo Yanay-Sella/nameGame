@@ -1,6 +1,6 @@
 # Ship controls
 
-**Status:** designed · **Updated:** 2026-11-17 · [GDD](../../GDD.md)
+**Status:** implemented · **Updated:** 2026-11-17 · [GDD](../../GDD.md) · [Implementation](implementation.md) · [Testing](testing.md)
 
 The player flies a small ship around the bottom of the screen and holds R1 to spray bullets upward. It should feel quick and exact: the ship stops where you let go, and bullets come out at a steady rhythm. It serves pillar 1 (readable) and the core loop's seconds.
 
@@ -10,7 +10,7 @@ The player flies a small ship around the bottom of the screen and holds R1 to sp
 3. Holding R1 (`fire`, read as held) fires one volley every fire interval, starting on the press frame.
 4. Bullets fly straight up (or along their spread angle) and disappear on hitting an enemy or leaving the screen.
 5. The gun has upgrade levels (see Weapon upgrades in the GDD index); level 1 fires one bullet.
-6. Each ship belongs to a player with its own controller index; game code loops over players, which is one in the MVP (D-007).
+6. Each ship belongs to a player with its own controller index; game code loops over players. A run starts with one, and a second can join ([co-op](../co-op/design.md), D-007, D-009).
 
 ## Numbers
 | Name | Value | Unit | What to watch in playtests |
@@ -28,7 +28,8 @@ The player flies a small ship around the bottom of the screen and holds R1 to sp
 ## Edge cases
 - Pause: holding R1 through pause doesn't fire on resume until the next interval.
 - Death: input is ignored until respawn; R1 held during respawn starts firing at once.
-- Unplugged controller: the game pauses.
+- Unplugged controller: the game pauses (M4).
 
 ## History
 - 2026-11-17: designed.
+- 2026-11-17: implemented in M2.

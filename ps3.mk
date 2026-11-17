@@ -23,7 +23,8 @@ LIBS      := -lSDL2_mixer -lmikmod -lvorbisfile -lvorbis -logg -lSDL2 -ldebugnet
 ifneq ($(BUILD),$(notdir $(CURDIR)))
 
 export OUTPUT   := $(CURDIR)/$(BUILD)/$(TARGET)
-# Copied into the package root: pkgfiles/USRDIR/* lands next to EBOOT.BIN.
+# Copied into the package root after the SDK's default icon: pkgfiles/ICON0.PNG and PIC1.PNG are the XMB art,
+# pkgfiles/USRDIR/* lands next to EBOOT.BIN.
 export PKGFILES := $(CURDIR)/pkgfiles
 export VPATH    := $(foreach dir,$(SOURCES),$(CURDIR)/$(dir))
 export DEPSDIR  := $(CURDIR)/$(BUILD)
