@@ -7,15 +7,18 @@ BUILD     := build
 SOURCES   ?= source
 INCLUDES  := include
 
-TITLE     := nameGame
+TITLE     := NAME game
 APPID     := NMGM00001
 CONTENTID := UP0001-$(APPID)_00-0000000000000000
 
 LOG_HOST  ?= 127.0.0.1
 LOG_PORT  ?= 18195
+RELEASE   ?= 0
+VERSION   ?= 0.0
 
 CFLAGS    = -O2 -Wall -mcpu=cell $(MACHDEP) $(INCLUDE) -I$(PORTLIBS)/include/SDL2 \
-            -DLOG_HOST=\"$(LOG_HOST)\" -DLOG_PORT=$(LOG_PORT)
+            -DLOG_HOST=\"$(LOG_HOST)\" -DLOG_PORT=$(LOG_PORT) \
+            -DRELEASE=$(RELEASE) -DGAME_VERSION=\"$(VERSION)\"
 CXXFLAGS  = $(CFLAGS)
 LDFLAGS   = $(MACHDEP) -Wl,-Map,$(notdir $@).map
 LIBS      := -lSDL2_mixer -lmikmod -lvorbisfile -lvorbis -logg -lSDL2 -ldebugnet -lnet -lsysmodule -lgcm_sys -lrsx -lsysutil -lio -laudio -lrt -llv2 -lm

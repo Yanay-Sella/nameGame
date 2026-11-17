@@ -5,14 +5,16 @@ LOG_PORT ?= 18195
 SOURCES  ?= source
 IMAGE    := namegame-ps3dev
 PKG      := build/nameGame.pkg
+VERSION  := 1.0
+RELEASE  ?= 0
 
-.PHONY: ps3 image deploy log clean music test
+.PHONY: ps3 image deploy release log clean music test
 
 # Compile and package build/nameGame.pkg inside the container (always a full rebuild so LOG_HOST/LOG_PORT changes apply).
 # SOURCES=prototypes/<idea> builds a prototype instead of the game.
 ps3: clean image
 	docker run --rm -v "$(CURDIR)":/src -w /src $(IMAGE) \
-		make -f ps3.mk pkg LOG_HOST=$(LOG_HOST) LOG_PORT=$(LOG_PORT) SOURCES=$(SOURCES)
+		make -f ps3.mk pkg LOG_HOST=$(LOG_HOST) LOG_PORT=$(LOG_PORT) SOURCES=$(SOURCES) RELEASE=$(RELEASE) VERSION=$(VERSION)
 
 # Build the toolchain image (ps3dev + patched SDL2); cached after the first run.
 image:
@@ -27,7 +29,16 @@ deploy: ps3
 		&& { echo "An app or game is running on the PS3; quit it to the XMB first."; exit 1; } || true
 	curl -sS --fail -m 600 -w "uploaded %{size_upload} bytes in %{time_total}s\n" -T $(PKG) ftp://$(PS3_IP)/dev_hdd0/packages/nameGame.pkg
 	curl -sS --fail -m 60 -o /dev/null "http://$(PS3_IP)/install.ps3/dev_hdd0/packages/nameGame.pkg"
-	@echo "Installed. Launch nameGame from the PS3's Game menu."
+	@echo "Installed. Launch NAME game from the PS3's Game menu."
+
+# Release package for other players: no dev aids, logs go nowhere, copied to dist/ with the install guide.
+release:
+	@test -f pkgfiles/USRDIR/music.ogg || { echo "pkgfiles/USRDIR/music.ogg is missing; run make music first."; exit 1; }
+	$(MAKE) ps3 RELEASE=1 LOG_HOST=127.0.0.1
+	mkdir -p dist
+	cp build/nameGame.pkg "dist/NAME-game-$(VERSION).pkg"
+	cp README.md "dist/NAME-game-$(VERSION)-README.md"
+	ls -l dist
 
 # Build and run the game-rule tests on the Mac (game.cpp and screen.cpp have no SDL or PS3 code).
 test:

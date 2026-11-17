@@ -6,6 +6,8 @@
 #include <sys/systime.h>
 #include <lv2/process.h>
 #include <rsx/gcm_sys.h>
+#include <malloc.h>
+#include <math.h>
 #include <stdio.h>
 #include <string>
 #include "audio.h"
@@ -16,6 +18,7 @@
 
 const float STEP = 1.0f / 60;   // s per game update
 const int MAX_STEPS_PER_FRAME = 4;
+const bool DEV_AIDS = !RELEASE;   // Triangle stress test and Select autopilot; off in make release
 
 enum Scene { SCENE_MAIN_MENU, SCENE_SETTINGS, SCENE_PLAYING, SCENE_PAUSED };
 const char* const SCENE_NAMES[] = {"main menu", "settings", "playing", "paused"};
@@ -82,7 +85,7 @@ int main(int argc, char** argv) {
     // The window matches the PS3's video output; the picture is copied into it scaled (CLAUDE.md, GDD D-008).
     SDL_DisplayMode desktop;
     SDL_GetDesktopDisplayMode(0, &desktop);
-    SDL_Window* window = SDL_CreateWindow("nameGame", 0, 0, desktop.w, desktop.h, 0);
+    SDL_Window* window = SDL_CreateWindow("NAME game", 0, 0, desktop.w, desktop.h, 0);
     SDL_Renderer* renderer = window ? SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC) : NULL;
     SDL_Texture* picture = renderer ? SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
                                                         SCREEN_W, SCREEN_H) : NULL;
@@ -112,6 +115,8 @@ int main(int argc, char** argv) {
     startGame(game, 1, (uint32_t)SDL_GetPerformanceCounter());   // gives the menu its stars; a second player joins with Start (co-op)
     Scene scene = SCENE_MAIN_MENU, settingsBack = SCENE_MAIN_MENU;
     int selected = 0;
+    bool autopilot = false;
+    float bossStart = 0;   // game time the current boss appeared
     bool running = true;
     auto setScene = [&](Scene next) {
         scene = next;
@@ -143,6 +148,10 @@ int main(int argc, char** argv) {
             menu.up |= a.up; menu.down |= a.down; menu.left |= a.left; menu.right |= a.right;
             menu.confirm |= a.confirm; menu.back |= a.back; menu.pause |= a.pause;
         }
+        // The first joined player whose controller is gone, or -1: a run pauses until it is back (D-014).
+        int lostController = -1;
+        for (int p = (int)game.players.size() - 1; p >= 0; p--)
+            if (!actions[p].connected) lostController = p;
         int itemCount = scene == SCENE_SETTINGS ? 4 : scene == SCENE_PAUSED ? 3 : 2;
         if (scene != SCENE_PLAYING) {
             if (menu.up) selected = (selected + itemCount - 1) % itemCount;
@@ -182,7 +191,7 @@ int main(int argc, char** argv) {
             break;
         case SCENE_PAUSED:
             if (menu.pause || menu.back || (menu.confirm && selected == 0)) {
-                setScene(SCENE_PLAYING);
+                if (lostController < 0) setScene(SCENE_PLAYING);
             } else if (menu.confirm && selected == 1) {
                 settingsBack = SCENE_PAUSED;
                 selected = 0;
@@ -194,6 +203,13 @@ int main(int argc, char** argv) {
             }
             break;
         case SCENE_PLAYING:
+            if (lostController >= 0 && !game.over) {
+                for (Player& player : game.players) player.rocketPressedAt = -1;   // as for a Start pause
+                selected = 0;
+                debugNetPrintf(INFO, "paused: controller %d disconnected\n", lostController + 1);
+                setScene(SCENE_PAUSED);
+                break;
+            }
             for (int p = 0; p < MAX_PLAYERS; p++) {
                 // A controller without a ship joins the running game with Start or X (co-op/design.md).
                 if (p >= (int)game.players.size()) {
@@ -209,7 +225,8 @@ int main(int argc, char** argv) {
                     setScene(SCENE_PAUSED);
                     break;   // a second Start in the same frame can't act
                 }
-                if (actions[p].stress) addStressLoad(game);
+                if (DEV_AIDS && actions[p].stress) addStressLoad(game);
+                if (DEV_AIDS && actions[p].autopilot) { autopilot = !autopilot; debugNetPrintf(INFO, "autopilot %s\n", autopilot ? "on" : "off"); }
                 // Game over: after the input lock, X or Start begins a new run and Circle goes to the main menu.
                 if (game.over && game.time - game.overTime > GAME_OVER_INPUT_LOCK) {
                     if (actions[p].confirm) {
@@ -226,8 +243,22 @@ int main(int argc, char** argv) {
             }
             break;
         }
+        // Dev aid (Select): player 1 sweeps along the bottom firing, a rocket every 5 s, invincible (30-minute soak test).
+        if (autopilot && scene == SCENE_PLAYING) {
+            Player& pilot = game.players[0];
+            float targetX = 152 + 120 * sinf(game.time * 0.7f);   // 152: the ship centred
+            actions[0].moveX = SDL_max(-1.0f, SDL_min((targetX - pilot.x) / 20, 1.0f));
+            actions[0].moveY = 1;
+            actions[0].fire = true;
+            actions[0].rocket = frame % 300 == 0;
+            if (pilot.alive) pilot.invincibleTimer = 1;   // runs out 1 s after the autopilot is switched off
+        }
+
         bool wasOver = game.over;
         bool bossWasAlive = game.boss.alive;
+        int waveBefore = game.wave;
+        int livesBefore[MAX_PLAYERS] = {};
+        for (size_t p = 0; p < game.players.size(); p++) livesBefore[p] = game.players[p].lives;
 
         stage = "update";
         int steps = 0;
@@ -239,8 +270,18 @@ int main(int argc, char** argv) {
             steps++;
         }
         if (steps == MAX_STEPS_PER_FRAME) accumulator = 0;   // fell far behind: drop the backlog rather than spiral
-        if (game.boss.alive && !bossWasAlive) debugNetPrintf(INFO, "boss wave %d, hp %d\n", game.wave, game.boss.hp);
-        if (!game.boss.alive && bossWasAlive) debugNetPrintf(INFO, "boss down at wave %d\n", game.wave);
+        if (game.wave != waveBefore)
+            for (size_t p = 0; p < game.players.size(); p++)
+                debugNetPrintf(INFO, "wave %d start at %.0f s: player %d lives %d, rockets %d, weapon %d, score %d\n", game.wave, game.time,
+                               (int)p + 1, game.players[p].lives, game.players[p].rockets, game.players[p].weaponLevel, game.players[p].score);
+        for (size_t p = 0; p < game.players.size(); p++)
+            if (game.players[p].lives < livesBefore[p])
+                debugNetPrintf(INFO, "player %d died at wave %d (%d lives left)\n", (int)p + 1, game.wave, game.players[p].lives);
+        if (game.boss.alive && !bossWasAlive) {
+            bossStart = game.time;
+            debugNetPrintf(INFO, "boss wave %d, hp %d\n", game.wave, game.boss.hp);
+        }
+        if (!game.boss.alive && bossWasAlive) debugNetPrintf(INFO, "boss down at wave %d after %.0f s\n", game.wave, game.time - bossStart);
         if (game.over && !wasOver) {
             audioStopMusic();
             int best = 0;
@@ -267,10 +308,11 @@ int main(int argc, char** argv) {
         stage = "draw";
         if (scene == SCENE_MAIN_MENU) {
             drawBackground(game);
-            drawMenu("NAMEGAME", MAIN_ITEMS, 2, selected, "X SELECT");
+            drawMenu("NAME GAME", MAIN_ITEMS, 2, selected, "X SELECT");
             char best[24];
             snprintf(best, sizeof best, "HI %07d", highScore);
             drawText((SCREEN_W - textWidth(best)) / 2, 124, best, paletteColor('y'));
+            drawText(SCREEN_W - 2 - textWidth("V" GAME_VERSION), SCREEN_H - 7, "V" GAME_VERSION, paletteColor('s'));
         } else if (scene == SCENE_SETTINGS) {
             if (settingsBack == SCENE_PAUSED) drawGame(game);
             else drawBackground(game);
@@ -281,7 +323,11 @@ int main(int argc, char** argv) {
             drawMenu("SETTINGS", settingsItems, 4, selected, "X CHANGE  O BACK");
         } else {
             drawGame(game);
-            if (scene == SCENE_PAUSED) drawMenu("PAUSED", PAUSE_ITEMS, 3, selected, "X SELECT  O RESUME");
+            if (scene == SCENE_PAUSED) {
+                char hint[32] = "X SELECT  O RESUME";
+                if (lostController >= 0) snprintf(hint, sizeof hint, "CONNECT CONTROLLER %d", lostController + 1);
+                drawMenu("PAUSED", PAUSE_ITEMS, 3, selected, hint);
+            }
         }
 
         stage = "present";
@@ -299,8 +345,8 @@ int main(int argc, char** argv) {
         worstWorkMs = SDL_max(worstWorkMs, workMs);
         statsTimer += (float)((SDL_GetPerformanceCounter() - frameStart) / counterHz);
         if (statsTimer >= 5) {
-            debugNetPrintf(INFO, "fps %.1f, worst work %.1f ms, wave %d, score %d, weapon %d\n", framesSinceStats / statsTimer,
-                           worstWorkMs, game.wave, game.players[0].score, game.players[0].weaponLevel);
+            debugNetPrintf(INFO, "fps %.1f, worst work %.1f ms, wave %d, score %d, weapon %d, heap %d KB\n", framesSinceStats / statsTimer,
+                           worstWorkMs, game.wave, game.players[0].score, game.players[0].weaponLevel, (int)(mallinfo().uordblks / 1024));
             framesSinceStats = 0;
             statsTimer = 0;
             worstWorkMs = 0;

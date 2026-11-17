@@ -26,7 +26,7 @@ A friend can pick up a second controller and drop into a run already going, arca
 - Joining while paused or at game over: ignored.
 - A player who is out can't rejoin until the next run (no continues).
 - Divers steer toward the nearest living ship, so with two ships they pick whichever is closer.
-- Player 2's controller unplugged: their ship stays and drifts idle. Unplug handling is M4.
+- Either player's controller unplugged: the run pauses until it is back (D-014). If player 1's goes while player 2's stays, the SDL port maps pads by count, so neither is read until player 1's controller returns; the pause covers it.
 
 ## History
 - 2026-11-17: designed and built as drop-in join (D-009).

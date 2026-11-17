@@ -10,7 +10,7 @@
 - [x] Movement and shooting feel tight. *(PS3 playtest 2026-11-17: user said "feels good")*
 - [x] D-pad presses (buttons 0–3) and Triangle (11) reach the game. *(PS3 log 2026-11-17: presses of 0, 1, 2, 3 and 11)*
 - [ ] The D-pad moves the ship at full speed in 8 directions. *(not proven: the presses were logged, the movement wasn't reported)*
-- [ ] An unplugged controller pauses the game. *(not built: M4)*
+- [x] An unplugged controller pauses the game until it is back. *(PS3 log 2026-11-17: controller 0 disconnected → paused, reconnected → stayed paused until Start)*
 
 ## Playtest checks
 1. On the PS3, move with the D-pad in all 8 directions; the ship moves at full speed and diagonals are no faster.

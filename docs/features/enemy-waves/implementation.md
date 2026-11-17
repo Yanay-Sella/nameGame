@@ -11,10 +11,10 @@
 | `source/game.cpp` › `startWave`, `formationRows` | formation layout and alien types |
 | `source/game.cpp` › `updateAlien`, `startDive` | fly-in, sway, dives, return, enemy shots |
 | `source/game.cpp` › `updateGame` | wave clear bonus, pause between waves, next wave |
-| `source/game.cpp` › `shotChance`, `diveInterval` | the difficulty formulas |
+| `source/game.cpp` › `shotChance`, `enemyShotSpeed`, `diveInterval` | the difficulty formulas |
 
 ## Data and config
-- **Config constants:** `FORMATION_COLUMNS`, `COLUMN_SPACING`, `ROW_SPACING`, `FORMATION_TOP`, `SWAY_RANGE`, `WAVE_PAUSE`, `BANNER_TIME`, `ALIEN_HP`, `ALIEN_SCORE`, `WAVE_CLEAR_BONUS`, `ENEMY_SHOT_SPEED`, `ENTRY_DISTANCE`, `ENTRY_SPEED`, `ENTRY_COLUMN_DELAY`, `ENTRY_ROW_DELAY`, `DIVE_SPEED`, `DIVE_STEER`, `DIVE_MAX_SIDEWAYS`, `RETURN_SPEED` (all `game.cpp`).
+- **Config constants:** `FORMATION_COLUMNS`, `COLUMN_SPACING`, `ROW_SPACING`, `FORMATION_TOP`, `SWAY_RANGE`, `WAVE_PAUSE`, `BANNER_TIME`, `ALIEN_HP`, `ALIEN_SCORE`, `WAVE_CLEAR_BONUS`, `ENEMY_SHOT_SPEED`, `SHOT_SPEEDUP_AFTER_WAVE`, `ENEMY_SHOT_SPEED_STEP`, `ENEMY_SHOT_MAX_SPEED`, `MORE_ARMOUR_WAVE`, `TWO_DIVERS_WAVE`, `ENTRY_DISTANCE`, `ENTRY_SPEED`, `ENTRY_COLUMN_DELAY`, `ENTRY_ROW_DELAY`, `DIVE_SPEED`, `DIVE_STEER`, `DIVE_MAX_SIDEWAYS`, `RETURN_SPEED` (all `game.cpp`).
 - **Persistence:** none.
 
 ## Deviations from design

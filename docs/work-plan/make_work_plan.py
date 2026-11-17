@@ -18,7 +18,7 @@ from reportlab.platypus.tableofcontents import TableOfContents
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "nameGame-work-plan.pdf")
-VERSION = "1.1"
+VERSION = "1.2"
 DATE = "17 November 2026"
 
 FONTS = "/System/Library/Fonts/Supplemental/"
@@ -140,7 +140,7 @@ def draw_cover(canv, doc):
     canv.drawCentredString(w / 2, 70 * mm, "A retro arcade shooter for a real PS3 (homebrew, PSL1GHT + SDL2)")
     canv.setFillColor(colors.HexColor("#8a90b0"))
     canv.setFont("Body", 9.5)
-    canv.drawCentredString(w / 2, 26 * mm, "Version %s  ·  %s  ·  working title" % (VERSION, DATE))
+    canv.drawCentredString(w / 2, 26 * mm, "Version %s  ·  %s" % (VERSION, DATE))
     canv.restoreState()
 
 
@@ -151,7 +151,7 @@ def draw_page_chrome(canv, doc):
     canv.rect(doc.leftMargin, h - 12 * mm, 14 * mm, 1.6, stroke=0, fill=1)
     canv.setFont("Body", 8)
     canv.setFillColor(MUTED)
-    canv.drawString(doc.leftMargin + 17 * mm, h - 12.6 * mm, "nameGame  ·  Work plan v%s" % VERSION)
+    canv.drawString(doc.leftMargin + 17 * mm, h - 12.6 * mm, "NAME game  ·  Work plan v%s" % VERSION)
     canv.drawRightString(w - doc.rightMargin, 10 * mm, "%d" % doc.page)
     canv.drawString(doc.leftMargin, 10 * mm, DATE)
     canv.restoreState()
@@ -254,7 +254,7 @@ def build():
                    "formation shooters and later wave-based shmups. You fly a small ship at the bottom of the screen, "
                    "hold R1 to spray bullets and fire a scarce, powerful rocket with R2. Waves get harder, every 5th "
                    "wave is a boss, and a run ends when the last life is lost."))
-    story.append(P("Milestones 1 and 2 are done. M1's throwaway grey-box prototype ran on the console and the verdict "
+    story.append(P("Milestones 1 to 3 are done and M4 is built: its unplug pause and a 21-minute soak are confirmed on the PS3, the balancing playtest and the fresh-player install are still open. M1's throwaway grey-box prototype ran on the console and the verdict "
                    "was <b>keep</b>. M2 built the real core loop: a full run from wave 1 to game over on the PS3 at "
                    "60 fps with pixel art, the song and sound effects. Alongside it, drop-in co-op (D-009) and the XMB "
                    "Game menu art were added.", "body"))
@@ -273,9 +273,9 @@ def build():
         ["Milestone", "Goal", "Status"],
         ["M1 Greybox on the PS3", "Prove controls, scaling, music and frame rate on the console", "Done, kept"],
         ["M2 Core loop", "A full run from wave 1 to game over, real pixel art and sound", "Done"],
-        ["M3 Full game", "Bosses, upgrades, screens, high score save, game feel", "Next (section 8)"],
-        ["M4 Release polish", "Name, icon, balancing, stability, install guide", "Planned (section 8)"],
-    ], [42 * mm, FULL - 42 * mm - 32 * mm, 32 * mm], row_colors={1: DONE, 2: DONE, 3: NOW}))
+        ["M3 Full game", "Bosses, upgrades, screens, high score save, game feel", "Done"],
+        ["M4 Release polish", "Name, icon, balancing, stability, install guide", "Built; playtest and install open"],
+    ], [42 * mm, FULL - 42 * mm - 32 * mm, 32 * mm], row_colors={1: DONE, 2: DONE, 3: DONE, 4: NOW}))
     story.append(Spacer(1, 8))
     story.append(P("Milestone 2 results on the PS3", "h2"))
     story.append(table([
@@ -341,11 +341,11 @@ def build():
         ["Lives and score", "3 lives, one hit kills, respawn invincibility, extra life every 50,000", "M2", "implemented"],
         ["Music and sound", "Song loops in gameplay; synthesized retro SFX", "M2", "implemented"],
         ["Pixel art", "Palette, sprites and font as text grids in code", "M2", "implemented"],
-        ["Bosses", "A boss on every 5th wave, stronger each time", "M3", "idea"],
-        ["Weapon upgrades", "Pickups: single → double → spread → fast spread; death loses a level", "M3", "idea"],
-        ["Screens", "Title, pause menu (with options), game over", "M3", "idea"],
-        ["High score save", "Best score saved on the PS3, shown on the title", "M3", "idea"],
-        ["Game feel", "Shake, hit-stop, flashes, particles by tier; shake and flash options", "M3", "idea"],
+        ["Bosses", "A boss on every 5th wave, stronger each time", "M3", "implemented"],
+        ["Weapon upgrades", "Pickups: single → double → spread → fast spread; death loses a level", "M3", "implemented"],
+        ["Screens", "Title, pause menu (with options), game over", "M3", "implemented"],
+        ["High score save", "Best score saved on the PS3, shown on the title", "M3", "implemented"],
+        ["Game feel", "Shake, hit-stop, flashes, particles by tier; shake and flash options", "M3", "implemented"],
         ["Co-op", "Player 2 drops in with Start on a second controller (D-009)", "M2", "in progress"],
     ], [32 * mm, FULL - 32 * mm - 20 * mm - 24 * mm, 20 * mm, 24 * mm]))
     story.append(P("Starting numbers for the core features", "h2"))
@@ -359,26 +359,28 @@ def build():
         ["Rocket", "speed / blast radius / blast damage", "60 → 260 px/s · 40 px · 20 HP"],
         ["Rocket", "pickup drop chance", "2 % per kill (about one per 2 waves)"],
         ["Aliens", "types (HP / score)", "green 1 / 100 · blue 2 / 200 (wave 4+) · red 4 / 400 (wave 7+)"],
-        ["Aliens", "enemy shot speed / wave clear bonus", "70 px/s · 1,000 × wave"],
+        ["Aliens", "enemy shot speed / wave clear bonus", "70 px/s, +2 per wave after wave 10, max 90 · 1,000 × wave"],
         ["Lives", "lives / respawn invincibility / extra life", "3 · 2 s · every 50,000 points (max 9)"],
     ], [24 * mm, 66 * mm, FULL - 90 * mm]))
     story.append(P("Difficulty curve, waves 1–20", "h2"))
-    rows = [["Wave", "Aliens", "Sway px/s", "Shots per alien/s", "Dive every", "Types", "Clear bonus"]]
+    rows = [["Wave", "Aliens", "Sway px/s", "Shots per alien/s", "Shot px/s", "Dive every", "Rows red/blue/green", "Clear bonus"]]
     highlight = {}
     for n in range(1, 21):
         if n % 5 == 0:
-            rows.append([str(n), "BOSS", "—", "—", "—", "boss %d" % (n // 5), "—"])
+            rows.append([str(n), "BOSS", "—", "—", "—", "—", "boss %d" % (n // 5), "—"])
             highlight[len(rows) - 1] = NOW
             continue
         alien_rows = min(2 + n // 2, 5)
-        types = "green" + (" blue" if n >= 4 else "") + (" red" if n >= 7 else "")
-        dive = "%.1f s" % max(4 - 0.2 * n, 1.5) if n >= 3 else "—"
+        red = 2 if n >= 13 else 1 if n >= 7 else 0
+        blue = (4 if n >= 13 else 2 if n >= 4 else 0) - red
+        dive = ("%.1f s" % max(4 - 0.2 * n, 1.5) + (" ×2" if n >= 15 else "")) if n >= 3 else "—"
         rows.append([str(n), str(8 * alien_rows), str(min(20 + 2 * n, 50)), "%.3f" % min(0.02 + 0.005 * n, 0.08),
-                     dive, types, "{:,}".format(1000 * n)])
-    story.append(table(rows, [13 * mm, 17 * mm, 20 * mm, 30 * mm, 20 * mm, FULL - 125 * mm, 25 * mm],
+                     str(min(70 + 2 * max(n - 10, 0), 90)), dive, "%d/%d/%d" % (red, blue, alien_rows - red - blue),
+                     "{:,}".format(1000 * n)])
+    story.append(table(rows, [11 * mm, 14 * mm, 17 * mm, 24 * mm, 17 * mm, 22 * mm, FULL - 130 * mm, 25 * mm],
                        row_colors=highlight))
     story.append(P("Formulas from the enemy-waves note: rows = min(2 + wave/2, 5) of 8; sway = min(20 + 2·wave, 50); "
-                   "shot chance = min(0.02 + 0.005·wave, 0.08); dives from wave 3, interval max(4 − 0.2·wave, 1.5) s.",
+                   "shot chance = min(0.02 + 0.005·wave, 0.08); dives from wave 3, interval max(4 − 0.2·wave, 1.5) s, two at once from wave 15; shot speed 70 + 2·(wave − 10), max 90 px/s; rows red from wave 7 (two from wave 13), blue from wave 4 (rows 3–4 from wave 13).",
                    "note"))
 
     story.append(P("Art direction", "h2"))
@@ -523,12 +525,12 @@ def build():
         ["M2 Core loop (done)", "Ship controls, rocket, enemy waves, lives and score, music and sound, pixel art, Mac "
          "tests; plus drop-in co-op and the XMB art",
          "A run from wave 1 to game over on the PS3 at 60 fps with real art and sound"],
-        ["M3 Full game", "Bosses, weapon upgrades, screens, high score save, game feel and its options",
+        ["M3 Full game (done)", "Bosses, weapon upgrades, screens, high score save, game feel and its options",
          "Title → run → game over → title works on the PS3; the high score survives a reboot"],
-        ["M4 Release polish", "Name and icon, balancing to wave 20, unplug handling, stability run, install guide",
+        ["M4 Release polish (built)", "Name and icon, balancing to wave 20, unplug handling, stability run, install guide",
          "A fresh player installs from the guide and plays a full run without help"],
         ["Later", "Button remapping menu", "Only if wanted after M4"],
-    ], [34 * mm, FULL - 34 * mm - 62 * mm, 62 * mm], row_colors={1: DONE, 2: DONE, 3: NOW}))
+    ], [34 * mm, FULL - 34 * mm - 62 * mm, 62 * mm], row_colors={1: DONE, 2: DONE, 3: DONE, 4: NOW}))
     story.append(Spacer(1, 8))
     story.append(P("Rules for every milestone", "h2"))
     story += bullets([
@@ -586,7 +588,7 @@ def build():
     ])
     story.append(P("Decisions to make during M2", "h2"))
     story += bullets([
-        "Working title stays 'nameGame' until M4, unless you pick a name sooner.",
+        "The game's name is 'NAME game' (D-012).",
         "Sprites stay as text grids in code (D-006) unless you'd rather draw PNGs in an editor (libpng is available).",
         "Fixed 60 Hz update vs variable time step: plan is a fixed 1/60 s step, since the PS3 locks to vsync.",
     ])
@@ -610,14 +612,14 @@ def build():
     ], [8 * mm, FULL - 8 * mm - 60 * mm, 60 * mm]))
     story.append(P("Milestone 4: release polish", "h2"))
     story.append(table([
-        ["#", "Task", "Done when"],
-        ["1", "Real game name; rerun docs/xmb-art/make_xmb_art.py so ICON0.PNG and PIC1.PNG carry it", "shows correctly in the Game menu"],
-        ["2", "Balancing pass to wave 20 with at least one other player", "difficulty curve tuned and logged"],
-        ["3", "Controller unplug pauses; reconnect resumes", "checked on the PS3"],
-        ["4", "Stability: a 30-minute run with no frame drops or memory growth", "log shows steady fps and no errors"],
-        ["5", "Install guide (README) and a versioned release package", "a fresh player installs from it"],
-        ["6", "Final docs sync and work-plan update", "all MVP features 'implemented'"],
-    ], [8 * mm, FULL - 8 * mm - 60 * mm, 60 * mm]))
+        ["#", "Task", "Done when", "Result"],
+        ["1", "Real game name; rerun docs/xmb-art/make_xmb_art.py so ICON0.PNG and PIC1.PNG carry it", "shows correctly in the Game menu", "Done: NAME game, icon redrawn, title and V1.0 checked on the PS3"],
+        ["2", "Balancing pass to wave 20 with at least one other player", "difficulty curve tuned and logged", "Open: curve extended to wave 20 and tests pass; the playtest is not done"],
+        ["3", "Controller unplug pauses; reconnect resumes", "checked on the PS3", "Done: single-player and co-op checked on the PS3"],
+        ["4", "Stability: a 30-minute run with no frame drops or memory growth", "log shows steady fps and no errors", "Done for 21 min: fps at least 59.9, worst work 6 ms, heap flat at 5,709 KB, autopilot to wave 50"],
+        ["5", "Install guide (README) and a versioned release package", "a fresh player installs from it", "Open: README and make release written; the fresh-player install is not tested"],
+        ["6", "Final docs sync and work-plan update", "all MVP features 'implemented'", "Done, except the open items above"],
+    ], [8 * mm, FULL - 8 * mm - 120 * mm, 38 * mm, 74 * mm]))
 
     # 9. Testing
     story += section("9. Testing and quality")
@@ -682,6 +684,16 @@ def build():
          "render targets are a no-op and copies have no blending; proven at 60 fps in M1"],
         ["D-009", "Co-op as drop-in join: player 2 presses Start on a second controller",
          "the user wanted co-op now, joining instead of two players by default"],
+        ["D-010", "A main menu with game modes (only Classic for now) and a Settings screen from the main and pause menus",
+         "the user wanted room for more modes and settings"],
+        ["D-011", "Hit-stop only on rocket blasts, the boss death and the player's death",
+         "spread fire kills several aliens a second and would stutter"],
+        ["D-012", "The game is called NAME game; the repo, app ID and file names keep nameGame",
+         "a new app ID would orphan the saved high score and settings"],
+        ["D-013", "Difficulty keeps climbing to wave 20", "every value was capped by wave 12–15"],
+        ["D-014", "A lost controller pauses the run; the player resumes after reconnecting", "user's choice"],
+        ["D-015", "make release builds without the dev aids, logs to 127.0.0.1, includes the song",
+         "a player pressing Triangle would spawn 60 aliens"],
     ], [16 * mm, FULL - 16 * mm - 72 * mm, 72 * mm]))
 
     # 12. Open questions
@@ -689,7 +701,7 @@ def build():
     story.append(P("None of these block M2; each has a default that will be used unless you decide otherwise."))
     story.append(table([
         ["Question", "Default"],
-        ["What is the game's real name?", "'nameGame' until M4"],
+        ["What is the game's real name?", "NAME game (D-012)"],
         ["Sprites as text grids in code, or PNG files drawn in an editor?", "text grids in code (D-006)"],
         ["Should there be a button-remapping menu?", "no; later only if wanted"],
         ["Should co-op get its own playtest before M3?", "yes, with two controllers"],

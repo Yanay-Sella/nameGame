@@ -13,6 +13,8 @@ struct Actions {
     bool stress;          // Triangle pressed: dev stress test (main.cpp)
     bool up, down, left, right;   // D-pad pressed or left stick flicked (menus)
     bool back;                    // Circle pressed
+    bool autopilot;               // Select pressed: dev autopilot toggle (main.cpp)
+    bool connected;               // this player's controller is open
 };
 
 // Sounds the game asks for during a step; main.cpp plays each requested one once.
@@ -115,6 +117,7 @@ void drawBackground(const Game& game);         // navy fill and stars
 
 int formationRows(int wave);        // rows of 8 aliens in a wave
 float shotChance(int wave);         // enemy shots per alien per second
+float enemyShotSpeed(int wave);     // px/s; rises after wave 10
 float diveInterval(int wave);       // s between dives; dives start at wave 3
 bool isBossWave(int wave);          // every 5th wave is a boss alone
 int bossHealth(int wave);           // 100 + 50 per earlier appearance

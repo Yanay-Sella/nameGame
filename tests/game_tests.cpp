@@ -162,6 +162,57 @@ static void divesStartAtWaveThree() {
     CHECK(divers == 1);
 }
 
+static void enemyShotsSpeedUpAfterWaveTen() {
+    CHECK(enemyShotSpeed(1) == 70);
+    CHECK(enemyShotSpeed(10) == 70);
+    CHECK(enemyShotSpeed(11) == 72);
+    CHECK(enemyShotSpeed(20) == 90);
+    CHECK(enemyShotSpeed(30) == 90);
+
+    Game game;
+    startSafeGame(game);
+    run(game, NO_INPUT, 8);
+    game.wave = 20;
+    game.enemyShots.clear();
+    for (int step = 0; step < 600 && game.enemyShots.empty(); step++) updateGame(game, &NO_INPUT, DT);
+    CHECK(!game.enemyShots.empty());
+    if (!game.enemyShots.empty()) CHECK(game.enemyShots[0].vy == 90);
+}
+
+static void lateWavesAddArmouredRows() {
+    for (int wave : {13, 7}) {
+        Game game;
+        startSafeGame(game);
+        game.wave = wave - 1;
+        for (Alien& alien : game.aliens) alien.alive = false;
+        run(game, NO_INPUT, 2.2f);
+        CHECK(game.wave == wave);
+        int redRows = wave == 13 ? 2 : 1, blueEnd = wave == 13 ? 4 : 2;
+        CHECK(game.aliens.size() == 40);
+        for (size_t i = 0; i < game.aliens.size() && i < 40; i++) {
+            int row = (int)i / 8;
+            AlienType expected = row < redRows ? ALIEN_RED : row < blueEnd ? ALIEN_BLUE : ALIEN_GREEN;
+            CHECK(game.aliens[i].type == expected);
+        }
+    }
+}
+
+static void twoAliensDiveFromWaveFifteen() {
+    Game game;
+    startSafeGame(game);
+    run(game, NO_INPUT, 8);
+    for (int wave : {14, 16}) {
+        game.wave = wave;
+        for (int i = 0; i < 3; i++) {
+            game.diveTimer = 0.01f;
+            run(game, NO_INPUT, 0.05f);
+        }
+        int divers = 0;
+        for (const Alien& alien : game.aliens) divers += alien.alive && alien.state == ALIEN_DIVING;
+        CHECK(divers == (wave == 14 ? 1 : 2));
+    }
+}
+
 static void rocketBufferFiresAnEarlyPress() {
     Game game;
     startSafeGame(game);
@@ -703,6 +754,9 @@ int main() {
     enemyFormulasFollowTheDesign();
     aliensFlyInBeforeTheyCanShoot();
     divesStartAtWaveThree();
+    enemyShotsSpeedUpAfterWaveTen();
+    lateWavesAddArmouredRows();
+    twoAliensDiveFromWaveFifteen();
     rocketBufferFiresAnEarlyPress();
     emptyRocketClicks();
     blastKillsOnlyInsideItsRadius();

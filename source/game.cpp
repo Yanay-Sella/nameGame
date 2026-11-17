@@ -22,6 +22,10 @@ const int ALIEN_HP[3] = {1, 2, 4};
 const int ALIEN_SCORE[3] = {100, 200, 400};
 const int WAVE_CLEAR_BONUS = 1000;     // points x wave
 const float ENEMY_SHOT_SPEED = 70;     // px/s
+const int SHOT_SPEEDUP_AFTER_WAVE = 10;
+const float ENEMY_SHOT_SPEED_STEP = 2, ENEMY_SHOT_MAX_SPEED = 90;   // px/s per wave, px/s
+const int MORE_ARMOUR_WAVE = 13;       // two red and two blue rows from here
+const int TWO_DIVERS_WAVE = 15;        // two aliens may dive at once from here
 const float ENTRY_DISTANCE = 150, ENTRY_SPEED = 150;      // px, px/s
 const float ENTRY_COLUMN_DELAY = 0.06f, ENTRY_ROW_DELAY = 0.12f;   // s
 const float DIVE_SPEED = 90, DIVE_STEER = 120, DIVE_MAX_SIDEWAYS = 70, RETURN_SPEED = 100;   // px/s, px/s^2
@@ -100,6 +104,10 @@ float shotChance(int wave) {
     return std::min(0.02f + 0.005f * wave, 0.08f);
 }
 
+float enemyShotSpeed(int wave) {
+    return std::min(ENEMY_SHOT_SPEED + ENEMY_SHOT_SPEED_STEP * std::max(wave - SHOT_SPEEDUP_AFTER_WAVE, 0), ENEMY_SHOT_MAX_SPEED);
+}
+
 float diveInterval(int wave) {
     return std::max(4 - 0.2f * wave, 1.5f);
 }
@@ -133,8 +141,10 @@ static void startWave(Game& game, int wave) {
     }
     float left = (SCREEN_W - (FORMATION_COLUMNS - 1) * COLUMN_SPACING - ALIEN_W) / 2;
     for (int row = 0; row < rows; row++) {
-        // Tougher aliens take the top rows once their wave is reached.
-        AlienType type = (wave >= 7 && row == 0) ? ALIEN_RED : (wave >= 4 && row <= 1) ? ALIEN_BLUE : ALIEN_GREEN;
+        // Tougher aliens take the top rows: red from wave 7, blue from wave 4, two of each from wave 13.
+        int redRows = wave >= MORE_ARMOUR_WAVE ? 2 : wave >= 7 ? 1 : 0;
+        int blueEnd = wave >= MORE_ARMOUR_WAVE ? 4 : wave >= 4 ? 2 : 0;   // rows above this that aren't red are blue
+        AlienType type = row < redRows ? ALIEN_RED : row < blueEnd ? ALIEN_BLUE : ALIEN_GREEN;
         for (int col = 0; col < FORMATION_COLUMNS; col++) {
             Alien alien;
             alien.type = type;
@@ -406,7 +416,7 @@ static void updateAlien(Game& game, Alien& alien, float dt) {
     }
     bool canShoot = alien.state == ALIEN_IN_FORMATION || alien.state == ALIEN_DIVING;
     if (canShoot && !game.over && randomUnit(game) < shotChance(game.wave) * dt) {
-        Shot shot = {alien.x + ALIEN_W / 2 - 1, alien.y + ALIEN_H, ENEMY_SHOT_SPEED, -1, 0};
+        Shot shot = {alien.x + ALIEN_W / 2 - 1, alien.y + ALIEN_H, enemyShotSpeed(game.wave), -1, 0};
         game.enemyShots.push_back(shot);
     }
 }
@@ -462,11 +472,12 @@ static void updateBoss(Game& game, float dt) {
 
 static void startDive(Game& game) {
     std::vector<Alien*> candidates;
+    int divers = 0;
     for (Alien& alien : game.aliens) {
-        if (alien.alive && alien.state == ALIEN_DIVING) return;   // one diver at a time
+        if (alien.alive && alien.state == ALIEN_DIVING) divers++;
         if (alien.alive && alien.state == ALIEN_IN_FORMATION) candidates.push_back(&alien);
     }
-    if (candidates.empty()) return;
+    if (divers >= (game.wave >= TWO_DIVERS_WAVE ? 2 : 1) || candidates.empty()) return;
     Alien* diver = candidates[(size_t)(randomUnit(game) * candidates.size())];
     diver->state = ALIEN_DIVING;
     diver->vx = 0;

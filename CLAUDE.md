@@ -2,6 +2,7 @@
 
 C++ game for a real PS3, built with the open-source ps3dev toolchain (PSL1GHT) and SDL2.
 Sony's official SDK, and the Unity/Unreal PS3 exports, are not available and must not be used.
+The game's title is "NAME game" (GDD D-012); the repo, app ID NMGM00001, build/nameGame.pkg and the log lines keep "nameGame".
 Full setup history, debugging toolkit and new-project checklist: `docs/ps3-new-project-guide.md`.
 
 ## Hardware setup
@@ -16,9 +17,10 @@ Full setup history, debugging toolkit and new-project checklist: `docs/ps3-new-p
 - `make ps3` — full rebuild in Docker → `build/nameGame.pkg`. Uses image `namegame-ps3dev` (`docker/Dockerfile`:
   `zeldin/ps3dev-docker` + SDL2 rebuilt with `docker/sdl2-psl1ght-render.patch`), built automatically by `make image`.
 - `make deploy` — build, upload via FTP to `/dev_hdd0/packages/`, install with webMAN (`/install.ps3/...`).
-  The user then launches nameGame from the PS3's Game menu; webMAN can't start installed hdd0 games remotely.
+  The user then launches NAME game from the PS3's Game menu; webMAN can't start installed hdd0 games remotely.
 - `make log` — print the game's UDP log lines (port 18195). Run it before the user launches the game.
   `make ps3` deletes `build/`, so don't redirect the log into `build/`.
+- `make release` — release build (no dev aids, logs to 127.0.0.1, song required) → `dist/NAME-game-<VERSION>.pkg` and the README.
 - `make deploy SOURCES=prototypes/<idea>` — build and install a throwaway prototype instead of `source/` (same app ID).
 - `make music MUSIC_SRC=<song>` — convert a song to `pkgfiles/USRDIR/music.ogg` (gitignored), packaged next to EBOOT.BIN.
 - `python3 docs/xmb-art/make_xmb_art.py` — redraw the XMB Game menu art (`pkgfiles/ICON0.PNG` 320x176, `PIC1.PNG` 1920x1080)
@@ -45,5 +47,5 @@ Full setup history, debugging toolkit and new-project checklist: `docs/ps3-new-p
 - Audio device is 48 kHz stereo float; open the mixer at 48000 Hz to avoid resampling.
 - Controller (from the port's `SDL_sysjoystick.c`): buttons 0 left, 1 down, 2 right, 3 up, 4 start, 5 R3, 6 L3, 7 select,
   8 square, 9 cross, 10 circle, 11 triangle, 12 R1, 13 L1, 14 R2, 15 L2; axes 0/1 left stick x/y, 2/3 right stick x/y.
-  Confirmed on the PS3: 0, 1, 2, 3, 4, 9, 10, 11, 12, 14; the rest is from the source.
+  Confirmed on the PS3: 0, 1, 2, 3, 4, 7, 9, 10, 11, 12, 14; the rest is from the source.
 - No `SDL_JOYDEVICEADDED`/`REMOVED` events: open controllers yourself from `SDL_NumJoysticks()` (see `source/input.cpp`).

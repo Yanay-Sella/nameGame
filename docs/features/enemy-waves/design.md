@@ -8,9 +8,9 @@ Aliens fly in, line up in a formation at the top of the screen, sway side to sid
 1. A wave starts with its aliens flying in from above the screen into formation slots; they can't shoot until they reach their slot.
 2. The formation sways left and right as one and reverses at the screen edges.
 3. Every alien has a chance per second to drop a shot straight down; shots are magenta and are the only magenta objects.
-4. From wave 3, one alien at a time leaves formation and dives in a curve toward the ship, then exits the bottom and returns to its slot from the top.
+4. From wave 3, one alien at a time (from wave 15 up to two at once) leaves formation and dives in a curve toward the ship, then exits the bottom and returns to its slot from the top.
 5. A wave is cleared when every alien is dead; the next starts after a short pause with a "WAVE n" banner.
-6. Alien types: green (1 HP), blue (2 HP, from wave 4), red armoured (4 HP, from wave 7).
+6. Alien types: green (1 HP), blue (2 HP, from wave 4), red armoured (4 HP, from wave 7); from wave 13 the top two rows are red and the next two blue.
 7. Every 5th wave is a boss instead of a formation (the Bosses feature, M3).
 
 ## Numbers
@@ -20,7 +20,9 @@ Aliens fly in, line up in a formation at the top of the screen, sway side to sid
 | Alien size | 12 × 10 | px | see [pixel art](../pixel-art/design.md) |
 | Sway speed | 20 + 2 × wave, max 50 | px/s | [ASSUMPTION] |
 | Shot chance per alien | 0.02 + 0.005 × wave, max 0.08 | per s | wave 1 is calm, wave 10 is busy [ASSUMPTION] |
-| Enemy shot speed | 70 | px/s | dodgeable once seen [ASSUMPTION] |
+| Enemy shot speed | 70, +2 per wave after wave 10, max 90 | px/s | late waves stay tense [ASSUMPTION] |
+| Armoured rows | wave 4: 2 blue; wave 7: 1 red + 1 blue; wave 13: 2 red + 2 blue | rows | waves 13+ feel harder than 7–12 [ASSUMPTION] |
+| Simultaneous divers | 1, from wave 15: 2 | aliens | two divers are dodgeable [ASSUMPTION] |
 | Dive interval | 4 − 0.2 × wave, min 1.5 | s | [ASSUMPTION] |
 | Score per alien | 100 / 200 / 400 | points (green / blue / red) | [ASSUMPTION] |
 | Wave clear bonus | 1000 × wave | points | [ASSUMPTION] |
@@ -32,8 +34,9 @@ Aliens fly in, line up in a formation at the top of the screen, sway side to sid
 ## Edge cases
 - The player dies mid-wave: the wave continues; diving aliens return to formation during respawn.
 - A rocket kills the last alien: the wave clears normally.
-- Wave count past 5 rows: only the speeds and shot chances keep rising.
+- Past wave 15 only the sway keeps rising; everything else is capped.
 
 ## History
 - 2026-11-17: designed; alien size set to 12 × 10 with the pixel art.
 - 2026-11-17: implemented in M2.
+- 2026-11-17: difficulty extended to wave 20 (D-013).

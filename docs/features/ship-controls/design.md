@@ -28,8 +28,9 @@ The player flies a small ship around the bottom of the screen and holds R1 to sp
 ## Edge cases
 - Pause: holding R1 through pause doesn't fire on resume until the next interval.
 - Death: input is ignored until respawn; R1 held during respawn starts firing at once.
-- Unplugged controller: the game pauses (M4).
+- Unplugged controller: the run pauses with CONNECT CONTROLLER n; after reconnecting, the player resumes from the pause menu (D-014).
 
 ## History
 - 2026-11-17: designed.
 - 2026-11-17: implemented in M2.
+- 2026-11-17: unplug pause added (D-014).

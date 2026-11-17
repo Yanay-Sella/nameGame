@@ -1,6 +1,6 @@
-# nameGame — Game Design Document
+# NAME game — Game Design Document
 
-**Version:** 0.13 · **Updated:** 2026-11-17 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
+**Version:** 0.15 · **Updated:** 2026-11-17 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
 
 ## Summary
 You pilot a small ship at the bottom of the screen against waves of pixel-art aliens. Hold R1 to spray bullets, and save the scarce R2 rocket for the moment a wave gets out of hand. Waves get harder, and every 5th wave is a boss. The run ends when you lose your last life, and you chase the saved high score.
@@ -50,7 +50,7 @@ dodge + shoot (R1) → kill aliens → score and pickups → stronger gun / more
 1. **M1, greybox on the PS3:** boxes for ship, bullets, rocket and enemies; low-res scaling, music playback and button mapping proven · done when: [prototypes/ship-feel/BRIEF.md](../prototypes/ship-feel/BRIEF.md) has a RESULT line.
 2. **M2, core loop (done 2026-11-17):** ship controls, rocket, enemy waves, lives and score, music and sound, pixel art · done when: a run goes from wave 1 to game over on the PS3 at 60 fps.
 3. **M3, full game (done 2026-11-17):** bosses, weapon upgrades, screens, high score save, game feel · done when: title → run → game over → title works on the PS3 and the high score survives a reboot.
-4. **M4, release polish:** game name and icon, balancing to wave 20, controller unplug handling, 30-minute stability run, install guide · done when: a fresh player installs the pkg from the guide and plays a full run without help.
+4. **M4, release polish (built 2026-11-17; balancing playtest and fresh-player install still open):** game name and icon, balancing to wave 20, controller unplug handling, 30-minute stability run, install guide · done when: a fresh player installs the pkg from the guide and plays a full run without help.
 
 The task-by-task plan for each milestone is in the [work plan](work-plan/nameGame-work-plan.pdf) (source: [make_work_plan.py](work-plan/make_work_plan.py)).
 
@@ -60,7 +60,7 @@ Boot → MAIN MENU ─ CLASSIC ──→ PLAYING ⇄ (Start) PAUSED ─ RETURN T
            └─ SETTINGS ⇄           │                  └─ SETTINGS ⇄
                                    └─ game over: X/Start = play again, Circle = MAIN MENU
 ```
-- **Main menu:** title "NAMEGAME", the items Classic and Settings and the saved high score. Silent. Classic is the only game mode for now.
+- **Main menu:** title "NAME GAME", the items Classic and Settings and the saved high score. Silent. Classic is the only game mode for now.
 - **Settings:** music on/off, screen shake 0–100 % and reduced flashing, saved to settings.txt. Circle or Back returns to the menu that opened it.
 - **Game:** the HUD shows score, wave, lives and rockets. Music loops if enabled.
 - **Pause:** Start opens it (Resume, Settings, Return to menu); the music keeps playing.
@@ -75,6 +75,8 @@ Boot → MAIN MENU ─ CLASSIC ──→ PLAYING ⇄ (Start) PAUSED ─ RETURN T
 
 ## Game-level acceptance
 - 60 fps on the PS3 with 60 enemies, 100 bullets and 2 explosions on screen. *(PS3 stress test 2026-11-17 with Triangle: 60 fps held up to 60 aliens, 1,900 bullets and 8 explosions; slowest frame 11 ms of 16.7)*
+
+- No frame drops or memory growth over 30 minutes. *(PS3 soak 2026-11-17, about 21 min not 30: autopilot to wave 50, fps ≥ 59.9, worst work 6 ms, heap 5,709 → 5,709 KB)*
 
 ## Decisions
 
@@ -91,9 +93,13 @@ Boot → MAIN MENU ─ CLASSIC ──→ PLAYING ⇄ (Start) PAUSED ─ RETURN T
 | D-009 | 2026-11-17 | Co-op as drop-in join: runs start with one player, player 2 presses Start on a second controller to join | two players by default; a player-count menu | the user wanted to add co-op now, with a player joining instead of two players by default | [co-op](features/co-op/design.md), [lives and score](features/lives-and-score/design.md) |
 | D-010 | 2026-11-17 | A main menu with game modes (only Classic for now) and a Settings screen reachable from the main and pause menus; music on/off saved to settings.txt | title screen with "press X" only | the user wanted room for more modes and settings | [screens](features/screens/design.md), [music and sound](features/music-and-sound/design.md), [co-op](features/co-op/design.md) |
 | D-011 | 2026-11-17 | No hit-stop on ordinary alien kills; hit-stop only on rocket blasts, the boss death and the player's death | hit-stop on every kill (the medium tier) | spread fire kills several aliens a second and would stutter; the large events keep their weight | [game feel](features/game-feel/design.md) |
+| D-012 | 2026-11-17 | The game is called "NAME game" ("NAME GAME" in the uppercase pixel fonts); the repo, app ID NMGM00001 and file names keep nameGame | ROCKET PANIC; STARSWARM; HIVE STORM | user's choice; a new app ID would install a second game and orphan the saved high score and settings | [screens](features/screens/design.md) |
+| D-013 | 2026-11-17 | Difficulty keeps climbing to wave 20: enemy shots 70→90 px/s over waves 11–20, two red and two blue rows from wave 13, two divers at once from wave 15 | keep the wave-12 caps and only retune | every value was capped by wave 12–15, so waves 13–19 played alike | [enemy waves](features/enemy-waves/design.md) |
+| D-014 | 2026-11-17 | A lost controller pauses the run; after it reconnects the pause menu stays up and the player resumes | resume at once; 3-2-1 countdown | user's choice: the player resumes when ready | [ship controls](features/ship-controls/design.md), [co-op](features/co-op/design.md), [screens](features/screens/design.md) |
+| D-015 | 2026-11-17 | make release builds without the dev aids (Triangle stress, Select autopilot), logs to 127.0.0.1 and includes the song | one build for everything | a player pressing Triangle would spawn 60 aliens; the user may share the song | [music and sound](features/music-and-sound/design.md) |
 
 ## Open questions
-- **Assumptions to confirm:** working title "nameGame"; sprites as text grids in code (D-006); every number marked `[ASSUMPTION]` in the feature notes.
+- **Assumptions to confirm:** sprites as text grids in code (D-006); every number marked `[ASSUMPTION]` in the feature notes.
 - **Risks:**
   - Frame rate with real sprites and many objects → M1 used ~2 ms of the 16.7 ms frame with ~45 boxes; recheck in M2 with the stress test.
   - R2, Triangle and Start button numbers are from the SDL port's source, not yet seen in a PS3 log (left, right and R1 are confirmed).
@@ -112,3 +118,5 @@ Boot → MAIN MENU ─ CLASSIC ──→ PLAYING ⇄ (Start) PAUSED ─ RETURN T
 **0.11 (2026-11-17):** high score save implemented.
 **0.12 (2026-11-17):** game feel implemented (D-011).
 **0.13 (2026-11-17):** M3 done: screens and co-op confirmed on the PS3, M3 numbers confirmed in play.
+**0.14 (2026-11-17):** M4 built: name, unplug pause, difficulty to wave 20, release build and install guide (D-012 to D-015).
+**0.15 (2026-11-17):** M4 checked on the PS3: unplug pause (single-player and co-op) and a 21-minute soak confirmed; balancing playtest and fresh-player install still open.

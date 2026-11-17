@@ -33,6 +33,7 @@ LOGO_FONT = {
     "M": ["##...##", "###.###", "#######", "##.#.##", "##...##", "##...##", "##...##"],
     "E": ["#####", "##...", "##...", "####.", "##...", "##...", "#####"],
     "G": [".####.", "##..##", "##....", "##.###", "##..##", "##..##", ".####."],
+    " ": ["...", "...", "...", "...", "...", "...", "..."],
 }
 LOGO_FILL = "wyyyooorrR"   # top-to-bottom gradient, one colour per band
 
@@ -162,8 +163,9 @@ def logo(canvas, text, y, unit):
     # Glint: a white tick on the top-left of each letter's first stroke.
     x = 0
     for g in glyphs:
-        first = next(col for col, c in enumerate(g[1]) if c == "#")
-        canvas.dot(left + (x + first) * unit, y + unit, "w", s)
+        first = next((col for col, c in enumerate(g[1]) if c == "#"), None)
+        if first is not None:
+            canvas.dot(left + (x + first) * unit, y + unit, "w", s)
         x += len(g[0]) + 1
 
 
@@ -194,7 +196,7 @@ def make_icon():
     for i in range(4):
         c.dot(93 + i % 2, 61 + i * 2, "o" if i < 2 else "r")
 
-    logo(c, "NAMEGAME", 5, 2)
+    logo(c, "NAME GAME", 5, 2)
     c.save(os.path.join(OUT, "ICON0.PNG"), 2)
 
 

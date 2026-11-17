@@ -19,7 +19,7 @@
 
 ## Deviations from design
 - The fire timer subtracts the interval instead of resetting, so the rhythm stays exactly 0.12 s at 60 Hz steps (resetting gave 0.133 s).
-- "Unplugged controller: the game pauses" is not built yet; it is M4 task 3.
+- Unplug: `inputRead` sets `Actions.connected`; `main.cpp` pauses the run while a joined player's controller is gone and blocks Resume.
 
 ## History
 - 2026-11-17: implemented in M2.
