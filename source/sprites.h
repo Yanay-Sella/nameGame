@@ -190,6 +190,15 @@ const Sprite ROCKET_PICKUP = {8, 8,
     "p.r..r.p"
     "pp.oo.pp"
     ".pppppp."};
+const Sprite UPGRADE_PICKUP = {8, 8,
+    ".oooooo."
+    "oo.yy.oo"
+    "o.yyyy.o"
+    "oyyyyyyo"
+    "o..yy..o"
+    "o..yy..o"
+    "oo.yy.oo"
+    ".oooooo."};
 const Sprite LIFE_ICON = {7, 5,
     "...c..."
     "..cbc.."

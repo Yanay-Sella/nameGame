@@ -33,6 +33,12 @@ const int EXPLOSION_DAMAGE = 20;       // HP
 const float PICKUP_CHANCE = 0.02f;     // per kill
 const float PICKUP_FALL_SPEED = 30;    // px/s
 const float EXPLOSION_GROW = 0.1f, EXPLOSION_FADE = 0.35f;   // s
+// Weapon upgrades (weapon-upgrades/design.md)
+const int MAX_WEAPON_LEVEL = 4;
+const float FAST_FIRE_INTERVAL = 0.08f;   // s, level 4
+const float DOUBLE_OFFSET = 3, SPREAD_SPEED = 70;   // px, px/s
+const float UPGRADE_CHANCE = 0.03f;    // per kill, rolled together with PICKUP_CHANCE
+const int UPGRADE_MAX_POINTS = 1000;
 // Lives and score (lives-and-score/design.md)
 const int START_LIVES = 3, MAX_LIVES = 9;
 const float RESPAWN_DELAY = 1.5f, INVINCIBLE_TIME = 2, BLINK_PERIOD = 0.1f;   // s
@@ -121,6 +127,7 @@ static Player newPlayer(int index) {
     player.lives = START_LIVES;
     player.rockets = START_ROCKETS;
     player.nextExtraLife = EXTRA_LIFE_EVERY;
+    player.weaponLevel = 1;
     return player;
 }
 
@@ -173,8 +180,9 @@ static void damageAlien(Game& game, Alien& alien, int damage, int owner) {
     if (owner >= 0) addScore(game, game.players[owner], ALIEN_SCORE[alien.type]);
     float cx = alien.x + ALIEN_W / 2.0f, cy = alien.y + ALIEN_H / 2.0f;
     spawnParticles(game, cx, cy, 8, paletteColor(ALIEN_COLORS[alien.type]), 50);
-    if (randomUnit(game) < PICKUP_CHANCE) {
-        Pickup pickup = {cx - 4, cy - 4};
+    float roll = randomUnit(game);   // below 2 %: rocket pickup, below 5 %: upgrade pickup
+    if (roll < PICKUP_CHANCE + UPGRADE_CHANCE) {
+        Pickup pickup = {cx - 4, cy - 4, roll < PICKUP_CHANCE ? PICKUP_ROCKET : PICKUP_UPGRADE};
         game.pickups.push_back(pickup);
     }
     game.soundRequested[SOUND_ALIEN_DEATH] = true;
@@ -197,6 +205,7 @@ static void killPlayer(Game& game, Player& player) {
     player.lives--;
     player.respawnTimer = RESPAWN_DELAY;
     player.rocketPressedAt = -1;
+    player.weaponLevel = std::max(1, player.weaponLevel - 1);
     float cx = player.x + SHIP_W / 2.0f, cy = player.y + SHIP_H / 2.0f;
     Explosion explosion = {cx, cy, 0, SHIP_EXPLOSION_RADIUS};
     game.explosions.push_back(explosion);
@@ -223,9 +232,18 @@ static void updatePlayer(Game& game, Player& player, int index, const Actions& a
     // Keeps the fire rhythm exact while R1 is held; the first bullet leaves on the press step.
     player.fireTimer -= dt;
     if (a.fire && player.fireTimer <= 0) {
-        Shot bullet = {player.x + SHIP_W / 2 - 1, player.y - 4, -BULLET_SPEED, index};
-        game.bullets.push_back(bullet);
-        player.fireTimer += FIRE_INTERVAL;
+        float noseX = player.x + SHIP_W / 2 - 1, noseY = player.y - 4;
+        if (player.weaponLevel == 1) {
+            game.bullets.push_back({noseX, noseY, -BULLET_SPEED, index, 0});
+        } else if (player.weaponLevel == 2) {
+            game.bullets.push_back({noseX - DOUBLE_OFFSET, noseY, -BULLET_SPEED, index, 0});
+            game.bullets.push_back({noseX + DOUBLE_OFFSET, noseY, -BULLET_SPEED, index, 0});
+        } else {
+            game.bullets.push_back({noseX, noseY, -BULLET_SPEED, index, -SPREAD_SPEED});
+            game.bullets.push_back({noseX, noseY, -BULLET_SPEED, index, 0});
+            game.bullets.push_back({noseX, noseY, -BULLET_SPEED, index, SPREAD_SPEED});
+        }
+        player.fireTimer += player.weaponLevel == MAX_WEAPON_LEVEL ? FAST_FIRE_INTERVAL : FIRE_INTERVAL;
         game.soundRequested[SOUND_SHOOT] = true;
     }
     if (player.fireTimer < 0) player.fireTimer = 0;
@@ -303,7 +321,7 @@ static void updateAlien(Game& game, Alien& alien, float dt) {
     }
     bool canShoot = alien.state == ALIEN_IN_FORMATION || alien.state == ALIEN_DIVING;
     if (canShoot && !game.over && randomUnit(game) < shotChance(game.wave) * dt) {
-        Shot shot = {alien.x + ALIEN_W / 2 - 1, alien.y + ALIEN_H, ENEMY_SHOT_SPEED, -1};
+        Shot shot = {alien.x + ALIEN_W / 2 - 1, alien.y + ALIEN_H, ENEMY_SHOT_SPEED, -1, 0};
         game.enemyShots.push_back(shot);
     }
 }
@@ -356,6 +374,7 @@ void updateGame(Game& game, const Actions* actions, float dt) {
     }
 
     for (Shot& bullet : game.bullets) {
+        bullet.x += bullet.vx * dt;
         bullet.y += bullet.vy * dt;
         for (Alien& alien : game.aliens) {
             if (!alien.alive || alien.y + ALIEN_H < 0 || !overlap(bullet.x, bullet.y, 2, 4, alien.x, alien.y, ALIEN_W, ALIEN_H)) continue;
@@ -377,7 +396,10 @@ void updateGame(Game& game, const Actions* actions, float dt) {
         }
     }
 
-    for (Shot& shot : game.enemyShots) shot.y += shot.vy * dt;
+    for (Shot& shot : game.enemyShots) {
+        shot.x += shot.vx * dt;
+        shot.y += shot.vy * dt;
+    }
     for (Pickup& pickup : game.pickups) pickup.y += PICKUP_FALL_SPEED * dt;
 
     for (Player& player : game.players) {
@@ -400,7 +422,9 @@ void updateGame(Game& game, const Actions* actions, float dt) {
         }
         for (Pickup& pickup : game.pickups) {
             if (!overlap(pickup.x, pickup.y, 8, 8, player.x, player.y, SHIP_W, SHIP_H)) continue;
-            player.rockets = std::min(player.rockets + 1, MAX_ROCKETS);
+            if (pickup.type == PICKUP_ROCKET) player.rockets = std::min(player.rockets + 1, MAX_ROCKETS);
+            else if (player.weaponLevel < MAX_WEAPON_LEVEL) player.weaponLevel++;
+            else addScore(game, player, UPGRADE_MAX_POINTS);
             pickup.y = SCREEN_H + 100;   // collected; removed below
             game.soundRequested[SOUND_PICKUP] = true;
         }
@@ -483,7 +507,8 @@ void drawGame(const Game& game) {
         if (alien.flash > 0) drawSpriteSolid(sprite, (int)alien.x, (int)alien.y, paletteColor('w'));
         else drawSprite(sprite, (int)alien.x, (int)alien.y);
     }
-    for (const Pickup& pickup : game.pickups) drawSprite(ROCKET_PICKUP, (int)pickup.x, (int)pickup.y);
+    for (const Pickup& pickup : game.pickups)
+        drawSprite(pickup.type == PICKUP_ROCKET ? ROCKET_PICKUP : UPGRADE_PICKUP, (int)pickup.x, (int)pickup.y);
     for (const Shot& bullet : game.bullets) drawSprite(BULLET, (int)bullet.x, (int)bullet.y);
     for (const Rocket& rocket : game.rockets) drawSprite(ROCKET, (int)rocket.x, (int)rocket.y);
     for (size_t i = 0; i < game.players.size(); i++) {

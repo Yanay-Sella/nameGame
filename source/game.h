@@ -31,10 +31,11 @@ struct Player {
     float respawnTimer;      // s until the ship returns after a death
     float invincibleTimer;   // s of blinking invincibility left
     int lives, rockets, score;
+    int weaponLevel;         // 1..4: single, double, spread, fast spread
     int nextExtraLife;       // score that gives the next extra life
 };
 
-struct Shot { float x, y, vy; int owner; };   // owner: player index for bullets, -1 for enemy shots
+struct Shot { float x, y, vy; int owner; float vx; };   // owner: player index for bullets, -1 for enemy shots
 
 enum AlienType { ALIEN_GREEN, ALIEN_BLUE, ALIEN_RED };
 enum AlienState { ALIEN_ENTERING, ALIEN_IN_FORMATION, ALIEN_DIVING, ALIEN_RETURNING };
@@ -53,7 +54,8 @@ struct Alien {
 
 struct Rocket { float x, y, speed; int owner; };
 struct Explosion { float x, y, age, radius; };
-struct Pickup { float x, y; };
+enum PickupType { PICKUP_ROCKET, PICKUP_UPGRADE };
+struct Pickup { float x, y; PickupType type; };
 struct Particle { float x, y, vx, vy, life; uint32_t color; };
 struct Star { float x, y; int layer; };
 

@@ -50,14 +50,14 @@ static Alien parkedAlien(float x, float y) {
 
 static void spritesHaveTheirSize() {
     const Sprite* sprites[] = {&SHIP_A, &SHIP_B, &SHIP2_A, &SHIP2_B, &GREEN_ALIEN_A, &GREEN_ALIEN_B, &BLUE_ALIEN_A, &BLUE_ALIEN_B,
-                               &RED_ALIEN_A, &RED_ALIEN_B, &BULLET, &ENEMY_SHOT, &ROCKET, &ROCKET_PICKUP,
+                               &RED_ALIEN_A, &RED_ALIEN_B, &BULLET, &ENEMY_SHOT, &ROCKET, &ROCKET_PICKUP, &UPGRADE_PICKUP,
                                &LIFE_ICON, &ROCKET_ICON};
     for (const Sprite* s : sprites) CHECK((int)strlen(s->pixels) == s->w * s->h);
 }
 
 static void onlyEnemyShotsUseMagenta() {
     const Sprite* sprites[] = {&SHIP_A, &SHIP_B, &SHIP2_A, &SHIP2_B, &GREEN_ALIEN_A, &GREEN_ALIEN_B, &BLUE_ALIEN_A, &BLUE_ALIEN_B,
-                               &RED_ALIEN_A, &RED_ALIEN_B, &BULLET, &ROCKET, &ROCKET_PICKUP, &LIFE_ICON, &ROCKET_ICON};
+                               &RED_ALIEN_A, &RED_ALIEN_B, &BULLET, &ROCKET, &ROCKET_PICKUP, &UPGRADE_PICKUP, &LIFE_ICON, &ROCKET_ICON};
     for (const Sprite* s : sprites) CHECK(strchr(s->pixels, 'm') == NULL);
 }
 
@@ -223,7 +223,7 @@ static void threeDeathsEndTheRun() {
     game.swayDirection = 0;
     for (int death = 1; death <= 3; death++) {
         Player& p = game.players[0];
-        Shot shot = {p.x + 7, p.y + 5, 0, -1};   // parked on the hitbox
+        Shot shot = {p.x + 7, p.y + 5, 0, -1, 0};   // parked on the hitbox
         game.enemyShots.push_back(shot);
         updateGame(game, &NO_INPUT, DT);
         CHECK(!game.players[0].alive && game.players[0].lives == 3 - death);
@@ -238,7 +238,7 @@ static void nextWaveWaitsForALivingShip() {
     startGame(game, 1, 7);
     for (Alien& alien : game.aliens) alien.alive = false;
     Player& p = game.players[0];
-    Shot shot = {p.x + 7, p.y + 5, 0, -1};
+    Shot shot = {p.x + 7, p.y + 5, 0, -1, 0};
     game.enemyShots.push_back(shot);
     updateGame(game, &NO_INPUT, DT);
     CHECK(!game.players[0].alive);
@@ -265,7 +265,7 @@ static void pickupAddsARocketUpToNine() {
     Game game;
     startSafeGame(game);
     Player& p = game.players[0];
-    Pickup pickup = {p.x + 4, p.y};
+    Pickup pickup = {p.x + 4, p.y, PICKUP_ROCKET};
     game.pickups.push_back(pickup);
     updateGame(game, &NO_INPUT, DT);
     CHECK(game.players[0].rockets == 4 && game.pickups.empty() && game.soundRequested[SOUND_PICKUP]);
@@ -301,13 +301,13 @@ static void coOpRunEndsWhenBothPlayersAreOut() {
     game.swayDirection = 0;
     Actions actions[2] = {};
     game.players[0].lives = 1;
-    Shot shot = {game.players[0].x + 7, game.players[0].y + 5, 0, -1};
+    Shot shot = {game.players[0].x + 7, game.players[0].y + 5, 0, -1, 0};
     game.enemyShots.push_back(shot);
     for (int step = 0; step < 3 * 60; step++) updateGame(game, actions, DT);
     CHECK(game.players[0].lives == 0 && game.players[1].alive && !game.over);
     game.players[1].lives = 1;
     game.players[1].invincibleTimer = 0;
-    Shot shot2 = {game.players[1].x + 7, game.players[1].y + 5, 0, -1};
+    Shot shot2 = {game.players[1].x + 7, game.players[1].y + 5, 0, -1, 0};
     game.enemyShots.push_back(shot2);
     for (int step = 0; step < 2 * 60; step++) updateGame(game, actions, DT);
     CHECK(game.over);
@@ -323,6 +323,66 @@ static void waveBonusSkipsAPlayerWhoIsOut() {
     Actions actions[2] = {};
     updateGame(game, actions, DT);
     CHECK(game.players[0].score == 1000 && game.players[1].score == 0);
+}
+
+static void weaponLevelsFireTheirPattern() {
+    Game game;
+    startSafeGame(game);
+    Actions a = noInput();
+    a.fire = true;
+    size_t expected[4] = {1, 2, 3, 3};
+    for (int level = 1; level <= 3; level++) {
+        game.bullets.clear();
+        game.players[0].weaponLevel = level;
+        game.players[0].fireTimer = 0;
+        updateGame(game, &a, DT);
+        CHECK(game.bullets.size() == expected[level - 1]);
+        if (level == 2) CHECK(game.bullets[0].x < game.bullets[1].x && game.bullets[0].vx == 0 && game.bullets[1].vx == 0);
+        if (level == 3) CHECK(game.bullets[0].vx == -70 && game.bullets[1].vx == 0 && game.bullets[2].vx == 70);
+    }
+    game.bullets.clear();
+    game.players[0].weaponLevel = 4;
+    game.players[0].fireTimer = 0;
+    int volleys = 0;
+    for (int step = 0; step < 60; step++) {   // one second at 0.08 s: shots at 0, 0.08, ... 0.96 s
+        game.soundRequested[SOUND_SHOOT] = false;
+        updateGame(game, &a, DT);
+        if (game.soundRequested[SOUND_SHOOT]) volleys++;
+    }
+    CHECK(volleys == 13);
+}
+
+static void upgradePickupRaisesLevelUpToFour() {
+    Game game;
+    startSafeGame(game);
+    Player& p = game.players[0];
+    Pickup pickup = {p.x + 4, p.y, PICKUP_UPGRADE};
+    for (int expected = 2; expected <= 4; expected++) {
+        game.pickups.push_back(pickup);
+        updateGame(game, &NO_INPUT, DT);
+        CHECK(game.players[0].weaponLevel == expected && game.pickups.empty());
+    }
+    int score = game.players[0].score;
+    game.pickups.push_back(pickup);
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(game.players[0].weaponLevel == 4 && game.players[0].score == score + 1000);
+    CHECK(game.players[0].rockets == 3);   // an upgrade is not a rocket
+}
+
+static void deathLosesOneWeaponLevel() {
+    Game game;
+    startGame(game, 1, 7);
+    game.swayDirection = 0;
+    for (int level = 3; level >= 1; level -= 2) {   // 3 -> 2, then 1 -> 1
+        Player& p = game.players[0];
+        p.weaponLevel = level;
+        p.invincibleTimer = 0;
+        Shot shot = {p.x + 7, p.y + 5, 0, -1, 0};
+        game.enemyShots.push_back(shot);
+        updateGame(game, &NO_INPUT, DT);
+        CHECK(!game.players[0].alive && game.players[0].weaponLevel == (level == 3 ? 2 : 1));
+        run(game, noInput(), 1.6f);
+    }
 }
 
 static void settingsDefaultToMusicOn() {
@@ -365,6 +425,9 @@ int main() {
     nextWaveWaitsForALivingShip();
     alienBodyKillsTheShip();
     pickupAddsARocketUpToNine();
+    weaponLevelsFireTheirPattern();
+    upgradePickupRaisesLevelUpToFour();
+    deathLosesOneWeaponLevel();
     secondPlayerJoinsBlinkingWithAFreshRun();
     coOpRunEndsWhenBothPlayersAreOut();
     waveBonusSkipsAPlayerWhoIsOut();

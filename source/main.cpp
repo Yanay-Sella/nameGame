@@ -46,7 +46,7 @@ static void watchdog(void* arg) {
 // Dev aid (Triangle): tops the screen up to the 60 fps stress case of 60 aliens, 100 bullets and 2 explosions.
 static void addStressLoad(Game& game) {
     for (int i = 0; i < 100; i++) {
-        Shot bullet = {(float)(i * 3 % SCREEN_W), (float)(SCREEN_H - 20 - i % 60), -40, 0};
+        Shot bullet = {(float)(i * 3 % SCREEN_W), (float)(SCREEN_H - 20 - i % 60), -40, 0, 0};
         game.bullets.push_back(bullet);
     }
     for (int i = (int)game.aliens.size(); i < 60; i++) {
@@ -267,8 +267,8 @@ int main(int argc, char** argv) {
         worstWorkMs = SDL_max(worstWorkMs, workMs);
         statsTimer += (float)((SDL_GetPerformanceCounter() - frameStart) / counterHz);
         if (statsTimer >= 5) {
-            debugNetPrintf(INFO, "fps %.1f, worst work %.1f ms, wave %d, score %d\n", framesSinceStats / statsTimer,
-                           worstWorkMs, game.wave, game.players[0].score);
+            debugNetPrintf(INFO, "fps %.1f, worst work %.1f ms, wave %d, score %d, weapon %d\n", framesSinceStats / statsTimer,
+                           worstWorkMs, game.wave, game.players[0].score, game.players[0].weaponLevel);
             framesSinceStats = 0;
             statsTimer = 0;
             worstWorkMs = 0;
