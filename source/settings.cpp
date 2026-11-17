@@ -11,6 +11,8 @@ Settings settingsLoad(const char* path) {
     while (fgets(line, sizeof line, file)) {
         int value;
         if (sscanf(line, "music=%d", &value) == 1) settings.music = value != 0;
+        if (sscanf(line, "shake=%d", &value) == 1) settings.shake = value < 0 ? 0 : value > 100 ? 100 : value;
+        if (sscanf(line, "flash=%d", &value) == 1) settings.reduceFlashing = value != 0;
     }
     fclose(file);
     return settings;
@@ -19,7 +21,7 @@ Settings settingsLoad(const char* path) {
 bool settingsSave(const char* path, const Settings& settings) {
     FILE* file = fopen(path, "w");
     if (!file) return false;
-    bool written = fprintf(file, "music=%d\n", settings.music ? 1 : 0) > 0;
+    bool written = fprintf(file, "music=%d\nshake=%d\nflash=%d\n", settings.music ? 1 : 0, settings.shake, settings.reduceFlashing ? 1 : 0) > 0;
     return fclose(file) == 0 && written;
 }
 

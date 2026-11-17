@@ -6,6 +6,7 @@
 #include <sys/systime.h>
 #include <lv2/process.h>
 #include <rsx/gcm_sys.h>
+#include <stdio.h>
 #include <string>
 #include "audio.h"
 #include "game.h"
@@ -101,7 +102,8 @@ int main(int argc, char** argv) {
     audioOpen(exeFolder.c_str());
     std::string settingsPath = exeFolder + "/settings.txt";
     Settings settings = settingsLoad(settingsPath.c_str());
-    debugNetPrintf(INFO, "settings: music %s\n", settings.music ? "on" : "off");
+    debugNetPrintf(INFO, "settings: music %s, shake %d, flashing %s\n", settings.music ? "on" : "off", settings.shake,
+                   settings.reduceFlashing ? "reduced" : "normal");
     std::string highScorePath = exeFolder + "/highscore.txt";
     int highScore = highScoreLoad(highScorePath.c_str());
     debugNetPrintf(INFO, "high score: %d\n", highScore);
@@ -141,7 +143,7 @@ int main(int argc, char** argv) {
             menu.up |= a.up; menu.down |= a.down; menu.left |= a.left; menu.right |= a.right;
             menu.confirm |= a.confirm; menu.back |= a.back; menu.pause |= a.pause;
         }
-        int itemCount = scene == SCENE_PAUSED ? 3 : 2;
+        int itemCount = scene == SCENE_SETTINGS ? 4 : scene == SCENE_PAUSED ? 3 : 2;
         if (scene != SCENE_PLAYING) {
             if (menu.up) selected = (selected + itemCount - 1) % itemCount;
             if (menu.down) selected = (selected + 1) % itemCount;
@@ -160,15 +162,22 @@ int main(int argc, char** argv) {
             }
             break;
         case SCENE_SETTINGS:
-            if (menu.back || (menu.confirm && selected == 1)) {
+            if (menu.back || (menu.confirm && selected == 3)) {
                 selected = 1;   // the SETTINGS item in both menus
                 setScene(settingsBack);
-            } else if (selected == 0 && (menu.confirm || menu.left || menu.right)) {
-                settings.music = !settings.music;
-                if (!settings.music) audioStopMusic();
-                else if (settingsBack == SCENE_PAUSED) audioStartMusic();
+            } else if (selected < 3 && (menu.confirm || menu.left || menu.right)) {
+                if (selected == 0) {
+                    settings.music = !settings.music;
+                    if (!settings.music) audioStopMusic();
+                    else if (settingsBack == SCENE_PAUSED) audioStartMusic();
+                } else if (selected == 1) {
+                    settings.shake = (settings.shake + (menu.left ? -25 : 25) + 125) % 125;   // 0, 25 ... 100, wrapping
+                } else {
+                    settings.reduceFlashing = !settings.reduceFlashing;
+                }
                 bool saved = settingsSave(settingsPath.c_str(), settings);
-                debugNetPrintf(INFO, "settings: music %s (%s)\n", settings.music ? "on" : "off", saved ? "saved" : "SAVE FAILED");
+                debugNetPrintf(INFO, "settings: music %s, shake %d, flashing %s (%s)\n", settings.music ? "on" : "off", settings.shake,
+                               settings.reduceFlashing ? "reduced" : "normal", saved ? "saved" : "SAVE FAILED");
             }
             break;
         case SCENE_PAUSED:
@@ -253,15 +262,23 @@ int main(int argc, char** argv) {
         }
 
         game.highScore = highScore;
+        game.shakeStrength = settings.shake / 100.0f;
+        game.reduceFlashing = settings.reduceFlashing;
         stage = "draw";
         if (scene == SCENE_MAIN_MENU) {
             drawBackground(game);
             drawMenu("NAMEGAME", MAIN_ITEMS, 2, selected, "X SELECT");
+            char best[24];
+            snprintf(best, sizeof best, "HI %07d", highScore);
+            drawText((SCREEN_W - textWidth(best)) / 2, 124, best, paletteColor('y'));
         } else if (scene == SCENE_SETTINGS) {
             if (settingsBack == SCENE_PAUSED) drawGame(game);
             else drawBackground(game);
-            const char* settingsItems[] = {settings.music ? "MUSIC: ON" : "MUSIC: OFF", "BACK"};
-            drawMenu("SETTINGS", settingsItems, 2, selected, "X CHANGE  O BACK");
+            char shake[24];
+            snprintf(shake, sizeof shake, "SHAKE: %d%%", settings.shake);
+            const char* settingsItems[] = {settings.music ? "MUSIC: ON" : "MUSIC: OFF", shake,
+                                           settings.reduceFlashing ? "FLASHING: REDUCED" : "FLASHING: NORMAL", "BACK"};
+            drawMenu("SETTINGS", settingsItems, 4, selected, "X CHANGE  O BACK");
         } else {
             drawGame(game);
             if (scene == SCENE_PAUSED) drawMenu("PAUSED", PAUSE_ITEMS, 3, selected, "X SELECT  O RESUME");

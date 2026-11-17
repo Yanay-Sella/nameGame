@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 // Ship controls (ship-controls/design.md)
 const float SHIP_SPEED = 150;          // px/s
@@ -48,9 +49,17 @@ const float BOSS_BASE_INTERVAL = 2.5f, BOSS_INTERVAL_STEP = 0.3f, BOSS_MIN_INTER
 const int BOSS_BURST_SHOTS = 3, BOSS_FAN_SHOTS = 5;
 const float BOSS_BURST_GAP = 0.15f;    // s
 const float BOSS_AIMED_SPEED = 90, BOSS_FAN_DOWN_SPEED = 70, BOSS_FAN_SIDEWAYS = 60;   // px/s
-const int BOSS_BLAST_DAMAGE = EXPLOSION_DAMAGE, BOSS_REWARD = 5000;   // HP, points x appearance
+const int BOSS_REWARD = 5000;          // points x appearance
 const float BOSS_EXPLOSION_RADIUS = 48;   // px
 const int BOSS_HEALTH_BAR_W = 120, BOSS_HEALTH_BAR_Y = 16;   // px
+// Game feel (game-feel/design.md)
+const float TRAUMA_DECAY = 1.5f;       // per s
+const float SHAKE_X = 4, SHAKE_Y = 3;  // px at trauma 1 and full strength
+const float FLASH_MIN_GAP = 0.33f;     // s between screen flashes
+const float TRAUMA_BLAST = 0.6f, STOP_BLAST = 0.06f, FLASH_BLAST = 0.05f;
+const float TRAUMA_BOSS_DEATH = 1.0f, STOP_BOSS_DEATH = 0.15f, FLASH_BOSS_DEATH = 0.08f;
+const float TRAUMA_PLAYER_DEATH = 0.8f, STOP_PLAYER_DEATH = 0.12f, FLASH_PLAYER_DEATH = 0.08f;
+const int BLAST_PARTICLES = 20, PICKUP_PARTICLES = 4;
 // Lives and score (lives-and-score/design.md)
 const int START_LIVES = 3, MAX_LIVES = 9;
 const float RESPAWN_DELAY = 1.5f, INVINCIBLE_TIME = 2, BLINK_PERIOD = 0.1f;   // s
@@ -186,6 +195,16 @@ void joinGame(Game& game) {
     game.soundRequested[SOUND_EXTRA_LIFE] = true;
 }
 
+// One event's feel: trauma adds (capped), the longest hit-stop wins, a screen flash is dropped inside the rate limit.
+static void feedback(Game& game, float trauma, float hitStop, float flash) {
+    game.trauma = std::min(game.trauma + trauma, 1.0f);
+    game.hitStop = std::max(game.hitStop, hitStop);
+    if (flash > 0 && game.feelTime - game.lastFlashTime >= FLASH_MIN_GAP) {
+        game.flashTimer = flash;
+        game.lastFlashTime = game.feelTime;
+    }
+}
+
 // Adds points and gives an extra life for every threshold crossed (lives-and-score rule 6).
 static void addScore(Game& game, Player& player, int points) {
     player.score = std::min(player.score + points, MAX_SCORE);
@@ -233,6 +252,7 @@ static void damageBoss(Game& game, int damage, int owner) {
     }
     boss.alive = false;
     boss.burstShotsLeft = 0;
+    feedback(game, TRAUMA_BOSS_DEATH, STOP_BOSS_DEATH, FLASH_BOSS_DEATH);
     if (owner >= 0) addScore(game, game.players[owner], BOSS_REWARD * (game.wave / 5));
     float cx = boss.x + BOSS_W / 2.0f, cy = boss.y + BOSS_H / 2.0f;
     Explosion explosion = {cx, cy, 0, BOSS_EXPLOSION_RADIUS};
@@ -249,6 +269,8 @@ static void damageBoss(Game& game, int damage, int owner) {
 static void explode(Game& game, float x, float y, int owner) {
     Explosion explosion = {x, y, 0, EXPLOSION_RADIUS};
     game.explosions.push_back(explosion);
+    spawnParticles(game, x, y, BLAST_PARTICLES, paletteColor('o'), 80);
+    feedback(game, TRAUMA_BLAST, STOP_BLAST, FLASH_BLAST);
     float reach = EXPLOSION_RADIUS + ALIEN_W / 2.0f;
     for (Alien& alien : game.aliens) {
         float dx = alien.x + ALIEN_W / 2.0f - x, dy = alien.y + ALIEN_H / 2.0f - y;
@@ -258,7 +280,7 @@ static void explode(Game& game, float x, float y, int owner) {
     float nearestX = std::max(game.boss.x, std::min(x, game.boss.x + BOSS_W));
     float nearestY = std::max(game.boss.y, std::min(y, game.boss.y + BOSS_H));
     if (game.boss.alive && (nearestX - x) * (nearestX - x) + (nearestY - y) * (nearestY - y) <= EXPLOSION_RADIUS * EXPLOSION_RADIUS)
-        damageBoss(game, BOSS_BLAST_DAMAGE, owner);
+        damageBoss(game, EXPLOSION_DAMAGE, owner);
     game.soundRequested[SOUND_EXPLOSION] = true;
 }
 
@@ -268,6 +290,7 @@ static void killPlayer(Game& game, Player& player) {
     player.respawnTimer = RESPAWN_DELAY;
     player.rocketPressedAt = -1;
     player.weaponLevel = std::max(1, player.weaponLevel - 1);
+    feedback(game, TRAUMA_PLAYER_DEATH, STOP_PLAYER_DEATH, FLASH_PLAYER_DEATH);
     float cx = player.x + SHIP_W / 2.0f, cy = player.y + SHIP_H / 2.0f;
     Explosion explosion = {cx, cy, 0, SHIP_EXPLOSION_RADIUS};
     game.explosions.push_back(explosion);
@@ -460,6 +483,15 @@ void updateBackground(Game& game, float dt) {
 }
 
 void updateGame(Game& game, const Actions* actions, float dt) {
+    game.feelTime += dt;
+    game.trauma = std::max(0.0f, game.trauma - TRAUMA_DECAY * dt);
+    game.flashTimer = std::max(0.0f, game.flashTimer - dt);
+    if (game.hitStop > 0) {   // frozen: game time stands still, so a recorded R2 press keeps its buffer
+        game.hitStop -= dt;
+        for (size_t i = 0; i < game.players.size(); i++)
+            if (actions[i].rocket && game.players[i].alive) game.players[i].rocketPressedAt = game.time;
+        return;
+    }
     game.time += dt;
     bool anyPlayerAlive = false;
     for (const Player& p : game.players) anyPlayerAlive |= p.alive;
@@ -544,6 +576,7 @@ void updateGame(Game& game, const Actions* actions, float dt) {
             if (pickup.type == PICKUP_ROCKET) player.rockets = std::min(player.rockets + 1, MAX_ROCKETS);
             else if (player.weaponLevel < MAX_WEAPON_LEVEL) player.weaponLevel++;
             else addScore(game, player, UPGRADE_MAX_POINTS);
+            spawnParticles(game, pickup.x + 4, pickup.y + 4, PICKUP_PARTICLES, paletteColor(pickup.type == PICKUP_ROCKET ? 'p' : 'y'), 30);
             pickup.y = SCREEN_H + 100;   // collected; removed below
             game.soundRequested[SOUND_PICKUP] = true;
         }
@@ -644,6 +677,27 @@ void drawGame(const Game& game) {
     for (const Shot& shot : game.enemyShots) drawSprite(ENEMY_SHOT, (int)shot.x, (int)shot.y);
     for (const Explosion& explosion : game.explosions) drawExplosion(explosion);
     for (const Particle& p : game.particles) fillRect((int)p.x, (int)p.y, 1, 1, p.color);
+
+    // Screen flash: the play field halfway to white; reduce flashing turns it off.
+    if (game.flashTimer > 0 && !game.reduceFlashing)
+        for (uint32_t& pixel : screenPixels) pixel = 0xFF000000 | (((pixel >> 1) & 0x7F7F7F) + 0x808080);
+
+    // Shake: shift the play field picture by a whole pixel offset; the HUD below is drawn after, so it stays still.
+    float shake = game.trauma * game.trauma * game.shakeStrength;
+    int dx = (int)lroundf(SHAKE_X * shake * sinf(game.feelTime * 41)), dy = (int)lroundf(SHAKE_Y * shake * sinf(game.feelTime * 57));
+    if (dx != 0 || dy != 0) {
+        for (int i = 0; i < SCREEN_H; i++) {
+            int y = dy > 0 ? SCREEN_H - 1 - i : i, sourceY = y - dy;   // copy order: a row is read before it is overwritten
+            uint32_t* row = screenPixels + y * SCREEN_W;
+            if (sourceY < 0 || sourceY >= SCREEN_H) {
+                std::fill(row, row + SCREEN_W, paletteColor('k'));
+                continue;
+            }
+            memmove(row + std::max(dx, 0), screenPixels + sourceY * SCREEN_W + std::max(-dx, 0), (SCREEN_W - abs(dx)) * sizeof(uint32_t));
+            if (dx > 0) std::fill(row, row + dx, paletteColor('k'));
+            if (dx < 0) std::fill(row + SCREEN_W + dx, row + SCREEN_W, paletteColor('k'));
+        }
+    }
 
     // HUD: the wave at the top centre; each player's score, spare lives and rockets on their side (1P left, 2P right).
     char text[48];

@@ -16,15 +16,15 @@ Every 5th wave a single big boss replaces the formation (GDD D-002). It is the r
 ## Numbers
 | Name | Value | Unit | What to watch in playtests |
 |---|---|---|---|
-| Boss size | 32×20 | px | big, but the fan has gaps to fly through [ASSUMPTION] |
-| HP | 100 + 50·(n−1) | HP | wave 5 about 25 s of steady fire plus a rocket or two [ASSUMPTION] |
-| Entry speed, stop height | 150, y = 20 | px/s | same as aliens' entry [ASSUMPTION] |
-| Sway speed | 40 + 10·(n−1), max 80 | px/s | [ASSUMPTION] |
-| Attack interval | max(2.5 − 0.3·(n−1), 1.2) | s | threatening, never constant fire [ASSUMPTION] |
-| Burst | 3 shots, 0.15 s apart, 90 px/s | | dodgeable by moving [ASSUMPTION] |
-| Fan | 5 shots, sideways −60…+60, down 70 | px/s | [ASSUMPTION] |
+| Boss size | 32×20 | px | big, but the fan has gaps to fly through |
+| HP | 100 + 50·(n−1) | HP | wave 5 about 25 s of steady fire plus a rocket or two |
+| Entry speed, stop height | 150, y = 20 | px/s | same as aliens' entry |
+| Sway speed | 40 + 10·(n−1), max 80 | px/s | |
+| Attack interval | max(2.5 − 0.3·(n−1), 1.2) | s | threatening, never constant fire |
+| Burst | 3 shots, 0.15 s apart, 90 px/s | | dodgeable by moving |
+| Fan | 5 shots, sideways −60…+60, down 70 | px/s | |
 | Bullet / blast damage | 1 / 20 | HP | |
-| Reward | 5,000·n | points | [ASSUMPTION] |
+| Reward | 5,000·n | points | |
 
 ## Edge cases
 - Both ships dead or waiting to respawn: the boss holds fire and its attack timer stands still.
@@ -35,3 +35,4 @@ Every 5th wave a single big boss replaces the formation (GDD D-002). It is the r
 ## History
 - 2026-11-17: designed.
 - 2026-11-17: implemented in M3.
+- 2026-11-17: numbers confirmed in single-player and co-op playtests.

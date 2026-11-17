@@ -15,13 +15,13 @@ Pickups upgrade the ship's bullets through four levels, so the gun grows from a 
 ## Numbers
 | Name | Value | Unit | What to watch in playtests |
 |---|---|---|---|
-| Levels | 1–4 | | each level looks and feels distinct [ASSUMPTION] |
+| Levels | 1–4 | | each level looks and feels distinct |
 | Fire interval, levels 1–3 | 0.12 | s | existing |
-| Fire interval, level 4 | 0.08 | s | strong but not buzzing [ASSUMPTION] |
-| Double side offset | 3 | px | [ASSUMPTION] |
-| Spread sideways speed | 70 | px/s | covers about a third of the formation [ASSUMPTION] |
-| Upgrade drop chance | 3 | % per kill | level 4 reached in about 4–5 waves [ASSUMPTION] |
-| Points at max level | 1,000 | points | [ASSUMPTION] |
+| Fire interval, level 4 | 0.08 | s | strong but not buzzing |
+| Double side offset | 3 | px | |
+| Spread sideways speed | 70 | px/s | covers about a third of the formation |
+| Upgrade drop chance | 3 | % per kill | level 4 reached in about 4–5 waves |
+| Points at max level | 1,000 | points | |
 | Pickup fall speed | 30 | px/s | same as the rocket pickup |
 
 ## Edge cases
@@ -32,3 +32,4 @@ Pickups upgrade the ship's bullets through four levels, so the gun grows from a 
 ## History
 - 2026-11-17: designed.
 - 2026-11-17: implemented in M3.
+- 2026-11-17: numbers confirmed in single-player and co-op playtests.

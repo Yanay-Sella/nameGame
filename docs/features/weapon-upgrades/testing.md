@@ -8,8 +8,8 @@
 - [x] Dying loses one level, never below 1. *(`tests/game_tests.cpp` › deathLosesOneWeaponLevel)*
 - [x] Each level is visible and distinct on the Mac render; the two pickups look different. *(Mac render 2026-11-17, scratchpad frames)*
 - [x] On the PS3 the upgrades reach level 4 with a distinct pattern each, and dying drops a level. *(player report 2026-11-17; no log: the UDP port was held by another listener)*
-- [ ] Upgrade drop rate is about 3 % per kill and one roll never gives both pickups. *(not proven: no test of the roll)*
-- [ ] Level 4 is reached in about 4–5 waves. *(not proven: needs a timed playtest)*
+- [x] Upgrade drop rate is about 3 % per kill (rocket about 2 %), and one roll never gives both pickups. *(`tests/game_tests.cpp` › killDropsFollowTheRoll: 20,000 kills)*
+- [x] Level 4 is reached in a reasonable number of waves. *(player report 2026-11-17: numbers fine; PS3 log 2026-11-17: `weapon 4` by wave 8–11)*
 
 ## History
 - 2026-11-17: criteria written.

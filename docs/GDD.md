@@ -1,6 +1,6 @@
 # nameGame — Game Design Document
 
-**Version:** 0.11 · **Updated:** 2026-11-17 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
+**Version:** 0.13 · **Updated:** 2026-11-17 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
 
 ## Summary
 You pilot a small ship at the bottom of the screen against waves of pixel-art aliens. Hold R1 to spray bullets, and save the scarce R2 rocket for the moment a wave gets out of hand. Waves get harder, and every 5th wave is a boss. The run ends when you lose your last life, and you chase the saved high score.
@@ -41,15 +41,15 @@ dodge + shoot (R1) → kill aliens → score and pickups → stronger gun / more
 | Bosses | implemented | MVP | A boss on every 5th wave, stronger each time | [design](features/bosses/design.md) |
 | Music and sound | implemented | MVP | Your song looped during gameplay; synthesized retro SFX | [design](features/music-and-sound/design.md) |
 | Pixel art | implemented | MVP | 320×180 palette art: sprites, font and starfield as text grids in code | [design](features/pixel-art/design.md) |
-| Screens | in progress | MVP | Main menu (Classic, Settings), pause menu, settings with music on/off, game over | [design](features/screens/design.md) |
+| Screens | implemented | MVP | Main menu (Classic, Settings), pause menu, settings (music, shake, flashing), high score on the title, game over | [design](features/screens/design.md) |
 | High score save | implemented | MVP | Best score saved on the PS3, shown on the title | [design](features/high-score/design.md) |
-| Game feel | idea | MVP | Shake, hit-stop, flashes, particles by event tier; shake and flash options | — |
-| Co-op | in progress | MVP | A second player drops in with Start on a second controller | [design](features/co-op/design.md) |
+| Game feel | implemented | MVP | Shake, hit-stop, flashes, particles by event tier; shake and flash options | [design](features/game-feel/design.md) |
+| Co-op | implemented | MVP | A second player drops in with Start on a second controller | [design](features/co-op/design.md) |
 
 ## Milestones
 1. **M1, greybox on the PS3:** boxes for ship, bullets, rocket and enemies; low-res scaling, music playback and button mapping proven · done when: [prototypes/ship-feel/BRIEF.md](../prototypes/ship-feel/BRIEF.md) has a RESULT line.
 2. **M2, core loop (done 2026-11-17):** ship controls, rocket, enemy waves, lives and score, music and sound, pixel art · done when: a run goes from wave 1 to game over on the PS3 at 60 fps.
-3. **M3, full game:** bosses, weapon upgrades, screens, high score save, game feel · done when: title → run → game over → title works on the PS3 and the high score survives a reboot.
+3. **M3, full game (done 2026-11-17):** bosses, weapon upgrades, screens, high score save, game feel · done when: title → run → game over → title works on the PS3 and the high score survives a reboot.
 4. **M4, release polish:** game name and icon, balancing to wave 20, controller unplug handling, 30-minute stability run, install guide · done when: a fresh player installs the pkg from the guide and plays a full run without help.
 
 The task-by-task plan for each milestone is in the [work plan](work-plan/nameGame-work-plan.pdf) (source: [make_work_plan.py](work-plan/make_work_plan.py)).
@@ -60,8 +60,8 @@ Boot → MAIN MENU ─ CLASSIC ──→ PLAYING ⇄ (Start) PAUSED ─ RETURN T
            └─ SETTINGS ⇄           │                  └─ SETTINGS ⇄
                                    └─ game over: X/Start = play again, Circle = MAIN MENU
 ```
-- **Main menu:** title "NAMEGAME" and the items Classic and Settings. Silent. Classic is the only game mode for now.
-- **Settings:** music on/off, saved to settings.txt. Circle or Back returns to the menu that opened it.
+- **Main menu:** title "NAMEGAME", the items Classic and Settings and the saved high score. Silent. Classic is the only game mode for now.
+- **Settings:** music on/off, screen shake 0–100 % and reduced flashing, saved to settings.txt. Circle or Back returns to the menu that opened it.
 - **Game:** the HUD shows score, wave, lives and rockets. Music loops if enabled.
 - **Pause:** Start opens it (Resume, Settings, Return to menu); the music keeps playing.
 - **Game over:** final score and wave; X or Start plays again, Circle goes to the main menu.
@@ -90,6 +90,7 @@ Boot → MAIN MENU ─ CLASSIC ──→ PLAYING ⇄ (Start) PAUSED ─ RETURN T
 | D-008 | 2026-11-17 | Draw the 320×180 picture in a CPU pixel buffer, then one scaled `SDL_RenderCopy` to the screen | SDL render target; scaled sprite textures | the port's `SDL_SetRenderTarget` is a no-op and `SDL_RenderCopy` has no alpha blending (read in SDL_PSL1GHT's renderer source); the scaled copy is a hardware blit with nearest-neighbour | all drawing |
 | D-009 | 2026-11-17 | Co-op as drop-in join: runs start with one player, player 2 presses Start on a second controller to join | two players by default; a player-count menu | the user wanted to add co-op now, with a player joining instead of two players by default | [co-op](features/co-op/design.md), [lives and score](features/lives-and-score/design.md) |
 | D-010 | 2026-11-17 | A main menu with game modes (only Classic for now) and a Settings screen reachable from the main and pause menus; music on/off saved to settings.txt | title screen with "press X" only | the user wanted room for more modes and settings | [screens](features/screens/design.md), [music and sound](features/music-and-sound/design.md), [co-op](features/co-op/design.md) |
+| D-011 | 2026-11-17 | No hit-stop on ordinary alien kills; hit-stop only on rocket blasts, the boss death and the player's death | hit-stop on every kill (the medium tier) | spread fire kills several aliens a second and would stutter; the large events keep their weight | [game feel](features/game-feel/design.md) |
 
 ## Open questions
 - **Assumptions to confirm:** working title "nameGame"; sprites as text grids in code (D-006); every number marked `[ASSUMPTION]` in the feature notes.
@@ -109,3 +110,5 @@ Boot → MAIN MENU ─ CLASSIC ──→ PLAYING ⇄ (Start) PAUSED ─ RETURN T
 **0.9 (2026-11-17):** weapon upgrades implemented.
 **0.10 (2026-11-17):** bosses implemented.
 **0.11 (2026-11-17):** high score save implemented.
+**0.12 (2026-11-17):** game feel implemented (D-011).
+**0.13 (2026-11-17):** M3 done: screens and co-op confirmed on the PS3, M3 numbers confirmed in play.

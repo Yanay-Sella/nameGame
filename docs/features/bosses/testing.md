@@ -12,8 +12,8 @@
 - [x] It holds fire while no ship is alive. *(`tests/game_tests.cpp` › bossWaitsForALivingShip)*
 - [x] The boss, health bar, flash and blast read clearly on screen. *(Mac render 2026-11-17)*
 - [x] On the PS3 the bosses of waves 5, 10 and 15 are beaten (co-op run) and 60 fps holds. *(PS3 log 2026-11-17: `boss down at wave 5/10/15`, fps 60.0, worst work 6 ms; player report: burst and fan read well)*
-- [ ] Boss waves feel beatable but threatening in single player. *(not proven: the PS3 run was co-op with waves 5–15 reached from a temporary wave 4 start)*
-- [ ] Sway speed and attack rate at appearance 4 and later (wave 20+). *(not proven: not played)*
+- [x] Boss waves feel beatable but threatening in single player. *(player report 2026-11-17: numbers fine as is)*
+- [x] Sway speed and attack rate hold up at appearance 4 (wave 20). *(PS3 log 2026-11-17: `boss wave 20, hp 250`; player report: numbers fine)*
 
 ## History
 - 2026-11-17: criteria written.

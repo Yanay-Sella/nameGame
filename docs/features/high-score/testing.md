@@ -10,7 +10,7 @@
 - [x] A finished run with a new best is saved. *(PS3 log 2026-11-17: `high score: 220900 (saved)`, co-op run, player 1's score)*
 - [x] The value is read at the next launch. *(PS3 log 2026-11-17: `high score: 220900` at boot)*
 - [x] The value survives a PS3 reboot. *(PS3 log 2026-11-17: `high score: 220900` at boot after a reboot and HEN re-enabled)*
-- [ ] Reinstalling the pkg doesn't wipe the file. *(not proven: checked after the next `make deploy`, feature 4)*
+- [x] Reinstalling the pkg doesn't wipe the file. *(PS3 log 2026-11-17: `high score: 220900` at launch after the game-feel `make deploy`)*
 - [ ] A run left through RETURN TO MENU doesn't save. *(not proven: no test, the path is screen code)*
 - [ ] `SAVE FAILED` path on the console. *(not proven: no way to force a failed write on the PS3)*
 

@@ -93,6 +93,13 @@ struct Game {
     float overTime;        // game time when the run ended
     bool soundRequested[SOUND_COUNT];
     uint32_t random;       // xorshift state
+    float trauma;          // 0..1 screen shake, decays in real time
+    float hitStop;         // s the game step is still frozen
+    float flashTimer;      // s of screen flash left
+    float lastFlashTime = -1;   // feelTime of the last screen flash, for the rate limit
+    float feelTime;        // real seconds, advances during hit-stop
+    float shakeStrength = 1;    // draw-only: 0..1, copied from Settings by main.cpp
+    bool reduceFlashing;   // draw-only: copied from Settings by main.cpp
 };
 
 const float GAME_OVER_INPUT_LOCK = 1.5f;   // s before X or Start can start a new run

@@ -7,7 +7,7 @@
 - [x] The run goes on while one player is still in and ends when both are out. *(`tests/game_tests.cpp` › coOpRunEndsWhenBothPlayersAreOut)*
 - [x] A player who is out gets no wave clear bonus. *(`tests/game_tests.cpp` › waveBonusSkipsAPlayerWhoIsOut)*
 - [x] Start on a second controller joins player 2 on the PS3. *(PS3 log 2026-11-17: "controller 1 connected", then "player 2 joined at wave 1")*
-- [ ] Both HUDs and both ships are easy to tell apart on the TV. *(not proven: no co-op playtest)*
+- [x] Both HUDs and both ships are easy to tell apart on the TV. *(player report 2026-11-17)*
 - [x] 60 fps after player 2 joined, including a Triangle stress press. *(PS3 log 2026-11-17: fps 59.9–60.0, slowest frame 5 ms)*
 
 ## Playtest checks

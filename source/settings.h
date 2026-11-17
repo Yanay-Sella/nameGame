@@ -3,6 +3,8 @@
 
 struct Settings {
     bool music = true;   // the song plays during runs
+    int shake = 100;     // screen shake strength in percent: 0, 25, 50, 75 or 100
+    bool reduceFlashing = false;   // no full-screen flashes
 };
 
 Settings settingsLoad(const char* path);                         // defaults when the file is missing or unreadable

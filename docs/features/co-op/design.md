@@ -1,6 +1,6 @@
 # Co-op
 
-**Status:** in progress · **Updated:** 2026-11-17 · [GDD](../../GDD.md)
+**Status:** implemented · **Updated:** 2026-11-17 · [GDD](../../GDD.md)
 
 A friend can pick up a second controller and drop into a run already going, arcade style. Runs still start with one player (D-009), so nothing changes for someone playing alone. It serves pillar 3 (arcade): no lobby or menu, just press Start.
 
@@ -18,7 +18,7 @@ A friend can pick up a second controller and drop into a run already going, arca
 | Name | Value | Unit | What to watch in playtests |
 |---|---|---|---|
 | Maximum players | 2 | players | |
-| Player 2 spawn offset | 40 | px right of centre | ships don't overlap at the start [ASSUMPTION] |
+| Player 2 spawn offset | 40 | px right of centre | ships don't overlap at the start |
 | Join invincibility | 2 | s | same as the respawn invincibility |
 
 ## Edge cases
@@ -30,3 +30,4 @@ A friend can pick up a second controller and drop into a run already going, arca
 
 ## History
 - 2026-11-17: designed and built as drop-in join (D-009).
+- 2026-11-17: numbers confirmed in single-player and co-op playtests.

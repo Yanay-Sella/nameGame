@@ -1,7 +1,9 @@
 // Game-rule tests that run on the Mac (make test); no PS3, SDL or test framework needed.
+#include <algorithm>
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include <vector>
 #include "game.h"
 #include "input.h"
 #include "screen.h"
@@ -17,11 +19,6 @@ static int failures = 0;
             failures++;                                                      \
         }                                                                    \
     } while (0)
-
-static Actions noInput() {
-    Actions a = {};
-    return a;
-}
 
 const float DT = 1.0f / 60;
 const Actions NO_INPUT = {};
@@ -48,17 +45,16 @@ static Alien parkedAlien(float x, float y) {
     return alien;
 }
 
+static const Sprite* const ALL_SPRITES[] = {&SHIP_A, &SHIP_B, &SHIP2_A, &SHIP2_B, &GREEN_ALIEN_A, &GREEN_ALIEN_B, &BLUE_ALIEN_A, &BLUE_ALIEN_B,
+                                            &RED_ALIEN_A, &RED_ALIEN_B, &BOSS_A, &BOSS_B, &BULLET, &ENEMY_SHOT, &ROCKET, &ROCKET_PICKUP,
+                                            &UPGRADE_PICKUP, &LIFE_ICON, &ROCKET_ICON};
+
 static void spritesHaveTheirSize() {
-    const Sprite* sprites[] = {&SHIP_A, &SHIP_B, &SHIP2_A, &SHIP2_B, &GREEN_ALIEN_A, &GREEN_ALIEN_B, &BLUE_ALIEN_A, &BLUE_ALIEN_B,
-                               &RED_ALIEN_A, &RED_ALIEN_B, &BULLET, &ENEMY_SHOT, &ROCKET, &ROCKET_PICKUP, &UPGRADE_PICKUP, &BOSS_A, &BOSS_B,
-                               &LIFE_ICON, &ROCKET_ICON};
-    for (const Sprite* s : sprites) CHECK((int)strlen(s->pixels) == s->w * s->h);
+    for (const Sprite* s : ALL_SPRITES) CHECK((int)strlen(s->pixels) == s->w * s->h);
 }
 
 static void onlyEnemyShotsUseMagenta() {
-    const Sprite* sprites[] = {&SHIP_A, &SHIP_B, &SHIP2_A, &SHIP2_B, &GREEN_ALIEN_A, &GREEN_ALIEN_B, &BLUE_ALIEN_A, &BLUE_ALIEN_B,
-                               &RED_ALIEN_A, &RED_ALIEN_B, &BULLET, &ROCKET, &ROCKET_PICKUP, &UPGRADE_PICKUP, &BOSS_A, &BOSS_B, &LIFE_ICON, &ROCKET_ICON};
-    for (const Sprite* s : sprites) CHECK(strchr(s->pixels, 'm') == NULL);
+    for (const Sprite* s : ALL_SPRITES) CHECK((s == &ENEMY_SHOT) == (strchr(s->pixels, 'm') != NULL));
 }
 
 static void deadzoneIsRadialAndRescaled() {
@@ -79,7 +75,7 @@ static void deadzoneIsRadialAndRescaled() {
 static void holdingFireShootsEvery012Seconds() {
     Game game;
     startSafeGame(game);
-    Actions a = noInput();
+    Actions a = NO_INPUT;
     a.fire = true;
     int bullets = 0;
     for (int step = 0; step < 60; step++) {   // one second; early bullets leave the screen meanwhile, so count shots
@@ -93,7 +89,7 @@ static void holdingFireShootsEvery012Seconds() {
 static void shipStaysInsideMovementZone() {
     Game game;
     startSafeGame(game);
-    Actions a = noInput();
+    Actions a = NO_INPUT;
     a.moveX = -1, a.moveY = -1;
     for (int step = 0; step < 300; step++) updateGame(game, &a, 1.0f / 60);
     CHECK(game.players[0].x == 0 && game.players[0].y == 100);
@@ -117,7 +113,7 @@ static void clearingAWaveStartsTheNextAfterThePause() {
     Game game;
     startSafeGame(game);
     for (Alien& alien : game.aliens) alien.alive = false;
-    Actions a = noInput();
+    Actions a = NO_INPUT;
     updateGame(game, &a, 1.0f / 60);
     CHECK(game.players[0].score == 1000);   // wave 1 clear bonus
     for (int step = 0; step < 119; step++) updateGame(game, &a, 1.0f / 60);
@@ -138,7 +134,7 @@ static void aliensFlyInBeforeTheyCanShoot() {
     Game game;
     startSafeGame(game);
     CHECK(game.aliens[0].state == ALIEN_ENTERING && game.aliens[0].y < 0);
-    run(game, noInput(), 2.5f);
+    run(game, NO_INPUT, 2.5f);
     for (const Alien& alien : game.aliens) CHECK(alien.state == ALIEN_IN_FORMATION);
 
     // Held in the entering state for 30 s at the highest shot chance: ~38 shots if entering aliens could fire.
@@ -156,11 +152,11 @@ static void aliensFlyInBeforeTheyCanShoot() {
 static void divesStartAtWaveThree() {
     Game game;
     startSafeGame(game);
-    run(game, noInput(), 8);
+    run(game, NO_INPUT, 8);
     for (const Alien& alien : game.aliens) CHECK(alien.state != ALIEN_DIVING);
     game.wave = 3;
     game.diveTimer = 0.01f;
-    run(game, noInput(), 0.05f);
+    run(game, NO_INPUT, 0.05f);
     int divers = 0;
     for (const Alien& alien : game.aliens) divers += alien.state == ALIEN_DIVING;
     CHECK(divers == 1);
@@ -169,15 +165,15 @@ static void divesStartAtWaveThree() {
 static void rocketBufferFiresAnEarlyPress() {
     Game game;
     startSafeGame(game);
-    Actions press = noInput();
+    Actions press = NO_INPUT;
     press.rocket = true;
     game.players[0].rocketCooldown = 0.1f;   // pressed 0.1 s early: inside the 0.15 s buffer
     updateGame(game, &press, DT);
-    run(game, noInput(), 0.2f);
+    run(game, NO_INPUT, 0.2f);
     CHECK(game.players[0].rockets == 2);
     game.players[0].rocketCooldown = 0.3f;   // pressed 0.3 s early: the press expires
     updateGame(game, &press, DT);
-    run(game, noInput(), 0.5f);
+    run(game, NO_INPUT, 0.5f);
     CHECK(game.players[0].rockets == 2);
 }
 
@@ -185,7 +181,7 @@ static void emptyRocketClicks() {
     Game game;
     startSafeGame(game);
     game.players[0].rockets = 0;
-    Actions press = noInput();
+    Actions press = NO_INPUT;
     press.rocket = true;
     updateGame(game, &press, DT);
     CHECK(game.soundRequested[SOUND_ROCKET_EMPTY] && game.rockets.empty());
@@ -201,7 +197,7 @@ static void blastKillsOnlyInsideItsRadius() {
     game.swayDirection = 0;
     Rocket rocket = {104, 60, 60, 0};
     game.rockets.push_back(rocket);
-    run(game, noInput(), 0.5f);
+    run(game, NO_INPUT, 0.5f);
     CHECK(!game.aliens[0].alive && !game.aliens[1].alive && game.aliens[2].alive);
     CHECK(game.players[0].score == 200);
 }
@@ -227,7 +223,7 @@ static void threeDeathsEndTheRun() {
         game.enemyShots.push_back(shot);
         updateGame(game, &NO_INPUT, DT);
         CHECK(!game.players[0].alive && game.players[0].lives == 3 - death);
-        run(game, noInput(), 1.5f + 2.1f);   // respawn delay, then invincibility
+        run(game, NO_INPUT, 0.12f + 1.5f + 2.1f);   // hit-stop, respawn delay, then invincibility
         CHECK(game.players[0].alive == (death < 3));
     }
     CHECK(game.over);
@@ -243,11 +239,11 @@ static void nextWaveWaitsForALivingShip() {
     updateGame(game, &NO_INPUT, DT);
     CHECK(!game.players[0].alive);
     game.players[0].respawnTimer = 4;   // longer than the 2 s wave pause
-    run(game, noInput(), 3);
+    run(game, NO_INPUT, 3);
     CHECK(game.wave == 1);              // the 2 s pause only counts while a ship is alive
-    run(game, noInput(), 1.1f);
+    run(game, NO_INPUT, 1.1f + 0.2f);   // the death's hit-stop (0.12 s) comes first
     CHECK(game.players[0].alive && game.wave == 1);
-    run(game, noInput(), 2);
+    run(game, NO_INPUT, 2.2f);
     CHECK(game.wave == 2);
 }
 
@@ -278,7 +274,7 @@ static void pickupAddsARocketUpToNine() {
 static void secondPlayerJoinsBlinkingWithAFreshRun() {
     Game game;
     startSafeGame(game);
-    run(game, noInput(), 5);
+    run(game, NO_INPUT, 5);
     CHECK(game.players.size() == 1);   // one player until someone joins
     for (bool& s : game.soundRequested) s = false;
     joinGame(game);
@@ -328,7 +324,7 @@ static void waveBonusSkipsAPlayerWhoIsOut() {
 static void weaponLevelsFireTheirPattern() {
     Game game;
     startSafeGame(game);
-    Actions a = noInput();
+    Actions a = NO_INPUT;
     a.fire = true;
     size_t expected[4] = {1, 2, 3, 3};
     for (int level = 1; level <= 3; level++) {
@@ -350,6 +346,29 @@ static void weaponLevelsFireTheirPattern() {
         if (game.soundRequested[SOUND_SHOOT]) volleys++;
     }
     CHECK(volleys == 13);
+}
+
+static void killDropsFollowTheRoll() {
+    Game game;
+    startSafeGame(game);
+    game.swayDirection = 0;
+    int rockets = 0, upgrades = 0;
+    const int KILLS = 20000;
+    for (int kill = 0; kill < KILLS; kill++) {
+        game.aliens.clear();
+        game.aliens.push_back(parkedAlien(10, 20));    // keeps the wave going
+        game.aliens.push_back(parkedAlien(150, 40));   // the victim
+        Shot bullet = {150, 40, 0, 0, 0};
+        game.bullets.push_back(bullet);
+        updateGame(game, &NO_INPUT, DT);
+        for (const Pickup& pickup : game.pickups) {
+            rockets += pickup.type == PICKUP_ROCKET;
+            upgrades += pickup.type == PICKUP_UPGRADE;
+        }
+        game.pickups.clear();
+    }
+    CHECK(rockets > KILLS * 0.015 && rockets < KILLS * 0.025);    // about 2 %
+    CHECK(upgrades > KILLS * 0.024 && upgrades < KILLS * 0.036);  // about 3 %
 }
 
 static void upgradePickupRaisesLevelUpToFour() {
@@ -381,7 +400,7 @@ static void deathLosesOneWeaponLevel() {
         game.enemyShots.push_back(shot);
         updateGame(game, &NO_INPUT, DT);
         CHECK(!game.players[0].alive && game.players[0].weaponLevel == (level == 3 ? 2 : 1));
-        run(game, noInput(), 1.6f);
+        run(game, NO_INPUT, 1.6f);
     }
 }
 
@@ -390,8 +409,8 @@ static void startBossGame(Game& game, int wave) {
     startSafeGame(game);
     game.wave = wave - 1;
     for (Alien& alien : game.aliens) alien.alive = false;
-    run(game, noInput(), 2.5f);   // wave clear pause, then the boss enters
-    run(game, noInput(), 0.5f);
+    run(game, NO_INPUT, 2.5f);   // wave clear pause, then the boss enters
+    run(game, NO_INPUT, 0.5f);
     game.boss.attackTimer = 100;
 }
 
@@ -400,10 +419,10 @@ static void everyFifthWaveIsABoss() {
     startSafeGame(game);
     game.wave = 4;
     for (Alien& alien : game.aliens) alien.alive = false;
-    run(game, noInput(), 2.2f);
+    run(game, NO_INPUT, 2.2f);
     CHECK(game.wave == 5 && game.boss.alive && game.aliens.empty() && game.bannerTimer > 0);
     game.boss.alive = false;
-    run(game, noInput(), 2.2f);
+    run(game, NO_INPUT, 2.2f);
     CHECK(game.wave == 6 && !game.boss.alive && game.aliens.size() == 40);
 }
 
@@ -430,10 +449,10 @@ static void bulletsAndBlastsDamageTheBoss() {
     updateGame(game, &NO_INPUT, DT);
     CHECK(boss.hp == 79 && game.rockets.empty());
     game.rockets.push_back({boss.x - 80, 3, 60, 0});   // bursts at the top, 80 px beside the boss: out of reach
-    run(game, noInput(), 0.2f);
+    run(game, NO_INPUT, 0.2f);
     CHECK(boss.hp == 79);
     game.rockets.push_back({boss.x + 14, 3, 60, 0});   // bursts at the top, 20 px above the boss: the blast reaches it
-    run(game, noInput(), 0.2f);
+    run(game, NO_INPUT, 0.2f);
     CHECK(boss.hp == 59);
 }
 
@@ -452,7 +471,7 @@ static void killingTheBossScoresAndDropsBothPickups() {
         upgrades += pickup.type == PICKUP_UPGRADE;
     }
     CHECK(rockets == 1 && upgrades == 1 && !game.explosions.empty());
-    run(game, noInput(), 0.1f);
+    run(game, NO_INPUT, 0.1f);
     CHECK(game.nextWaveTimer > 0);   // the normal wave-clear pause starts
 }
 
@@ -472,12 +491,12 @@ static void bossFiresBurstThenFan() {
     Game game;
     startBossGame(game, 5);
     game.boss.attackTimer = 0.01f;
-    run(game, noInput(), 0.5f);
+    run(game, NO_INPUT, 0.5f);
     CHECK(game.enemyShots.size() == 3);   // burst: 0, 0.15, 0.3 s
     for (const Shot& shot : game.enemyShots) CHECK(fabsf(sqrtf(shot.vx * shot.vx + shot.vy * shot.vy) - 90) < 0.5f && shot.vy > 0);
     game.enemyShots.clear();
     game.boss.attackTimer = 0.01f;
-    run(game, noInput(), 0.05f);
+    run(game, NO_INPUT, 0.05f);
     CHECK(game.enemyShots.size() == 5);   // fan
     CHECK(game.enemyShots[0].vx == -60 && game.enemyShots[2].vx == 0 && game.enemyShots[4].vx == 60 && game.enemyShots[2].vy == 70);
 }
@@ -488,8 +507,124 @@ static void bossWaitsForALivingShip() {
     game.players[0].alive = false;
     game.players[0].respawnTimer = 1e9f;
     game.boss.attackTimer = 0.01f;
-    run(game, noInput(), 3);
+    run(game, NO_INPUT, 3);
     CHECK(game.enemyShots.empty());
+}
+
+// A frozen copy of the picture drawGame just drew.
+static std::vector<uint32_t> pictureOf(const Game& game) {
+    drawGame(game);
+    return std::vector<uint32_t>(screenPixels, screenPixels + SCREEN_W * SCREEN_H);
+}
+
+// A rocket 0.5 px under the top of the screen: it bursts on the next step.
+static void rocketAboutToBurst(Game& game, float x) {
+    Rocket rocket = {x, 0.5f, 60, 0};
+    game.rockets.push_back(rocket);
+}
+
+static void overlappingHitStopsTakeTheLongest() {
+    Game game;
+    startSafeGame(game);
+    game.aliens.clear();
+    game.aliens.push_back(parkedAlien(10, 20));   // keeps the wave going
+    game.swayDirection = 0;
+    game.players[0].invincibleTimer = 0;
+    Player& p = game.players[0];
+    Shot shot = {p.x + 7, p.y + 5, 0, -1, 0};
+    game.enemyShots.push_back(shot);   // the ship dies (0.12 s) on the same step as a blast (0.06 s)
+    rocketAboutToBurst(game, 200);
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(!game.players[0].alive && game.explosions.size() == 2);
+    float frozenAt = game.time;
+    int frozenSteps = 0;
+    while (frozenSteps < 30) {
+        updateGame(game, &NO_INPUT, DT);
+        if (game.time != frozenAt) break;
+        frozenSteps++;
+    }
+    CHECK(frozenSteps >= 6 && frozenSteps <= 8);   // 0.12 s is 7.2 steps; the sum 0.18 s would be 10.8
+    CHECK(game.time > frozenAt);                   // and the game runs again
+}
+
+static void shootingAndKillsNeverShake() {
+    Game game;
+    startSafeGame(game);
+    game.aliens.clear();
+    for (int i = 0; i < 4; i++) game.aliens.push_back(parkedAlien(153, 30 + i * 12));   // stacked right above the ship
+    game.swayDirection = 0;
+    Actions a = NO_INPUT;
+    a.fire = true;
+    float worst = 0;
+    for (int step = 0; step < 120; step++) {
+        updateGame(game, &a, DT);
+        worst = std::max(worst, game.trauma);
+    }
+    CHECK(game.players[0].score >= 400 && worst == 0);   // aliens died, nothing shook
+}
+
+static void traumaDecaysToZero() {
+    Game game;
+    startSafeGame(game);
+    game.trauma = 1;
+    run(game, NO_INPUT, 0.3f);
+    CHECK(game.trauma > 0.4f && game.trauma < 0.6f);   // 1 - 1.5 x 0.3
+    run(game, NO_INPUT, 0.4f);
+    CHECK(game.trauma == 0);                           // inside 1 / 1.5 s
+}
+
+static void inputDuringHitStopStillFires() {
+    Game game;
+    startSafeGame(game);
+    game.hitStop = 0.1f;
+    Actions press = NO_INPUT;
+    press.rocket = true;
+    updateGame(game, &press, DT);   // pressed while frozen
+    CHECK(game.rockets.empty() && game.hitStop > 0);
+    run(game, NO_INPUT, 0.2f);
+    CHECK(game.players[0].rockets == 2);   // the buffered press launched once the stop ended
+}
+
+static void flashesAreRateLimited() {
+    Game game;
+    startSafeGame(game);
+    game.aliens.clear();
+    game.aliens.push_back(parkedAlien(10, 20));
+    game.swayDirection = 0;
+    int flashes = 0;
+    float before = 0;
+    for (int step = 0; step < 12; step++) {   // three blasts in about 0.2 s
+        if (step % 4 == 0) rocketAboutToBurst(game, 200);
+        updateGame(game, &NO_INPUT, DT);
+        if (game.flashTimer > before) flashes++;
+        before = game.flashTimer;
+    }
+    CHECK(flashes == 1);
+    run(game, NO_INPUT, 0.5f);
+    rocketAboutToBurst(game, 200);
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(game.flashTimer > 0);   // a later blast flashes again
+}
+
+static void reducedFlashingDrawsNoFlash() {
+    Game game;
+    startSafeGame(game);
+    std::vector<uint32_t> calm = pictureOf(game);
+    game.flashTimer = 0.05f;
+    CHECK(pictureOf(game) != calm);   // a flash changes the picture
+    game.reduceFlashing = true;
+    CHECK(pictureOf(game) == calm);   // reduced: no pixel differs
+}
+
+static void zeroShakeDrawsNoOffset() {
+    Game game;
+    startSafeGame(game);
+    std::vector<uint32_t> calm = pictureOf(game);
+    game.trauma = 1;
+    game.feelTime = 0.1f;
+    CHECK(pictureOf(game) != calm);   // full strength moves the picture
+    game.shakeStrength = 0;
+    CHECK(pictureOf(game) == calm);
 }
 
 static void settingsDefaultToMusicOn() {
@@ -533,6 +668,19 @@ static void highScoreIsClamped() {
     CHECK(highScoreLoad("build/tests/clamp-highscore.txt") == 9999999);
 }
 
+static void shakeAndFlashSettingsSurviveASave() {
+    Settings defaults = settingsLoad("build/tests/missing.txt");
+    CHECK(defaults.shake == 100 && !defaults.reduceFlashing);
+    Settings settings;
+    settings.shake = 50;
+    settings.reduceFlashing = true;
+    CHECK(settingsSave("build/tests/shake-settings.txt", settings));
+    Settings loaded = settingsLoad("build/tests/shake-settings.txt");
+    CHECK(loaded.shake == 50 && loaded.reduceFlashing && loaded.music);
+    writeTextFile("build/tests/shake-settings.txt", "shake=900\n");
+    CHECK(settingsLoad("build/tests/shake-settings.txt").shake == 100);   // clamped
+}
+
 static void menuCursorHasAGlyph() {
     CHECK(fontGlyph('>') != 0);
 }
@@ -541,6 +689,7 @@ int main() {
     spritesHaveTheirSize();
     settingsDefaultToMusicOn();
     settingsSurviveASave();
+    shakeAndFlashSettingsSurviveASave();
     highScoreDefaultsToZero();
     highScoreSurvivesASave();
     highScoreIsClamped();
@@ -563,6 +712,7 @@ int main() {
     alienBodyKillsTheShip();
     pickupAddsARocketUpToNine();
     weaponLevelsFireTheirPattern();
+    killDropsFollowTheRoll();
     upgradePickupRaisesLevelUpToFour();
     deathLosesOneWeaponLevel();
     everyFifthWaveIsABoss();
@@ -572,6 +722,13 @@ int main() {
     bossBodyKillsTheShip();
     bossFiresBurstThenFan();
     bossWaitsForALivingShip();
+    overlappingHitStopsTakeTheLongest();
+    shootingAndKillsNeverShake();
+    traumaDecaysToZero();
+    inputDuringHitStopStillFires();
+    flashesAreRateLimited();
+    reducedFlashingDrawsNoFlash();
+    zeroShakeDrawsNoOffset();
     secondPlayerJoinsBlinkingWithAFreshRun();
     coOpRunEndsWhenBothPlayersAreOut();
     waveBonusSkipsAPlayerWhoIsOut();
