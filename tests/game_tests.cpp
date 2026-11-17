@@ -578,6 +578,62 @@ static void bossWaitsForALivingShip() {
     CHECK(game.enemyShots.empty());
 }
 
+static void levelBannerComesBeforeWaveOne() {
+    Game game;
+    startSafeGame(game);
+    CHECK(fabsf(game.bannerTimer - 3.5f) < 1e-4f);
+    run(game, NO_INPUT, 2.1f);
+    CHECK(game.wave == 1 && game.bannerTimer > 0 && game.bannerTimer < 1.5f);
+    for (Alien& alien : game.aliens) alien.alive = false;
+    run(game, NO_INPUT, 2.2f);
+    CHECK(game.wave == 2 && game.bannerTimer <= 1.5f);
+}
+
+static void killingTheLevelBossClearsTheLevel() {
+    Game game;
+    startBossGame(game, 20);
+    CHECK(game.boss.hp == 250);
+    game.boss.hp = 1;
+    Shot enemyShot = {10, 40, 0, -1, 0};   // parked away from the ship
+    game.enemyShots.push_back(enemyShot);
+    Shot bullet = {game.boss.x + 10, game.boss.y + 5, 0, 0, 0};
+    game.bullets.push_back(bullet);
+    int before = game.players[0].score;
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(!game.boss.alive && game.levelClear && game.clearTimer == 3 && !game.over);
+    CHECK(game.players[0].score == before + 20000 + 20 * 1000);   // 5,000 x 4 and the wave 20 clear bonus
+    CHECK(game.enemyShots.size() == 1);   // shots in the air stay
+    run(game, NO_INPUT, 2.9f);
+    CHECK(!game.over && game.wave == 20);   // the boss death's 0.15 s hit-stop comes first
+    run(game, NO_INPUT, 0.5f);
+    CHECK(game.over && game.won && game.wave == 20);
+    run(game, NO_INPUT, 3);
+    CHECK(game.wave == 20 && !game.boss.alive && game.aliens.empty());
+}
+
+static void deathDuringTheClearOnlyLosesOnTheLastLife() {
+    for (int lives : {1, 2}) {
+        Game game;
+        startBossGame(game, 20);
+        game.players[0].lives = lives;
+        game.players[0].nextExtraLife = MAX_SCORE;   // the boss reward must not grant a life
+        game.boss.hp = 1;
+        Shot bullet = {game.boss.x + 10, game.boss.y + 5, 0, 0, 0};
+        game.bullets.push_back(bullet);
+        updateGame(game, &NO_INPUT, DT);
+        CHECK(game.levelClear);
+        run(game, NO_INPUT, 0.2f);   // past the boss death's hit-stop, which skips collisions
+        Player& p = game.players[0];
+        p.invincibleTimer = 0;
+        Shot shot = {p.x + 7, p.y + 5, 0, -1, 0};   // parked on the hitbox, as in threeDeathsEndTheRun
+        game.enemyShots.push_back(shot);
+        updateGame(game, &NO_INPUT, DT);
+        CHECK(!game.players[0].alive && game.players[0].lives == lives - 1);
+        run(game, NO_INPUT, 4);
+        CHECK(game.over && game.won == (lives == 2));
+    }
+}
+
 // A frozen copy of the picture drawGame just drew.
 static std::vector<uint32_t> pictureOf(const Game& game) {
     drawGame(game);
@@ -694,24 +750,32 @@ static void zeroShakeDrawsNoOffset() {
     CHECK(pictureOf(game) == calm);
 }
 
-static void settingsDefaultToMusicOn() {
-    CHECK(settingsLoad("build/tests/missing.txt").music == true);
+static void settingsDefaultToMizrahit() {
+    CHECK(settingsLoad("build/tests/missing.txt").music == MUSIC_MIZRAHIT);
 }
 
 static void settingsSurviveASave() {
     Settings settings;
-    settings.music = false;
-    CHECK(settingsSave("build/tests/settings.txt", settings));
-    CHECK(settingsLoad("build/tests/settings.txt").music == false);
-    settings.music = true;
-    CHECK(settingsSave("build/tests/settings.txt", settings));
-    CHECK(settingsLoad("build/tests/settings.txt").music == true);
+    for (Music song : {MUSIC_OFF, MUSIC_DUBSTEP, MUSIC_MIZRAHIT}) {
+        settings.music = song;
+        CHECK(settingsSave("build/tests/settings.txt", settings));
+        CHECK(settingsLoad("build/tests/settings.txt").music == song);
+    }
 }
 
 static void writeTextFile(const char* path, const char* text) {
     FILE* file = fopen(path, "w");
     fputs(text, file);
     fclose(file);
+}
+
+static void oldMusicSettingsStillLoad() {
+    writeTextFile("build/tests/old-settings.txt", "music=0\n");
+    CHECK(settingsLoad("build/tests/old-settings.txt").music == MUSIC_OFF);
+    writeTextFile("build/tests/old-settings.txt", "music=1\n");
+    CHECK(settingsLoad("build/tests/old-settings.txt").music == MUSIC_MIZRAHIT);
+    writeTextFile("build/tests/old-settings.txt", "music=7\n");
+    CHECK(settingsLoad("build/tests/old-settings.txt").music == MUSIC_MIZRAHIT);
 }
 
 static void highScoreDefaultsToZero() {
@@ -743,7 +807,7 @@ static void shakeAndFlashSettingsSurviveASave() {
     settings.reduceFlashing = true;
     CHECK(settingsSave("build/tests/shake-settings.txt", settings));
     Settings loaded = settingsLoad("build/tests/shake-settings.txt");
-    CHECK(loaded.shake == 50 && loaded.reduceFlashing && loaded.music);
+    CHECK(loaded.shake == 50 && loaded.reduceFlashing && loaded.music == MUSIC_MIZRAHIT);
     writeTextFile("build/tests/shake-settings.txt", "shake=900\n");
     CHECK(settingsLoad("build/tests/shake-settings.txt").shake == 100);   // clamped
 }
@@ -754,8 +818,9 @@ static void menuCursorHasAGlyph() {
 
 int main() {
     spritesHaveTheirSize();
-    settingsDefaultToMusicOn();
+    settingsDefaultToMizrahit();
     settingsSurviveASave();
+    oldMusicSettingsStillLoad();
     shakeAndFlashSettingsSurviveASave();
     highScoreDefaultsToZero();
     highScoreSurvivesASave();
@@ -792,6 +857,9 @@ int main() {
     bossBodyKillsTheShip();
     bossFiresBurstThenFan();
     bossWaitsForALivingShip();
+    levelBannerComesBeforeWaveOne();
+    killingTheLevelBossClearsTheLevel();
+    deathDuringTheClearOnlyLosesOnTheLastLife();
     overlappingHitStopsTakeTheLongest();
     shootingAndKillsNeverShake();
     traumaDecaysToZero();

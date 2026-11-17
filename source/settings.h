@@ -1,8 +1,10 @@
 // Player settings saved next to EBOOT.BIN as "key=value" lines (docs/features/screens).
 #pragma once
 
+enum Music { MUSIC_OFF, MUSIC_MIZRAHIT, MUSIC_DUBSTEP, MUSIC_CHOICES };   // saved as music=0, 1, 2 (old files: 0 off, 1 on)
+
 struct Settings {
-    bool music = true;   // the song plays during runs
+    Music music = MUSIC_MIZRAHIT;   // the song played during runs
     int shake = 100;     // screen shake strength in percent: 0, 25, 50, 75 or 100
     bool reduceFlashing = false;   // no full-screen flashes
 };

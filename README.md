@@ -35,7 +35,7 @@ The high score and settings are saved automatically.
 ## Troubleshooting
 
 - **The file isn't in Package Manager:** HEN wasn't enabled, or the file isn't at the root of the stick.
-- **No music:** Settings → MUSIC: ON.
+- **No music:** Settings → MUSIC: MIZRAHIT or DUBSTEP.
 - **"CONNECT CONTROLLER" on screen:** press the controller's PS button, then Start to resume.
 - **The game is frozen:** hold the PS3's power button for about 10 seconds until it beeps (never pull the plug).
 

@@ -6,7 +6,7 @@ The best score is written to a small file on the PS3's hard drive, so it survive
 
 ## Rules
 1. The high score is the best single-player score of any finished run; in co-op, the better of the two players' scores.
-2. It is loaded at boot and written at game over, only when beaten. A run left through RETURN TO MENU doesn't count (that path is screen code).
+2. It is loaded at boot and written when a run ends (game over or level clear), only when beaten. A run left through RETURN TO MENU doesn't count (that path is screen code).
 3. The HUD shows `HI 0012345` centred at y = 9, under `WAVE n`. The game-over panel adds `NEW HIGH SCORE` in yellow when the run beat it.
 4. Missing or unreadable file: high score 0. A save failure keeps the value in memory and logs `SAVE FAILED`.
 5. The main menu shows it as `HI 0012345` under the panel.

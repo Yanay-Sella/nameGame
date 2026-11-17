@@ -24,6 +24,8 @@ enum Scene { SCENE_MAIN_MENU, SCENE_SETTINGS, SCENE_PLAYING, SCENE_PAUSED };
 const char* const SCENE_NAMES[] = {"main menu", "settings", "playing", "paused"};
 const char* const MAIN_ITEMS[] = {"CLASSIC", "SETTINGS"};          // game modes are added above SETTINGS
 const char* const PAUSE_ITEMS[] = {"RESUME", "SETTINGS", "RETURN TO MENU"};
+const char* const MUSIC_NAMES[] = {"off", "mizrahit", "dubstep"};                          // log names, indexed by Music
+const char* const MUSIC_LABELS[] = {"MUSIC: OFF", "MUSIC: MIZRAHIT", "MUSIC: DUBSTEP"};   // settings item, indexed by Music
 
 // Progress markers the main loop updates, read by the watchdog thread.
 static volatile unsigned frame = 0;
@@ -105,7 +107,7 @@ int main(int argc, char** argv) {
     audioOpen(exeFolder.c_str());
     std::string settingsPath = exeFolder + "/settings.txt";
     Settings settings = settingsLoad(settingsPath.c_str());
-    debugNetPrintf(INFO, "settings: music %s, shake %d, flashing %s\n", settings.music ? "on" : "off", settings.shake,
+    debugNetPrintf(INFO, "settings: music %s, shake %d, flashing %s\n", MUSIC_NAMES[settings.music], settings.shake,
                    settings.reduceFlashing ? "reduced" : "normal");
     std::string highScorePath = exeFolder + "/highscore.txt";
     int highScore = highScoreLoad(highScorePath.c_str());
@@ -162,7 +164,7 @@ int main(int argc, char** argv) {
         case SCENE_MAIN_MENU:
             if (menu.confirm && selected == 0) {
                 startGame(game, 1, (uint32_t)SDL_GetPerformanceCounter());
-                if (settings.music) audioStartMusic();
+                audioStartMusic(settings.music);
                 setScene(SCENE_PLAYING);
             } else if (menu.confirm && selected == 1) {
                 settingsBack = SCENE_MAIN_MENU;
@@ -176,16 +178,15 @@ int main(int argc, char** argv) {
                 setScene(settingsBack);
             } else if (selected < 3 && (menu.confirm || menu.left || menu.right)) {
                 if (selected == 0) {
-                    settings.music = !settings.music;
-                    if (!settings.music) audioStopMusic();
-                    else if (settingsBack == SCENE_PAUSED) audioStartMusic();
+                    settings.music = (Music)((settings.music + (menu.left ? MUSIC_CHOICES - 1 : 1)) % MUSIC_CHOICES);   // Mizrahit → Dubstep → Off → Mizrahit
+                    if (settingsBack == SCENE_PAUSED) audioStartMusic(settings.music);   // the main menu stays silent
                 } else if (selected == 1) {
                     settings.shake = (settings.shake + (menu.left ? -25 : 25) + 125) % 125;   // 0, 25 ... 100, wrapping
                 } else {
                     settings.reduceFlashing = !settings.reduceFlashing;
                 }
                 bool saved = settingsSave(settingsPath.c_str(), settings);
-                debugNetPrintf(INFO, "settings: music %s, shake %d, flashing %s (%s)\n", settings.music ? "on" : "off", settings.shake,
+                debugNetPrintf(INFO, "settings: music %s, shake %d, flashing %s (%s)\n", MUSIC_NAMES[settings.music], settings.shake,
                                settings.reduceFlashing ? "reduced" : "normal", saved ? "saved" : "SAVE FAILED");
             }
             break;
@@ -213,7 +214,7 @@ int main(int argc, char** argv) {
             for (int p = 0; p < MAX_PLAYERS; p++) {
                 // A controller without a ship joins the running game with Start or X (co-op/design.md).
                 if (p >= (int)game.players.size()) {
-                    if (actions[p].confirm && p == (int)game.players.size() && !game.over) {
+                    if (actions[p].confirm && p == (int)game.players.size() && !game.over && !game.levelClear) {
                         joinGame(game);
                         debugNetPrintf(INFO, "player %d joined at wave %d\n", p + 1, game.wave);
                     }
@@ -232,7 +233,7 @@ int main(int argc, char** argv) {
                     if (actions[p].confirm) {
                         startGame(game, (int)game.players.size(), (uint32_t)SDL_GetPerformanceCounter());   // co-op runs stay co-op
                         Uint64 musicStart = SDL_GetPerformanceCounter();
-                        if (settings.music) audioStartMusic();
+                        audioStartMusic(settings.music);
                         debugNetPrintf(INFO, "new run (music restart took %.0f ms)\n", (SDL_GetPerformanceCounter() - musicStart) * 1000.0 / counterHz);
                     } else if (actions[p].back) {
                         selected = 0;
@@ -256,6 +257,7 @@ int main(int argc, char** argv) {
 
         bool wasOver = game.over;
         bool bossWasAlive = game.boss.alive;
+        bool clearBefore = game.levelClear;
         int waveBefore = game.wave;
         int livesBefore[MAX_PLAYERS] = {};
         for (size_t p = 0; p < game.players.size(); p++) livesBefore[p] = game.players[p].lives;
@@ -282,6 +284,7 @@ int main(int argc, char** argv) {
             debugNetPrintf(INFO, "boss wave %d, hp %d\n", game.wave, game.boss.hp);
         }
         if (!game.boss.alive && bossWasAlive) debugNetPrintf(INFO, "boss down at wave %d after %.0f s\n", game.wave, game.time - bossStart);
+        if (game.levelClear && !clearBefore) debugNetPrintf(INFO, "level 1 clear at %.1f s\n", game.time);
         if (game.over && !wasOver) {
             audioStopMusic();
             int best = 0;
@@ -293,7 +296,8 @@ int main(int argc, char** argv) {
                 debugNetPrintf(INFO, "high score: %d (%s)\n", highScore, saved ? "saved" : "SAVE FAILED");
             }
             for (size_t p = 0; p < game.players.size(); p++)
-                debugNetPrintf(INFO, "game over: player %d score %d, wave %d\n", (int)p + 1, game.players[p].score, game.wave);
+                debugNetPrintf(INFO, "%s at %.1f s: player %d score %d, wave %d\n", game.won ? "level clear" : "game over", game.overTime,
+                               (int)p + 1, game.players[p].score, game.wave);
         }
         if (scene == SCENE_PLAYING) {
             for (int s = 0; s < SOUND_COUNT; s++) {
@@ -318,7 +322,7 @@ int main(int argc, char** argv) {
             else drawBackground(game);
             char shake[24];
             snprintf(shake, sizeof shake, "SHAKE: %d%%", settings.shake);
-            const char* settingsItems[] = {settings.music ? "MUSIC: ON" : "MUSIC: OFF", shake,
+            const char* settingsItems[] = {MUSIC_LABELS[settings.music], shake,
                                            settings.reduceFlashing ? "FLASHING: REDUCED" : "FLASHING: NORMAL", "BACK"};
             drawMenu("SETTINGS", settingsItems, 4, selected, "X CHANGE  O BACK");
         } else {

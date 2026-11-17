@@ -11,7 +11,7 @@ Every 5th wave a single big boss replaces the formation (GDD D-002). It is the r
 4. Bullets do 1 damage, a rocket blast 20 (the rocket explodes on touching it; the blast hits it when the circle overlaps its rectangle). Each hit flashes it white for 0.06 s.
 5. Touching the boss's body kills the ship.
 6. A health bar 120×3 px sits under the top line at y = 16: red fill on dark red.
-7. Killing it gives 5,000·n points to the killer, a large explosion, a guaranteed upgrade pickup and a rocket pickup; then the normal wave-clear bonus and pause before the next wave.
+7. Killing it gives 5,000·n points to the killer, a large explosion, a guaranteed upgrade pickup and a rocket pickup; then the normal wave-clear bonus and pause before the next wave (the wave-20 boss ends level 1 instead: [Level 1](../level-1/design.md)).
 
 ## Numbers
 | Name | Value | Unit | What to watch in playtests |

@@ -38,6 +38,7 @@ deploy: ps3
 # Release package for other players: no dev aids, logs go nowhere, copied to dist/ with the install guide.
 release:
 	@test -f pkgfiles/USRDIR/music.ogg || { echo "pkgfiles/USRDIR/music.ogg is missing; run make music first."; exit 1; }
+	@test -f pkgfiles/USRDIR/dubstep.ogg || { echo "pkgfiles/USRDIR/dubstep.ogg is missing; run make music MUSIC_OUT=dubstep.ogg first."; exit 1; }
 	$(MAKE) ps3 RELEASE=1 LOG_HOST=127.0.0.1
 	mkdir -p dist
 	cp build/nameGame.pkg "dist/NAME-game-$(VERSION).pkg"
@@ -89,8 +90,9 @@ shot:
 clean:
 	rm -rf build
 
-# Convert a song to OGG for the package (the PS3's SDL2_mixer plays OGG and WAV only): make music MUSIC_SRC=path/to/song.flac
+MUSIC_OUT ?= music.ogg
+# Convert a song to OGG for the package (the PS3's SDL2_mixer plays OGG and WAV only): make music MUSIC_SRC=path/to/song [MUSIC_OUT=dubstep.ogg]
 music:
-	@test -n "$(MUSIC_SRC)" || { echo "Usage: make music MUSIC_SRC=path/to/song"; exit 1; }
+	@test -n "$(MUSIC_SRC)" || { echo "Usage: make music MUSIC_SRC=path/to/song [MUSIC_OUT=dubstep.ogg]"; exit 1; }
 	mkdir -p pkgfiles/USRDIR
-	ffmpeg -y -loglevel error -i "$(MUSIC_SRC)" -vn -ar 48000 -ac 2 -c:a libvorbis -q:a 5 pkgfiles/USRDIR/music.ogg
+	ffmpeg -y -loglevel error -i "$(MUSIC_SRC)" -vn -ar 48000 -ac 2 -c:a libvorbis -q:a 5 pkgfiles/USRDIR/$(MUSIC_OUT)

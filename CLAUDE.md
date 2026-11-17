@@ -31,7 +31,7 @@ Full setup history, debugging toolkit and new-project checklist: `docs/ps3-new-p
   `shots/shot.png` (gitignored). Read the PNG to see the screen. webMAN's own `/xmb.ps3$ingame_screenshot` saved nothing.
 - `make release` — release build (no dev aids, logs to 127.0.0.1, song required) → `dist/NAME-game-<VERSION>.pkg` and the README.
 - `make deploy SOURCES=prototypes/<idea>` — build and install a throwaway prototype instead of `source/` (same app ID).
-- `make music MUSIC_SRC=<song>` — convert a song to `pkgfiles/USRDIR/music.ogg` (gitignored), packaged next to EBOOT.BIN.
+- `make music MUSIC_SRC=<song>` — convert a song to `pkgfiles/USRDIR/music.ogg` (MIZRAHIT); add `MUSIC_OUT=dubstep.ogg` for the DUBSTEP song. Both gitignored, packaged next to EBOOT.BIN.
 - `python3 docs/xmb-art/make_xmb_art.py` — redraw the XMB Game menu art (`pkgfiles/ICON0.PNG` 320x176, `PIC1.PNG` 1920x1080)
   from the sprites in `source/sprites.h`; rerun it after changing sprites or the palette.
 

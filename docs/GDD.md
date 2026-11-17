@@ -1,16 +1,16 @@
 # NAME game — Game Design Document
 
-**Version:** 0.15 · **Updated:** 2026-11-17 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
+**Version:** 0.19 · **Updated:** 2026-11-17 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
 
 ## Summary
-You pilot a small ship at the bottom of the screen against waves of pixel-art aliens. Hold R1 to spray bullets, and save the scarce R2 rocket for the moment a wave gets out of hand. Waves get harder, and every 5th wave is a boss. The run ends when you lose your last life, and you chase the saved high score.
+You pilot a small ship at the bottom of the screen against waves of pixel-art aliens. Hold R1 to spray bullets, and save the scarce R2 rocket for the moment a wave gets out of hand. Waves get harder, and every 5th wave is a boss. The run is level 1, waves 1 to 20: it ends when you beat the wave-20 boss or lose your last life, and you chase the saved high score.
 
 | | |
 |---|---|
 | Genre and camera | 2D fixed-screen arcade shooter (shmup), vertical: enemies above, ship below |
 | Audience | casual players with arcade instincts; pick up and play, no tutorial |
 | Platforms and input | real PS3 (HEN), one DualShock 3 / Sixaxis; a second one joins for co-op |
-| Session | one run is about 5–15 min; play until game over |
+| Session | one run is about 15–20 min: level 1 clear or game over |
 | Engine | C++ with SDL2 + SDL2_mixer on PSL1GHT (see `CLAUDE.md`) |
 | Scope | small homebrew release; a greybox prototype first |
 | References | 80s fixed-screen shooters (alien formations that sway and dive), wave-based shmups with bosses (the waves-plus-boss rhythm and weapon upgrades). Characters, art and names are our own |
@@ -39,12 +39,13 @@ dodge + shoot (R1) → kill aliens → score and pickups → stronger gun / more
 | Weapon upgrades | implemented | MVP | Pickups upgrade bullets: double → spread; death loses a level | [design](features/weapon-upgrades/design.md) |
 | Lives and score | implemented | MVP | 3 lives, one hit kills, respawn invincibility, extra life every 50,000 | [design](features/lives-and-score/design.md) |
 | Bosses | implemented | MVP | A boss on every 5th wave, stronger each time | [design](features/bosses/design.md) |
-| Music and sound | implemented | MVP | Your song looped during gameplay; synthesized retro SFX | [design](features/music-and-sound/design.md) |
+| Music and sound | implemented | MVP | Two songs to choose from (Mizrahit, Dubstep) looped during gameplay; synthesized retro SFX | [design](features/music-and-sound/design.md) |
 | Pixel art | implemented | MVP | 320×180 palette art: sprites, font and starfield as text grids in code | [design](features/pixel-art/design.md) |
-| Screens | implemented | MVP | Main menu (Classic, Settings), pause menu, settings (music, shake, flashing), high score on the title, game over | [design](features/screens/design.md) |
+| Screens | implemented | MVP | Main menu (Classic, Settings), pause menu, settings (music Mizrahit/Dubstep/Off, shake, flashing), high score on the title, game over | [design](features/screens/design.md) |
 | High score save | implemented | MVP | Best score saved on the PS3, shown on the title | [design](features/high-score/design.md) |
 | Game feel | implemented | MVP | Shake, hit-stop, flashes, particles by event tier; shake and flash options | [design](features/game-feel/design.md) |
 | Co-op | implemented | MVP | A second player drops in with Start on a second controller | [design](features/co-op/design.md) |
+| Level 1 | implemented | MVP | First world: waves 1-20 of today's game, ends when the wave-20 boss dies; template for later themed levels | [design](features/level-1/design.md) |
 
 ## Milestones
 1. **M1, greybox on the PS3:** boxes for ship, bullets, rocket and enemies; low-res scaling, music playback and button mapping proven · done when: [prototypes/ship-feel/BRIEF.md](../prototypes/ship-feel/BRIEF.md) has a RESULT line.
@@ -58,17 +59,17 @@ The task-by-task plan for each milestone is in the [work plan](work-plan/nameGam
 ```
 Boot → MAIN MENU ─ CLASSIC ──→ PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN MENU
            └─ SETTINGS ⇄           │                  └─ SETTINGS ⇄
-                                   └─ game over: X/Start = play again, Circle = MAIN MENU
+                                   └─ game over / LEVEL 1 CLEAR: X/Start = play again, Circle = MAIN MENU
 ```
 - **Main menu:** title "NAME GAME", the items Classic and Settings and the saved high score. Silent. Classic is the only game mode for now.
-- **Settings:** music on/off, screen shake 0–100 % and reduced flashing, saved to settings.txt. Circle or Back returns to the menu that opened it.
+- **Settings:** music Mizrahit / Dubstep / Off, screen shake 0–100 % and reduced flashing, saved to settings.txt. Circle or Back returns to the menu that opened it.
 - **Game:** the HUD shows score, wave, lives and rockets. Music loops if enabled.
 - **Pause:** Start opens it (Resume, Settings, Return to menu); the music keeps playing.
-- **Game over:** final score and wave; X or Start plays again, Circle goes to the main menu.
+- **Game over / level clear:** final score and wave; the panel reads GAME OVER, or LEVEL 1 CLEAR after the wave-20 boss; X or Start plays again, Circle goes to the main menu.
 
 ## Direction
 - **Art:** pixel art drawn at 320×180 and scaled up by a whole number (×6 at 1080p, ×4 at 720p) with no smoothing. A small fixed palette; enemy shots are the only magenta/pink objects. Dark starfield background that scrolls slowly.
-- **Audio:** the user's song (an OGG copy of the FLAC) loops during gameplay only. Short square-wave and noise SFX for shooting, hits, explosions, pickups and death, mixed under the music.
+- **Audio:** the chosen song (Mizrahit or Dubstep, OGG copies) loops during gameplay only. Short square-wave and noise SFX for shooting, hits, explosions, pickups and death, mixed under the music.
 - **Game feel:** the [game-feel](../.claude/skills/game-feel/SKILL.md) tiers: bullet hits are small, kills and pickups medium, rocket explosions, boss hits and the player's death large. Shooting itself gets almost no feedback so held R1 doesn't buzz.
 - **Controls:** left stick or D-pad moves, R1 fires (hold), R2 rocket, Start pauses, X confirms in menus, Circle backs out in menus. Button numbers are measured in M1.
 - **Accessibility:** shake strength 0–100 % and reduce flashing in the settings screen; large flashes at most 3 per second.
@@ -98,6 +99,8 @@ Boot → MAIN MENU ─ CLASSIC ──→ PLAYING ⇄ (Start) PAUSED ─ RETURN T
 | D-014 | 2026-11-17 | A lost controller pauses the run; after it reconnects the pause menu stays up and the player resumes | resume at once; 3-2-1 countdown | user's choice: the player resumes when ready | [ship controls](features/ship-controls/design.md), [co-op](features/co-op/design.md), [screens](features/screens/design.md) |
 | D-015 | 2026-11-17 | make release builds without the dev aids (Triangle stress, Select autopilot, L1 screenshot), logs to 127.0.0.1 and includes the song | one build for everything | a player pressing Triangle would spawn 60 aliens; the user may share the song | [music and sound](features/music-and-sound/design.md) |
 | D-016 | 2026-11-17 | Claude drives PS3 tests remotely: launch (`/play.ps3?NMGM00001`) and quit (`/xmb.ps3$exit`) through webMAN, input through webMAN's virtual pad, screenshots from a dev-only L1 dump of the game's pixel buffer | the user launches and presses buttons; an in-game UDP input listener; webMAN's built-in screenshot | all three webMAN commands worked on the PS3; its own screenshot saved nothing | [music and sound](features/music-and-sound/design.md) |
+| D-017 | 2026-11-17 | A run is level 1: killing the wave-20 boss shows LEVEL 1 CLEAR for 3 s, then the end screen, and the high score is saved; enemy shots stay, so losing the last life during the banner is still game over; replaces D-002's endless run | endless waves; clear enemy shots at the kill; lock the win at the kill | user's choice: a level structure for later worlds; the finale stays dangerous to the end | [level 1](features/level-1/design.md), [bosses](features/bosses/design.md), [screens](features/screens/design.md), [high score](features/high-score/design.md) |
+| D-018 | 2026-11-17 | Music setting rotates MIZRAHIT, DUBSTEP, OFF; both songs are loaded into memory at boot; settings.txt keeps music=0/1 and adds 2 | music on/off with one song | the user wanted a second song to pick | [music and sound](features/music-and-sound/design.md), [screens](features/screens/design.md) |
 
 ## Open questions
 - **Assumptions to confirm:** sprites as text grids in code (D-006); every number marked `[ASSUMPTION]` in the feature notes.
@@ -122,3 +125,6 @@ Boot → MAIN MENU ─ CLASSIC ──→ PLAYING ⇄ (Start) PAUSED ─ RETURN T
 **0.14 (2026-11-17):** M4 built: name, unplug pause, difficulty to wave 20, release build and install guide (D-012 to D-015).
 **0.15 (2026-11-17):** M4 checked on the PS3: unplug pause (single-player and co-op) and a 21-minute soak confirmed; balancing playtest and fresh-player install still open.
 **0.16 (2026-11-17):** remote test workflow: make launch, quit, pad and shot (D-016).
+**0.17 (2026-11-17):** level 1 designed: waves 1-20 of the current game, ending on the wave-20 boss.
+**0.18 (2026-11-17):** level 1 ending implemented: the wave-20 boss ends the run with LEVEL 1 CLEAR (D-017).
+**0.19 (2026-11-17):** second song: music setting MIZRAHIT / DUBSTEP / OFF (D-018).

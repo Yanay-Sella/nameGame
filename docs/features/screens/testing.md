@@ -3,8 +3,9 @@
 **Updated:** 2026-11-17 · [Design](design.md) · [Implementation](implementation.md)
 
 ## Acceptance criteria
-- [x] Without a settings file, music defaults to on. *(`tests/game_tests.cpp` › settingsDefaultToMusicOn)*
-- [x] A saved music setting loads back. *(`tests/game_tests.cpp` › settingsSurviveASave)*
+- [x] Without a settings file, music defaults to MIZRAHIT. *(`tests/game_tests.cpp` › settingsDefaultToMizrahit)*
+- [x] Every music choice saves and loads back; old `music=0/1` files still load. *(`tests/game_tests.cpp` › settingsSurviveASave, oldMusicSettingsStillLoad)*
+- [x] Settings rotates MUSIC: MIZRAHIT → DUBSTEP → OFF; a run plays the chosen song; switching while paused changes the song at once. *(PS3 log 2026-11-17: the item rotated mizrahit → dubstep → off, left stepped back, all saved, the choice survived a relaunch, and `make shot` read `MUSIC: DUBSTEP`; player confirmed 2026-11-17 that the right song played and switched)*
 - [x] The menu cursor `>` has a font glyph. *(`tests/game_tests.cpp` › menuCursorHasAGlyph)*
 - [x] The title shows `HI` with the saved best; the settings items SHAKE (steps 0–100, wrapping) and FLASHING change and are saved. *(PS3 log 2026-11-17: `settings: … shake 75/50/25/0/…, flashing reduced/normal (saved)`; title and relaunch by player report 2026-11-17; file format: `tests/game_tests.cpp` › shakeAndFlashSettingsSurviveASave)*
 - [x] Menu up/down works with the D-pad and the stick, one flick per item. *(player report 2026-11-17; PS3 log: D-pad presses and scene changes)*

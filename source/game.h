@@ -94,6 +94,9 @@ struct Game {
     int highScore;         // draw-only: the saved best, copied in by main.cpp
     bool newHighScore;     // draw-only: this run beat it, set by main.cpp at game over
     float overTime;        // game time when the run ended
+    bool levelClear;       // the level boss is dead: the "LEVEL 1 CLEAR" banner runs, then the run ends
+    float clearTimer;      // s left of the "LEVEL 1 CLEAR" banner
+    bool won;              // the run ended on the level clear, not on the last life
     bool soundRequested[SOUND_COUNT];
     uint32_t random;       // xorshift state
     float trauma;          // 0..1 screen shake, decays in real time

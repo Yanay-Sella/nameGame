@@ -17,7 +17,7 @@
 
 ## Data and config
 - **Config constants:** stick flick thresholds 0.6 and 0.3 (`input.cpp`).
-- **Persistence:** `settings.txt` next to EBOOT.BIN: `music=`, `shake=` and `flash=` lines.
+- **Persistence:** `settings.txt` next to EBOOT.BIN: `music=` (0 off, 1 Mizrahit, 2 Dubstep), `shake=` and `flash=` lines.
 
 ## Deviations from design
 - None.

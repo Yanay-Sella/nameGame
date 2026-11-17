@@ -7,6 +7,7 @@
 - [x] The mixer opens at 48 kHz stereo and the song loads on the PS3 (file loading, before the memory change). *(PS3 log 2026-11-17: "audio: 48000 Hz, format 0x9010, 2 channels, music loaded")*
 - [x] Song and effects play together through a full run. *(PS3 playtest 2026-11-17: user said "feels good")*
 - [x] Starting a new run restarts the song without a visible freeze. *(PS3 log 2026-11-17: "music restart took 1 ms" after a game over, down from ~350 ms when the song streamed from the file)*
+- [x] Both songs load on the PS3 and each plays in a run. *(PS3 log 2026-11-17 "mizrahit loaded, dubstep loaded"; player confirmed 2026-11-17 that each song played)*
 - [ ] Every one of the 10 effects is heard and none drowns the song. *(not proven: no effect-by-effect listening check)*
 
 ## History

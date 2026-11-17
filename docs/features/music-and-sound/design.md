@@ -2,14 +2,14 @@
 
 **Status:** implemented · **Updated:** 2026-11-17 · [GDD](../../GDD.md) · [Implementation](implementation.md) · [Testing](testing.md)
 
-The user's song drives the action, and short 8-bit sound effects confirm every hit, kill and pickup without drowning it. Effects are synthesized in code at startup, so the only audio file is the song (D-005, D-006).
+One of two songs, chosen in Settings, drives the action, and short 8-bit sound effects confirm every hit, kill and pickup without drowning it. Effects are synthesized in code at startup, so the only audio files are the two songs (D-005, D-006).
 
 ## Rules
-1. The song (`music.ogg` next to EBOOT.BIN) starts when a run starts, only if music is enabled in settings, loops, and stops at game over or when returning to the main menu; it keeps playing while paused. The main menu is silent. Turning music off stops it at once; turning it on while paused starts it from the beginning.
+1. The chosen song (MIZRAHIT: `music.ogg`, DUBSTEP: `dubstep.ogg`, both next to EBOOT.BIN) starts when a run starts, loops, and stops at game over or the level-clear end screen, or when returning to the main menu; it keeps playing while paused. With OFF no song plays. The main menu is silent. Changing the choice while paused starts the new song from the beginning, or stops the music for OFF.
 2. The mixer opens at 48 kHz stereo, the PS3's native rate.
 3. Each game event plays at most one sound per frame (ten aliens dying in one rocket blast play one death sound and one explosion).
 4. The shoot sound has its own mixer channel so rapid fire never cuts off other sounds; the other sounds share the remaining channels.
-5. If the song or audio device fails, the game runs silently and logs the error.
+5. If a song or the audio device fails, the game runs silently and logs the error.
 
 ## Numbers
 | Name | Value | Unit | What to watch in playtests |
@@ -31,7 +31,9 @@ The user's song drives the action, and short 8-bit sound effects confirm every h
 - Game over while a sound plays: it finishes; the song stops at once.
 - A new run starts: the song restarts from the beginning.
 - Quitting through the PS button menu: audio closes before SDL quits.
+- A song file is missing: choosing it plays nothing; the other song still works.
 
 ## History
 - 2026-11-17: designed.
 - 2026-11-17: implemented in M2.
+- 2026-11-17: second song (DUBSTEP) and a three-way music setting (D-018).

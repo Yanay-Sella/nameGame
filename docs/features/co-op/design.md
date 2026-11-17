@@ -5,10 +5,10 @@
 A friend can pick up a second controller and drop into a run already going, arcade style. Runs still start with one player (D-009), so nothing changes for someone playing alone. It serves pillar 3 (arcade): no lobby or menu, just press Start.
 
 ## Rules
-1. A run starts with one player. While it's running and not paused, Start or X on the second controller adds player 2.
+1. A run starts with one player. While it's running, not paused and the level isn't clear, Start or X on the second controller adds player 2.
 2. Player 2 joins with a fresh run of their own (3 lives, 3 rockets, 0 points) and arrives blinking, as after a respawn, 40 px right of the centre.
 3. Each player has their own lives, rockets, score and extra lives. Bullet and rocket kills score for the player who fired. Pickups go to whoever touches them.
-4. A player with no lives left is out until the run ends. The run ends when every player is out.
+4. A player with no lives left is out until the run ends. The run ends when every player is out or the level is clear.
 5. The wave clear bonus goes to every player still in the run.
 6. Either player's Start pauses. At game over, X or Start from either player starts a new run with the same number of players, and Circle goes to the main menu.
 7. HUD: player 1's score, spare lives and rockets on the left, player 2's on the right, the wave in the centre. Scores read "1P"/"2P" in co-op and "SCORE" alone. With one player, "2P PRESS START" shows dimly at the top right.

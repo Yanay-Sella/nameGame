@@ -1,4 +1,4 @@
-// SDL2_mixer: the song streams from music.ogg; effects are synthesized once at startup into mixer chunks.
+// SDL2_mixer: the songs (music.ogg, dubstep.ogg) play from memory; effects are synthesized once at startup into mixer chunks.
 #include "audio.h"
 #include <SDL.h>
 #include <SDL_mixer.h>
@@ -16,7 +16,8 @@ const int SHOOT_CHANNEL = 0;        // reserved, so rapid fire never cuts off ot
 struct Tone { float start, seconds, startHz, endHz, volume; bool noise; };
 
 static bool audioReady = false;
-static Mix_Music* music = NULL;
+const char* const SONG_FILES[MUSIC_CHOICES] = {NULL, "music.ogg", "dubstep.ogg"};   // indexed by Music
+static Mix_Music* songs[MUSIC_CHOICES] = {};   // songs[MUSIC_OFF] stays NULL
 static Mix_Chunk* sounds[SOUND_COUNT];
 
 // Mixes the tones into one chunk in the mixer's own sample format (16-bit or float, as the PS3 device reports).
@@ -82,16 +83,18 @@ void audioOpen(const char* folder) {
 
     // The song is read into memory once (~190 ms at boot): restarting it after a game over took ~350 ms when it
     // streamed from the hard drive and 1 ms from memory.
-    std::string path = std::string(folder) + "/music.ogg";
-    SDL_RWops* file = SDL_RWFromFile(path.c_str(), "rb");
-    Sint64 size = file ? SDL_RWsize(file) : -1;
-    void* songBytes = size > 0 ? SDL_malloc((size_t)size) : NULL;   // kept for the game's lifetime
-    if (songBytes && SDL_RWread(file, songBytes, (size_t)size, 1) == 1)   // one object of `size` bytes
-        music = Mix_LoadMUS_RW(SDL_RWFromConstMem(songBytes, (int)size), 1);
-    if (file) SDL_RWclose(file);
-    if (!music) {
-        debugNetPrintf(ERROR, "audio: loading %s failed: %s\n", path.c_str(), Mix_GetError());
-        SDL_free(songBytes);
+    for (int song = MUSIC_MIZRAHIT; song < MUSIC_CHOICES; song++) {
+        std::string path = std::string(folder) + "/" + SONG_FILES[song];
+        SDL_RWops* file = SDL_RWFromFile(path.c_str(), "rb");
+        Sint64 size = file ? SDL_RWsize(file) : -1;
+        void* songBytes = size > 0 ? SDL_malloc((size_t)size) : NULL;   // kept for the game's lifetime
+        if (songBytes && SDL_RWread(file, songBytes, (size_t)size, 1) == 1)   // one object of `size` bytes
+            songs[song] = Mix_LoadMUS_RW(SDL_RWFromConstMem(songBytes, (int)size), 1);
+        if (file) SDL_RWclose(file);
+        if (!songs[song]) {
+            debugNetPrintf(ERROR, "audio: loading %s failed: %s\n", path.c_str(), Mix_GetError());
+            SDL_free(songBytes);
+        }
     }
 
     // Effects from music-and-sound/design.md: {start s, length s, start Hz, end Hz, volume, noise}.
@@ -107,11 +110,14 @@ void audioOpen(const char* folder) {
                                            {0.16f, 0.08f, 784, 784, 0.25f, false}});
     sounds[SOUND_EXTRA_LIFE] = synthesize({{0, 0.07f, 523, 523, 0.3f, false}, {0.07f, 0.07f, 659, 659, 0.3f, false},
                                            {0.14f, 0.07f, 784, 784, 0.3f, false}, {0.21f, 0.07f, 1047, 1047, 0.3f, false}});
-    debugNetPrintf(INFO, "audio: %d Hz, format 0x%x, %d channels, music %s\n", freq, format, channels, music ? "loaded" : "missing");
+    debugNetPrintf(INFO, "audio: %d Hz, format 0x%x, %d channels, mizrahit %s, dubstep %s\n", freq, format, channels,
+                   songs[MUSIC_MIZRAHIT] ? "loaded" : "missing", songs[MUSIC_DUBSTEP] ? "loaded" : "missing");
 }
 
-void audioStartMusic() {
-    if (music && Mix_PlayMusic(music, -1) != 0) debugNetPrintf(ERROR, "audio: Mix_PlayMusic failed: %s\n", Mix_GetError());
+void audioStartMusic(Music song) {
+    if (!audioReady) return;
+    if (!songs[song]) { Mix_HaltMusic(); return; }   // OFF, or the song didn't load: a song switched away from must stop too
+    if (Mix_PlayMusic(songs[song], -1) != 0) debugNetPrintf(ERROR, "audio: Mix_PlayMusic failed: %s\n", Mix_GetError());
 }
 
 void audioStopMusic() {

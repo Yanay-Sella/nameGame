@@ -71,6 +71,10 @@ const int EXTRA_LIFE_EVERY = 50000;
 const float SHIP_EXPLOSION_RADIUS = 24;   // px
 // Co-op (co-op/design.md)
 const float CO_OP_SPAWN_OFFSET = 40;     // px right of the centre for player 2
+// Level 1 (level-1/design.md)
+const int LEVEL_LAST_WAVE = 20;        // the level boss's wave; killing it ends the run
+const float LEVEL_BANNER_TIME = 2;     // s of "LEVEL 1" before "WAVE 1"
+const float LEVEL_CLEAR_TIME = 3;      // s of "LEVEL 1 CLEAR" before the end screen
 // Pixel art (pixel-art/design.md)
 const float ANIMATION_FRAME = 0.25f;   // s
 const float HIT_FLASH = 0.06f;         // s
@@ -162,7 +166,7 @@ static void startWave(Game& game, int wave) {
         }
     }
     game.diveTimer = diveInterval(wave);
-    game.bannerTimer = BANNER_TIME;
+    game.bannerTimer = BANNER_TIME + (wave == 1 ? LEVEL_BANNER_TIME : 0);   // "LEVEL 1" first, then "WAVE 1"
     game.nextWaveTimer = 0;
     game.soundRequested[SOUND_WAVE_START] = true;
 }
@@ -619,10 +623,26 @@ void updateGame(Game& game, const Actions* actions, float dt) {
 
     // The next wave waits for a living ship (lives-and-score edge case).
     bool anyAlienAlive = game.boss.alive || std::any_of(game.aliens.begin(), game.aliens.end(), [](const Alien& a) { return a.alive; });
-    if (!anyAlienAlive && game.nextWaveTimer == 0) {
-        game.nextWaveTimer = WAVE_PAUSE;
+    if (!anyAlienAlive && game.nextWaveTimer == 0 && !game.levelClear) {
         for (Player& player : game.players)
             if (player.lives > 0) addScore(game, player, WAVE_CLEAR_BONUS * game.wave);
+        if (game.wave == LEVEL_LAST_WAVE) {   // the level boss is dead (level-1 rule 4)
+            game.levelClear = true;
+            game.clearTimer = LEVEL_CLEAR_TIME;
+            game.soundRequested[SOUND_WAVE_START] = true;
+        } else {
+            game.nextWaveTimer = WAVE_PAUSE;
+        }
+    } else if (game.levelClear) {
+        // The banner's end is a win only while someone has lives left; otherwise the game over below ends the run.
+        game.clearTimer = std::max(0.0f, game.clearTimer - dt);
+        bool livesLeft = std::any_of(game.players.begin(), game.players.end(), [](const Player& p) { return p.lives > 0; });
+        if (game.clearTimer == 0 && livesLeft) {
+            game.won = true;
+            game.over = true;
+            game.overTime = game.time;
+            return;
+        }
     } else if (!anyAlienAlive && anyPlayerAlive) {
         game.nextWaveTimer -= dt;
         if (game.nextWaveTimer <= 0) startWave(game, game.wave + 1);
@@ -730,19 +750,22 @@ void drawGame(const Game& game) {
         fillRect(barX, BOSS_HEALTH_BAR_Y, BOSS_HEALTH_BAR_W, 3, paletteColor('R'));
         fillRect(barX, BOSS_HEALTH_BAR_Y, BOSS_HEALTH_BAR_W * std::max(game.boss.hp, 0) / game.boss.maxHp, 3, paletteColor('r'));
     }
-    if (!coOp && !game.over) drawText(SCREEN_W - 2 - textWidth("2P PRESS START"), 2, "2P PRESS START", paletteColor('s'));
+    if (!coOp && !game.over && !game.levelClear) drawText(SCREEN_W - 2 - textWidth("2P PRESS START"), 2, "2P PRESS START", paletteColor('s'));
 
     if (game.over) {
         fillRect(SCREEN_W / 2 - 72, 58, 144, 62, paletteColor('n'));   // panel so passing aliens don't hide the text
         fillRect(SCREEN_W / 2 - 71, 59, 142, 60, paletteColor('k'));
-        drawCentredText(66, "GAME OVER", paletteColor('r'), 2);
+        drawCentredText(66, game.won ? "LEVEL 1 CLEAR" : "GAME OVER", paletteColor(game.won ? 'y' : 'r'), 2);
         if (coOp) snprintf(text, sizeof text, "1P %d   2P %d   WAVE %d", game.players[0].score, game.players[1].score, game.wave);
         else snprintf(text, sizeof text, "SCORE %d   WAVE %d", game.players[0].score, game.wave);
         drawCentredText(86, text, paletteColor('w'), 1);
         if (game.newHighScore) drawCentredText(96, "NEW HIGH SCORE", paletteColor('y'), 1);
         if (game.time - game.overTime > GAME_OVER_INPUT_LOCK) drawCentredText(108, "X PLAY AGAIN   O MENU", paletteColor('y'), 1);
+    } else if (game.levelClear) {
+        drawCentredText(84, "LEVEL 1 CLEAR", paletteColor('y'), 2);
     } else if (game.bannerTimer > 0) {
-        snprintf(text, sizeof text, isBossWave(game.wave) ? "BOSS" : "WAVE %d", game.wave);
+        const char* banner = game.wave == 1 && game.bannerTimer > BANNER_TIME ? "LEVEL 1" : isBossWave(game.wave) ? "BOSS" : "WAVE %d";
+        snprintf(text, sizeof text, banner, game.wave);
         drawCentredText(84, text, paletteColor('y'), 2);
     }
 }
