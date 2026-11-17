@@ -6,14 +6,14 @@
 - [x] Without a settings file, music defaults to on. *(`tests/game_tests.cpp` › settingsDefaultToMusicOn)*
 - [x] A saved music setting loads back. *(`tests/game_tests.cpp` › settingsSurviveASave)*
 - [x] The menu cursor `>` has a font glyph. *(`tests/game_tests.cpp` › menuCursorHasAGlyph)*
-- [ ] Menu up/down works with the D-pad and the stick, one flick per item. *(PS3 check pending)*
+- [ ] Menu up/down works with the D-pad and the stick, one flick per item. *(partly: the log shows D-pad presses and scene changes main menu → settings → main menu → playing; the stick isn't logged)*
 - [ ] Settings → music off → Back → Classic gives a silent run with sound effects. *(PS3 check pending)*
 - [ ] Start → Settings → music on starts the song; Circle → Resume continues the run. *(PS3 check pending)*
 - [ ] Start → Return to menu shows the main menu and stops the music. *(PS3 check pending)*
 - [ ] The music setting is kept after quitting and relaunching. *(PS3 check pending)*
 - [ ] Losing a run, then Circle at game over, shows the main menu. *(PS3 check pending)*
 - [ ] Circle is button 10 on the PS3. *(PS3 check pending)*
-- [ ] 60 fps in the menus and in play. *(PS3 check pending)*
+- [x] 60 fps in the menus and in play. *(PS3 log 2026-11-17: fps 59.7 in the main menu, 60.0 in play, slowest frame 6 ms)*
 
 ## Playtest checks
 1. Menu up/down with the D-pad and the left stick.
