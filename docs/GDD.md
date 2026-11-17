@@ -1,6 +1,6 @@
 # nameGame — Game Design Document
 
-**Version:** 0.2 · **Updated:** 2026-11-17 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
+**Version:** 0.3 · **Updated:** 2026-11-17 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
 
 ## Summary
 You pilot a small ship at the bottom of the screen against waves of pixel-art aliens. Hold R1 to spray bullets, and save the scarce R2 rocket for the moment a wave gets out of hand. Waves get harder, and every 5th wave is a boss. The run ends when you lose your last life, and you chase the saved high score.
@@ -37,9 +37,10 @@ dodge + shoot (R1) → kill aliens → score and pickups → stronger gun / more
 | Rocket | designed | MVP | R2 fires a limited rocket that explodes in a large radius | [design](features/rocket/design.md) |
 | Enemy waves | designed | MVP | Alien formations that sway, shoot and dive; harder each wave | [design](features/enemy-waves/design.md) |
 | Weapon upgrades | idea | MVP | Pickups upgrade bullets: double → spread; death loses a level | — |
-| Lives and score | idea | MVP | 3 lives, one hit kills, respawn invincibility, extra life at score milestones | — |
+| Lives and score | designed | MVP | 3 lives, one hit kills, respawn invincibility, extra life every 50,000 | [design](features/lives-and-score/design.md) |
 | Bosses | idea | MVP | A boss on every 5th wave, stronger each time | — |
-| Music and sound | idea | MVP | Your song looped during gameplay; synthesized retro SFX | — |
+| Music and sound | designed | MVP | Your song looped during gameplay; synthesized retro SFX | [design](features/music-and-sound/design.md) |
+| Pixel art | designed | MVP | 320×180 palette art: sprites, font and starfield as text grids in code | [design](features/pixel-art/design.md) |
 | Screens | idea | MVP | Title, pause (Start), game over | — |
 | High score save | idea | MVP | Best score saved on the PS3, shown on the title | — |
 | Game feel | idea | MVP | Shake, hit-stop, flashes, particles by event tier; shake and flash options | — |
@@ -92,3 +93,4 @@ The task-by-task plan for each milestone is in the [work plan](work-plan/nameGam
 ## Change log
 **0.1 (2026-11-17):** first draft from the user's answers.
 **0.2 (2026-11-17):** M1 done, prototype kept ([brief](../prototypes/ship-feel/BRIEF.md)); D-008 logged.
+**0.3 (2026-11-17):** M2 started: lives and score, music and sound, pixel art designed.

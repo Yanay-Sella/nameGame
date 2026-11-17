@@ -6,7 +6,7 @@ SOURCES  ?= source
 IMAGE    := namegame-ps3dev
 PKG      := build/nameGame.pkg
 
-.PHONY: ps3 image deploy log clean music
+.PHONY: ps3 image deploy log clean music test
 
 # Compile and package build/nameGame.pkg inside the container (always a full rebuild so LOG_HOST/LOG_PORT changes apply).
 # SOURCES=prototypes/<idea> builds a prototype instead of the game.
@@ -28,6 +28,12 @@ deploy: ps3
 	curl -sS --fail -m 60 -T $(PKG) ftp://$(PS3_IP)/dev_hdd0/packages/nameGame.pkg
 	curl -sS --fail -m 60 -o /dev/null "http://$(PS3_IP)/install.ps3/dev_hdd0/packages/nameGame.pkg"
 	@echo "Installed. Launch nameGame from the PS3's Game menu."
+
+# Build and run the game-rule tests on the Mac (game.cpp and screen.cpp have no SDL or PS3 code).
+test:
+	mkdir -p build/tests
+	c++ -std=c++14 -Wall -Wextra -Isource tests/game_tests.cpp source/game.cpp source/screen.cpp -o build/tests/game_tests
+	build/tests/game_tests
 
 # Print the game's UDP log output (Ctrl+C to stop).
 log:

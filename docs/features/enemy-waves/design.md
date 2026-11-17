@@ -17,7 +17,7 @@ Aliens fly in, line up in a formation at the top of the screen, sway side to sid
 | Name | Value | Unit | What to watch in playtests |
 |---|---|---|---|
 | Formation | 8 columns × min(2 + wave/2, 5) rows | aliens | screen not too crowded at 5 rows [ASSUMPTION] |
-| Alien size | 12 × 12 | px | |
+| Alien size | 12 × 10 | px | see [pixel art](../pixel-art/design.md) |
 | Sway speed | 20 + 2 × wave, max 50 | px/s | [ASSUMPTION] |
 | Shot chance per alien | 0.02 + 0.005 × wave, max 0.08 | per s | wave 1 is calm, wave 10 is busy [ASSUMPTION] |
 | Enemy shot speed | 70 | px/s | dodgeable once seen [ASSUMPTION] |
@@ -25,6 +25,9 @@ Aliens fly in, line up in a formation at the top of the screen, sway side to sid
 | Score per alien | 100 / 200 / 400 | points (green / blue / red) | [ASSUMPTION] |
 | Wave clear bonus | 1000 × wave | points | [ASSUMPTION] |
 | Pause between waves | 2 | s | |
+| Fly-in | from 150 px above the slot at 150 px/s; 0.06 s later per column, 0.12 s per row | | wave starts feel lively, not slow [ASSUMPTION] |
+| Dive | 90 px/s down, steering 120 px/s² toward the ship, at most 70 px/s sideways | | dodgeable but threatening [ASSUMPTION] |
+| Return to formation | 100 | px/s | [ASSUMPTION] |
 
 ## Edge cases
 - The player dies mid-wave: the wave continues; diving aliens return to formation during respawn.
@@ -32,4 +35,4 @@ Aliens fly in, line up in a formation at the top of the screen, sway side to sid
 - Wave count past 5 rows: only the speeds and shot chances keep rising.
 
 ## History
-- 2026-11-17: designed.
+- 2026-11-17: designed; alien size set to 12 × 10 with the pixel art.

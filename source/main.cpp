@@ -1,4 +1,4 @@
-// Hello world: a bouncing square; any controller button changes its color. Logs go over UDP to the Mac.
+// nameGame: startup, the main loop (fixed 60 Hz game steps), pause, and copying the picture to the TV.
 #include <SDL.h>
 #include <debugnet.h>
 #include <net/net.h>
@@ -6,8 +6,15 @@
 #include <sys/systime.h>
 #include <lv2/process.h>
 #include <rsx/gcm_sys.h>
+#include <string>
+#include "audio.h"
+#include "game.h"
+#include "input.h"
+#include "screen.h"
 
-static bool running = true;
+const float STEP = 1.0f / 60;   // s per game update
+const int MAX_STEPS_PER_FRAME = 4;
+const int PLAYER_COUNT = 1;
 
 // Progress markers the main loop updates, read by the watchdog thread.
 static volatile unsigned frame = 0;
@@ -23,10 +30,8 @@ static void watchdog(void* arg) {
         lastFrame = frame;
         if (stalledSeconds == 5) {
             gcmControlRegister* rsx = gcmGetControlRegister();
-            u8 displayed = 0xff;
-            gcmGetCurrentDisplayBufferId(&displayed);
-            debugNetPrintf(ERROR, "watchdog: stuck in '%s' at frame %u; RSX put=0x%x get=0x%x ref=0x%x flipStatus=%u lastFlip=%lld displayedBuffer=%u\n",
-                           stage, frame, rsx->put, rsx->get, rsx->ref, gcmGetFlipStatus(), gcmGetLastFlipTime(), displayed);
+            debugNetPrintf(ERROR, "watchdog: stuck in '%s' at frame %u; RSX put=0x%x get=0x%x flipStatus=%u\n",
+                           stage, frame, rsx->put, rsx->get, gcmGetFlipStatus());
             debugNetPrintf(ERROR, "watchdog: exiting\n");
             sysProcessExit(1);
         }
@@ -42,66 +47,115 @@ int main(int argc, char** argv) {
     sysThreadCreate(&watchdogThread, watchdog, NULL, 1000, 0x4000, 0, (char*)"watchdog");
 
     stage = "SDL_Init";
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) != 0) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK | SDL_INIT_AUDIO) != 0) {
         debugNetPrintf(ERROR, "SDL_Init failed: %s\n", SDL_GetError());
         return 1;
     }
-    debugNetPrintf(INFO, "SDL initialized\n");
-    stage = "SDL_CreateWindow";
-    // Match the window to the PS3's video output so the PS3 SDL port's screen buffers fit it.
+    // The window matches the PS3's video output; the picture is copied into it scaled (CLAUDE.md, GDD D-008).
     SDL_DisplayMode desktop;
     SDL_GetDesktopDisplayMode(0, &desktop);
-    debugNetPrintf(INFO, "video output %dx%d\n", desktop.w, desktop.h);
     SDL_Window* window = SDL_CreateWindow("nameGame", 0, 0, desktop.w, desktop.h, 0);
-    debugNetPrintf(INFO, "window %s\n", window ? "created" : "failed");
-    stage = "SDL_CreateRenderer";
     SDL_Renderer* renderer = window ? SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC) : NULL;
-    if (!renderer) {
-        debugNetPrintf(ERROR, "window/renderer failed: %s\n", SDL_GetError());
+    SDL_Texture* picture = renderer ? SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
+                                                        SCREEN_W, SCREEN_H) : NULL;
+    if (!picture) {
+        debugNetPrintf(ERROR, "window/renderer/texture failed: %s\n", SDL_GetError());
         return 1;
     }
+    int outputW, outputH;
+    SDL_GetRendererOutputSize(renderer, &outputW, &outputH);
+    int scale = SDL_min(outputW / SCREEN_W, outputH / SCREEN_H);
+    SDL_Rect pictureRect = {(outputW - SCREEN_W * scale) / 2, (outputH - SCREEN_H * scale) / 2, SCREEN_W * scale, SCREEN_H * scale};
+    debugNetPrintf(INFO, "output %dx%d, picture x%d at %d,%d\n", outputW, outputH, scale, pictureRect.x, pictureRect.y);
 
-    int screenW, screenH;
-    SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
-    debugNetPrintf(INFO, "screen %dx%d, %d controller(s)\n", screenW, screenH, SDL_NumJoysticks());
-    if (SDL_NumJoysticks() > 0) SDL_JoystickOpen(0);
+    stage = "audio";
+    std::string exePath = argc > 0 ? argv[0] : "/dev_hdd0/game/NMGM00001/USRDIR/EBOOT.BIN";
+    audioOpen(exePath.substr(0, exePath.find_last_of('/')).c_str());
 
-    const SDL_Color colors[] = {{230, 60, 60, 255}, {60, 200, 90, 255}, {70, 120, 240, 255}, {240, 200, 50, 255}};
-    int colorIndex = 0;
-    SDL_Rect square = {100, 100, 120, 120};
-    int dx = 6, dy = 4;
+    Game game;
+    startGame(game, PLAYER_COUNT, (uint32_t)SDL_GetPerformanceCounter());
+    audioStartMusic();
+    bool paused = false, running = true;
+
+    const double counterHz = (double)SDL_GetPerformanceFrequency();
+    Uint64 lastCounter = SDL_GetPerformanceCounter();
+    float accumulator = 0, statsTimer = 0, worstWorkMs = 0;
+    int framesSinceStats = 0;
 
     while (running) {
+        Uint64 frameStart = SDL_GetPerformanceCounter();
+        accumulator += (float)((frameStart - lastCounter) / counterHz);
+        lastCounter = frameStart;
+
         // SDL also turns the PS button menu's "Quit Game" into SDL_QUIT.
-        stage = "SDL_PollEvent";
+        stage = "events";
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) running = false;
-            if (event.type == SDL_JOYBUTTONDOWN) {
-                colorIndex = (colorIndex + 1) % 4;
-                debugNetPrintf(INFO, "button %d pressed\n", event.jbutton.button);
+            inputHandleEvent(event);
+        }
+        Actions actions[PLAYER_COUNT];
+        for (int p = 0; p < PLAYER_COUNT; p++) actions[p] = inputRead(p);
+        for (int p = 0; p < PLAYER_COUNT; p++) {
+            if (actions[p].pause && !game.over) paused = !paused;
+            // Game over: X or Start begins a new run once the input lock has passed (M3's screens replace this).
+            if (actions[p].confirm && game.over && game.time - game.overTime > GAME_OVER_INPUT_LOCK) {
+                startGame(game, PLAYER_COUNT, (uint32_t)SDL_GetPerformanceCounter());
+                Uint64 musicStart = SDL_GetPerformanceCounter();
+                audioStartMusic();
+                debugNetPrintf(INFO, "new run (music restart took %.0f ms)\n", (SDL_GetPerformanceCounter() - musicStart) * 1000.0 / counterHz);
             }
         }
+        bool wasOver = game.over;
 
-        square.x += dx;
-        square.y += dy;
-        if (square.x < 0 || square.x + square.w > screenW) dx = -dx;
-        if (square.y < 0 || square.y + square.h > screenH) dy = -dy;
+        stage = "update";
+        int steps = 0;
+        while (accumulator >= STEP && steps < MAX_STEPS_PER_FRAME) {
+            if (!paused) updateGame(game, actions, STEP);
+            for (Actions& a : actions) a.rocket = false;   // a press counts once, in the first step
+            accumulator -= STEP;
+            steps++;
+        }
+        if (steps == MAX_STEPS_PER_FRAME) accumulator = 0;   // fell far behind: drop the backlog rather than spiral
+        if (game.over && !wasOver) {
+            audioStopMusic();
+            debugNetPrintf(INFO, "game over: score %d, wave %d\n", game.players[0].score, game.wave);
+        }
+        for (int s = 0; s < SOUND_COUNT; s++) {
+            if (game.soundRequested[s]) audioPlay((Sound)s);
+            game.soundRequested[s] = false;
+        }
 
-        stage = "SDL_RenderClear";
-        SDL_SetRenderDrawColor(renderer, 20, 20, 30, 255);
-        SDL_RenderClear(renderer);
-        const SDL_Color& c = colors[colorIndex];
-        SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, 255);
-        stage = "SDL_RenderFillRect";
-        SDL_RenderFillRect(renderer, &square);
-        stage = "SDL_RenderPresent";
+        stage = "draw";
+        drawGame(game);
+        if (paused) drawText((SCREEN_W - textWidth("PAUSED", 2)) / 2, 84, "PAUSED", 0xFFFFFFFF, 2);
+
+        stage = "present";
+        SDL_UpdateTexture(picture, NULL, screenPixels, SCREEN_W * sizeof(uint32_t));
+        if (frame < 2) {   // borders are never drawn over, so clearing both screen buffers once is enough
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+            SDL_RenderClear(renderer);
+        }
+        SDL_RenderCopy(renderer, picture, NULL, &pictureRect);
+        float workMs = (float)((SDL_GetPerformanceCounter() - frameStart) * 1000.0 / counterHz);
         SDL_RenderPresent(renderer);
 
-        if (++frame == 1 || frame % 3600 == 0) debugNetPrintf(INFO, "frame %u\n", frame);
+        // Every 5 s: frames per second and the worst work time (the 60 fps budget is 16.7 ms).
+        framesSinceStats++;
+        worstWorkMs = SDL_max(worstWorkMs, workMs);
+        statsTimer += (float)((SDL_GetPerformanceCounter() - frameStart) / counterHz);
+        if (statsTimer >= 5) {
+            debugNetPrintf(INFO, "fps %.1f, worst work %.1f ms, wave %d, score %d\n", framesSinceStats / statsTimer,
+                           worstWorkMs, game.wave, game.players[0].score);
+            framesSinceStats = 0;
+            statsTimer = 0;
+            worstWorkMs = 0;
+        }
+        frame++;
     }
 
     debugNetPrintf(INFO, "nameGame exiting\n");
+    audioClose();
     SDL_Quit();
     debugNetFinish();
     return 0;

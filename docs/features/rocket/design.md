@@ -24,6 +24,8 @@ R2 launches a big rocket that climbs, speeds up and explodes in a large blast on
 | Explosion radius | 40 | px | clears a chunk of a formation, not all of it [ASSUMPTION] |
 | Explosion damage | 20 | HP | kills normal aliens; hurts a boss a lot [ASSUMPTION] |
 | Pickup drop chance | 2 | % per kill | about one rocket per 2 waves [ASSUMPTION] |
+| Pickup fall speed | 30 | px/s | reachable before it leaves the screen [ASSUMPTION] |
+| Blast on screen | grows 0.1, dissolves 0.35 | s | [ASSUMPTION] |
 
 ## Edge cases
 - Two rockets in flight: each explodes on its own; an enemy is damaged by each blast at most once.
