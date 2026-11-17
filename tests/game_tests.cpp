@@ -506,6 +506,33 @@ static void settingsSurviveASave() {
     CHECK(settingsLoad("build/tests/settings.txt").music == true);
 }
 
+static void writeTextFile(const char* path, const char* text) {
+    FILE* file = fopen(path, "w");
+    fputs(text, file);
+    fclose(file);
+}
+
+static void highScoreDefaultsToZero() {
+    CHECK(highScoreLoad("build/tests/no-such-highscore.txt") == 0);
+    writeTextFile("build/tests/garbage-highscore.txt", "this is not a score\nbest=\n");
+    CHECK(highScoreLoad("build/tests/garbage-highscore.txt") == 0);
+}
+
+static void highScoreSurvivesASave() {
+    CHECK(highScoreSave("build/tests/highscore.txt", 123456));
+    CHECK(highScoreLoad("build/tests/highscore.txt") == 123456);
+    CHECK(highScoreSave("build/tests/highscore.txt", 0));
+    CHECK(highScoreLoad("build/tests/highscore.txt") == 0);
+    CHECK(!highScoreSave("build/tests/no-such-folder/highscore.txt", 5));
+}
+
+static void highScoreIsClamped() {
+    writeTextFile("build/tests/clamp-highscore.txt", "best=-500\n");
+    CHECK(highScoreLoad("build/tests/clamp-highscore.txt") == 0);
+    writeTextFile("build/tests/clamp-highscore.txt", "best=99999999999\n");
+    CHECK(highScoreLoad("build/tests/clamp-highscore.txt") == 9999999);
+}
+
 static void menuCursorHasAGlyph() {
     CHECK(fontGlyph('>') != 0);
 }
@@ -514,6 +541,9 @@ int main() {
     spritesHaveTheirSize();
     settingsDefaultToMusicOn();
     settingsSurviveASave();
+    highScoreDefaultsToZero();
+    highScoreSurvivesASave();
+    highScoreIsClamped();
     menuCursorHasAGlyph();
     onlyEnemyShotsUseMagenta();
     deadzoneIsRadialAndRescaled();

@@ -54,7 +54,7 @@ const int BOSS_HEALTH_BAR_W = 120, BOSS_HEALTH_BAR_Y = 16;   // px
 // Lives and score (lives-and-score/design.md)
 const int START_LIVES = 3, MAX_LIVES = 9;
 const float RESPAWN_DELAY = 1.5f, INVINCIBLE_TIME = 2, BLINK_PERIOD = 0.1f;   // s
-const int EXTRA_LIFE_EVERY = 50000, MAX_SCORE = 9999999;
+const int EXTRA_LIFE_EVERY = 50000;
 const float SHIP_EXPLOSION_RADIUS = 24;   // px
 // Co-op (co-op/design.md)
 const float CO_OP_SPAWN_OFFSET = 40;     // px right of the centre for player 2
@@ -649,6 +649,8 @@ void drawGame(const Game& game) {
     char text[48];
     snprintf(text, sizeof text, "WAVE %d", game.wave);
     drawCentredText(2, text, paletteColor('w'), 1);
+    snprintf(text, sizeof text, "HI %07d", game.highScore);
+    drawCentredText(9, text, paletteColor('s'), 1);
     bool coOp = game.players.size() > 1;
     for (size_t p = 0; p < game.players.size(); p++) {
         const Player& player = game.players[p];
@@ -666,13 +668,14 @@ void drawGame(const Game& game) {
     if (!coOp && !game.over) drawText(SCREEN_W - 2 - textWidth("2P PRESS START"), 2, "2P PRESS START", paletteColor('s'));
 
     if (game.over) {
-        fillRect(SCREEN_W / 2 - 72, 58, 144, 54, paletteColor('n'));   // panel so passing aliens don't hide the text
-        fillRect(SCREEN_W / 2 - 71, 59, 142, 52, paletteColor('k'));
+        fillRect(SCREEN_W / 2 - 72, 58, 144, 62, paletteColor('n'));   // panel so passing aliens don't hide the text
+        fillRect(SCREEN_W / 2 - 71, 59, 142, 60, paletteColor('k'));
         drawCentredText(66, "GAME OVER", paletteColor('r'), 2);
         if (coOp) snprintf(text, sizeof text, "1P %d   2P %d   WAVE %d", game.players[0].score, game.players[1].score, game.wave);
         else snprintf(text, sizeof text, "SCORE %d   WAVE %d", game.players[0].score, game.wave);
         drawCentredText(86, text, paletteColor('w'), 1);
-        if (game.time - game.overTime > GAME_OVER_INPUT_LOCK) drawCentredText(100, "X PLAY AGAIN   O MENU", paletteColor('y'), 1);
+        if (game.newHighScore) drawCentredText(96, "NEW HIGH SCORE", paletteColor('y'), 1);
+        if (game.time - game.overTime > GAME_OVER_INPUT_LOCK) drawCentredText(108, "X PLAY AGAIN   O MENU", paletteColor('y'), 1);
     } else if (game.bannerTimer > 0) {
         snprintf(text, sizeof text, isBossWave(game.wave) ? "BOSS" : "WAVE %d", game.wave);
         drawCentredText(84, text, paletteColor('y'), 2);

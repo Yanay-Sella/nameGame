@@ -1,6 +1,6 @@
 # nameGame — Game Design Document
 
-**Version:** 0.10 · **Updated:** 2026-11-17 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
+**Version:** 0.11 · **Updated:** 2026-11-17 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
 
 ## Summary
 You pilot a small ship at the bottom of the screen against waves of pixel-art aliens. Hold R1 to spray bullets, and save the scarce R2 rocket for the moment a wave gets out of hand. Waves get harder, and every 5th wave is a boss. The run ends when you lose your last life, and you chase the saved high score.
@@ -42,7 +42,7 @@ dodge + shoot (R1) → kill aliens → score and pickups → stronger gun / more
 | Music and sound | implemented | MVP | Your song looped during gameplay; synthesized retro SFX | [design](features/music-and-sound/design.md) |
 | Pixel art | implemented | MVP | 320×180 palette art: sprites, font and starfield as text grids in code | [design](features/pixel-art/design.md) |
 | Screens | in progress | MVP | Main menu (Classic, Settings), pause menu, settings with music on/off, game over | [design](features/screens/design.md) |
-| High score save | idea | MVP | Best score saved on the PS3, shown on the title | — |
+| High score save | implemented | MVP | Best score saved on the PS3, shown on the title | [design](features/high-score/design.md) |
 | Game feel | idea | MVP | Shake, hit-stop, flashes, particles by event tier; shake and flash options | — |
 | Co-op | in progress | MVP | A second player drops in with Start on a second controller | [design](features/co-op/design.md) |
 
@@ -108,3 +108,4 @@ Boot → MAIN MENU ─ CLASSIC ──→ PLAYING ⇄ (Start) PAUSED ─ RETURN T
 **0.8 (2026-11-17):** main menu, pause menu and settings (D-010).
 **0.9 (2026-11-17):** weapon upgrades implemented.
 **0.10 (2026-11-17):** bosses implemented.
+**0.11 (2026-11-17):** high score save implemented.

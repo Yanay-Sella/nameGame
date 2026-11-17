@@ -102,6 +102,9 @@ int main(int argc, char** argv) {
     std::string settingsPath = exeFolder + "/settings.txt";
     Settings settings = settingsLoad(settingsPath.c_str());
     debugNetPrintf(INFO, "settings: music %s\n", settings.music ? "on" : "off");
+    std::string highScorePath = exeFolder + "/highscore.txt";
+    int highScore = highScoreLoad(highScorePath.c_str());
+    debugNetPrintf(INFO, "high score: %d\n", highScore);
 
     Game game;
     startGame(game, 1, (uint32_t)SDL_GetPerformanceCounter());   // gives the menu its stars; a second player joins with Start (co-op)
@@ -231,6 +234,14 @@ int main(int argc, char** argv) {
         if (!game.boss.alive && bossWasAlive) debugNetPrintf(INFO, "boss down at wave %d\n", game.wave);
         if (game.over && !wasOver) {
             audioStopMusic();
+            int best = 0;
+            for (const Player& player : game.players) best = SDL_max(best, player.score);
+            if (best > highScore) {
+                highScore = best;
+                game.newHighScore = true;
+                bool saved = highScoreSave(highScorePath.c_str(), highScore);
+                debugNetPrintf(INFO, "high score: %d (%s)\n", highScore, saved ? "saved" : "SAVE FAILED");
+            }
             for (size_t p = 0; p < game.players.size(); p++)
                 debugNetPrintf(INFO, "game over: player %d score %d, wave %d\n", (int)p + 1, game.players[p].score, game.wave);
         }
@@ -241,6 +252,7 @@ int main(int argc, char** argv) {
             }
         }
 
+        game.highScore = highScore;
         stage = "draw";
         if (scene == SCENE_MAIN_MENU) {
             drawBackground(game);

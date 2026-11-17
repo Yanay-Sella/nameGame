@@ -88,12 +88,15 @@ struct Game {
     float bannerTimer;     // s the "WAVE n" banner stays up
     float nextWaveTimer;   // s until the next wave once this one is cleared; 0 while a wave is on
     bool over;             // the last life is gone
+    int highScore;         // draw-only: the saved best, copied in by main.cpp
+    bool newHighScore;     // draw-only: this run beat it, set by main.cpp at game over
     float overTime;        // game time when the run ended
     bool soundRequested[SOUND_COUNT];
     uint32_t random;       // xorshift state
 };
 
 const float GAME_OVER_INPUT_LOCK = 1.5f;   // s before X or Start can start a new run
+const int MAX_SCORE = 9999999;             // the score display and the saved high score stop here
 const int MAX_PLAYERS = 2;                 // player 2 drops in from a second controller (co-op)
 
 void startGame(Game& game, int playerCount, uint32_t seed);
