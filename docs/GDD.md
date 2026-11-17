@@ -96,7 +96,8 @@ Boot → MAIN MENU ─ CLASSIC ──→ PLAYING ⇄ (Start) PAUSED ─ RETURN T
 | D-012 | 2026-11-17 | The game is called "NAME game" ("NAME GAME" in the uppercase pixel fonts); the repo, app ID NMGM00001 and file names keep nameGame | ROCKET PANIC; STARSWARM; HIVE STORM | user's choice; a new app ID would install a second game and orphan the saved high score and settings | [screens](features/screens/design.md) |
 | D-013 | 2026-11-17 | Difficulty keeps climbing to wave 20: enemy shots 70→90 px/s over waves 11–20, two red and two blue rows from wave 13, two divers at once from wave 15 | keep the wave-12 caps and only retune | every value was capped by wave 12–15, so waves 13–19 played alike | [enemy waves](features/enemy-waves/design.md) |
 | D-014 | 2026-11-17 | A lost controller pauses the run; after it reconnects the pause menu stays up and the player resumes | resume at once; 3-2-1 countdown | user's choice: the player resumes when ready | [ship controls](features/ship-controls/design.md), [co-op](features/co-op/design.md), [screens](features/screens/design.md) |
-| D-015 | 2026-11-17 | make release builds without the dev aids (Triangle stress, Select autopilot), logs to 127.0.0.1 and includes the song | one build for everything | a player pressing Triangle would spawn 60 aliens; the user may share the song | [music and sound](features/music-and-sound/design.md) |
+| D-015 | 2026-11-17 | make release builds without the dev aids (Triangle stress, Select autopilot, L1 screenshot), logs to 127.0.0.1 and includes the song | one build for everything | a player pressing Triangle would spawn 60 aliens; the user may share the song | [music and sound](features/music-and-sound/design.md) |
+| D-016 | 2026-11-17 | Claude drives PS3 tests remotely: launch (`/play.ps3?NMGM00001`) and quit (`/xmb.ps3$exit`) through webMAN, input through webMAN's virtual pad, screenshots from a dev-only L1 dump of the game's pixel buffer | the user launches and presses buttons; an in-game UDP input listener; webMAN's built-in screenshot | all three webMAN commands worked on the PS3; its own screenshot saved nothing | [music and sound](features/music-and-sound/design.md) |
 
 ## Open questions
 - **Assumptions to confirm:** sprites as text grids in code (D-006); every number marked `[ASSUMPTION]` in the feature notes.
@@ -120,3 +121,4 @@ Boot → MAIN MENU ─ CLASSIC ──→ PLAYING ⇄ (Start) PAUSED ─ RETURN T
 **0.13 (2026-11-17):** M3 done: screens and co-op confirmed on the PS3, M3 numbers confirmed in play.
 **0.14 (2026-11-17):** M4 built: name, unplug pause, difficulty to wave 20, release build and install guide (D-012 to D-015).
 **0.15 (2026-11-17):** M4 checked on the PS3: unplug pause (single-player and co-op) and a 21-minute soak confirmed; balancing playtest and fresh-player install still open.
+**0.16 (2026-11-17):** remote test workflow: make launch, quit, pad and shot (D-016).

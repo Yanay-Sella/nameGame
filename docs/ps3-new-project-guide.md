@@ -58,7 +58,8 @@ make log      # in its own terminal: prints the game's log lines (UDP port 18195
 make deploy   # build in Docker → upload over FTP → install with webMAN
 ```
 
-Then launch the game from the PS3's Game menu. **webMAN can't start installed games remotely**: `/play.ps3/...` only mounts them.
+Then start it remotely with `make launch` (`curl http://<PS3>/play.ps3?<APPID>`; takes 10-15 s; webMAN MOD 1.47.50d, firmware 4.93, HEN 3.6.0).
+`/play.ps3/dev_hdd0/game/<APPID>` did not start it (tested for 60 s); `?<name>` and `col=game&seg=...` were not reliable either.
 
 What `make deploy` does:
 1. `make clean` + full rebuild. A full rebuild is needed because the log IP/port are compile-time flags, and make doesn't notice flag changes.
@@ -111,6 +112,25 @@ Rules for the game code:
 - After any restart: enable HEN, then wait ~30 s before launching (network startup).
 - Never install a package while a game or app is running.
 - webMAN status pages show the console's PSID/IDPS: never print, share or commit them.
+
+---
+
+## 6b. Driving the PS3 from the Mac
+
+Verified on a real PS3; the Makefile wraps these as `make launch|quit|pad|shot`.
+
+| Goal | Command |
+|---|---|
+| Launch | `/play.ps3?<APPID>` (game starts after 10-15 s) |
+| Quit to the XMB | `/xmb.ps3$exit` (the game logs its "exiting" line) |
+| Press buttons | `/pad.ps3?cross\|1\|circle` (`\|n\|` waits n seconds); SDL sees them as a normal controller (Start 4, Cross 9, Circle 10, L1 13 in the log) |
+| Restart the PS3 | `/restart.ps3` |
+| Screenshot | the game writes `shot.bmp` on L1 (dev builds); `make shot` fetches it over FTP and converts it to `shots/shot.png` |
+
+- webMAN's built-in `/xmb.ps3$ingame_screenshot` (R2+O) saved nothing in `/dev_hdd0/photo`, so the game dumps its own pixel buffer (`screenSaveBmp` in `source/screen.cpp`).
+- Every webMAN reply, even `/play.ps3` and `/pad.ps3`, can contain the PSID/IDPS: send curl output to `/dev/null`.
+- A stale `make log` listener keeps UDP 18195 and the next one fails with "Address already in use": `lsof -nP -iUDP:18195`, then kill that PID.
+- In a Makefile never put a trailing comment on a variable line (`X := 1   # why`): the spaces stay in the value.
 
 ---
 

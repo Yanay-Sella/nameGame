@@ -14,3 +14,4 @@ void drawSpriteSolid(const Sprite& sprite, int x, int y, uint32_t color);   // s
 void drawText(int x, int y, const char* text, uint32_t color, int scale = 1);
 int textWidth(const char* text, int scale = 1);
 void drawMenu(const char* title, const char* const* items, int count, int selected, const char* hint);   // centred panel
+bool screenSaveBmp(const char* path);   // writes screenPixels as a 24-bit BMP; false when the file couldn't be written

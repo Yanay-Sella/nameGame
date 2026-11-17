@@ -18,7 +18,7 @@
 
 const float STEP = 1.0f / 60;   // s per game update
 const int MAX_STEPS_PER_FRAME = 4;
-const bool DEV_AIDS = !RELEASE;   // Triangle stress test and Select autopilot; off in make release
+const bool DEV_AIDS = !RELEASE;   // Triangle stress test, Select autopilot and L1 screenshot; off in make release
 
 enum Scene { SCENE_MAIN_MENU, SCENE_SETTINGS, SCENE_PLAYING, SCENE_PAUSED };
 const char* const SCENE_NAMES[] = {"main menu", "settings", "playing", "paused"};
@@ -146,7 +146,7 @@ int main(int argc, char** argv) {
         Actions menu = {};
         for (const Actions& a : actions) {
             menu.up |= a.up; menu.down |= a.down; menu.left |= a.left; menu.right |= a.right;
-            menu.confirm |= a.confirm; menu.back |= a.back; menu.pause |= a.pause;
+            menu.confirm |= a.confirm; menu.back |= a.back; menu.pause |= a.pause; menu.screenshot |= a.screenshot;
         }
         // The first joined player whose controller is gone, or -1: a run pauses until it is back (D-014).
         int lostController = -1;
@@ -328,6 +328,12 @@ int main(int argc, char** argv) {
                 if (lostController >= 0) snprintf(hint, sizeof hint, "CONNECT CONTROLLER %d", lostController + 1);
                 drawMenu("PAUSED", PAUSE_ITEMS, 3, selected, hint);
             }
+        }
+
+        if (DEV_AIDS && menu.screenshot) {
+            stage = "screenshot";
+            std::string shotPath = exeFolder + "/shot.bmp";
+            debugNetPrintf(INFO, "shot: %s %s\n", shotPath.c_str(), screenSaveBmp(shotPath.c_str()) ? "saved" : "SAVE FAILED");
         }
 
         stage = "present";

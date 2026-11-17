@@ -1,5 +1,6 @@
 // Software drawing into the 320x180 pixel buffer; everything is clipped to the screen.
 #include "screen.h"
+#include <stdio.h>
 #include <string.h>
 
 uint32_t screenPixels[SCREEN_W * SCREEN_H];
@@ -61,4 +62,37 @@ void drawMenu(const char* title, const char* const* items, int count, int select
         if (i == selected) drawText(textX - 8, textY, ">", paletteColor('y'));
     }
     drawText((SCREEN_W - textWidth(hint)) / 2, y + 28 + 12 * (count - 1) + 8, hint, paletteColor('s'));
+}
+
+bool screenSaveBmp(const char* path) {
+    const int imageSize = SCREEN_W * SCREEN_H * 3;   // rows are 960 bytes, so no row padding
+    uint8_t header[54] = {};
+    auto put32 = [&](int offset, uint32_t value) {
+        for (int i = 0; i < 4; i++) header[offset + i] = (uint8_t)(value >> (8 * i));
+    };
+    header[0] = 'B';
+    header[1] = 'M';
+    put32(2, 54 + imageSize);
+    put32(10, 54);
+    put32(14, 40);
+    put32(18, SCREEN_W);
+    put32(22, SCREEN_H);   // positive height: rows are stored bottom-up
+    header[26] = 1;        // colour planes
+    header[28] = 24;       // bits per pixel
+    put32(34, imageSize);
+
+    FILE* file = fopen(path, "wb");
+    if (!file) return false;
+    bool ok = fwrite(header, 1, sizeof header, file) == sizeof header;
+    uint8_t row[SCREEN_W * 3];
+    for (int y = SCREEN_H - 1; y >= 0; y--) {
+        for (int x = 0; x < SCREEN_W; x++) {
+            uint32_t p = screenPixels[y * SCREEN_W + x];
+            row[x * 3] = p & 0xFF;
+            row[x * 3 + 1] = (p >> 8) & 0xFF;
+            row[x * 3 + 2] = (p >> 16) & 0xFF;
+        }
+        ok &= fwrite(row, 1, sizeof row, file) == sizeof row;
+    }
+    return fclose(file) == 0 && ok;
 }

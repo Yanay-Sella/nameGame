@@ -1,4 +1,5 @@
 build/
 dist/
+shots/
 .DS_Store
 pkgfiles/USRDIR/music.ogg

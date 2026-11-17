@@ -10,9 +10,9 @@ Pipe long output: `make test 2>&1 | tail -15`, `make ps3 2>&1 | tail -8`.
 ## What this gives
 Claude (or the user) drives the PS3 from the Mac with no controller in hand. Everything below was probed on the real
 PS3 (webMAN MOD 1.47.50d, firmware 4.93, HEN 3.6.0) except the L1 screenshot, which is new:
-- `make launch`: starts the installed game. `curl http://<PS3>/play.ps3/dev_hdd0/game/NMGM00001` launched it
-  (log showed "controller connected" and a wave-1 run). These did nothing: `/play.ps3?NMGM00001`,
-  `/play.ps3?NAME%20game`, `/play.ps3?col=game&seg=seg_gamedata`.
+- `make launch`: starts the installed game with `curl http://<PS3>/play.ps3?NMGM00001` (10-15 s until "nameGame started").
+  **Corrected while building:** the first probe wrongly credited `/play.ps3/dev_hdd0/game/NMGM00001`; tested alone for 60 s it
+  did not start the game, while `?NMGM00001` started it twice in a row. See "Built" at the end.
 - `make quit`: `curl 'http://<PS3>/xmb.ps3$exit'` quits the game to the XMB (log showed "nameGame exiting").
 - `make pad BUTTONS='cross|1|circle'`: `curl 'http://<PS3>/pad.ps3?cross|1|circle'` presses virtual-pad buttons, `|n|`
   waits n seconds. SDL sees them as a normal controller: Start = button 4, Cross = 9, Circle = 10 appeared in the log.
@@ -60,7 +60,8 @@ bool screenSaveBmp(const char* path);   // writes screenPixels as a 24-bit BMP; 
 - `Makefile`: add `launch quit pad shot` to `.PHONY`. Add near the `log` target (spaces below are tabs in the real file):
 ```make
 APP_FOLDER := /dev_hdd0/game/NMGM00001/USRDIR
-SHOT_SIZE  := 172854   # 54-byte BMP header + 320*180*3 pixel bytes
+# A shot is a 54-byte BMP header + 320*180*3 pixel bytes (no trailing comment: make would keep the spaces in the value).
+SHOT_SIZE  := 172854
 
 # Start the installed game (webMAN mounts it and starts it); refuses while an app or game already runs.
 launch:
@@ -68,7 +69,7 @@ launch:
 		|| { echo "webMAN didn't answer; try again."; exit 1; }; \
 	echo "$$status" | grep -io '[0-9A-F]\{8\}_[^<" ]*\.\(self\|bin\|elf\)' | grep -qv main_vsh \
 		&& { echo "An app or game is already running on the PS3; make quit first."; exit 1; } || true
-	curl -sS --fail -m 20 -o /dev/null "http://$(PS3_IP)/play.ps3/dev_hdd0/game/NMGM00001"
+	curl -sS --fail -m 20 -o /dev/null "http://$(PS3_IP)/play.ps3?NMGM00001"
 	@echo "Launching NAME game; watch make log."
 
 # Quit the running game to the XMB.
@@ -103,7 +104,7 @@ New test function, called from `main()` after `waveBonusSkipsAPlayerWhoIsOut();`
 - `screenshotIsAValidBmp`: draw something known (`fillRect(0, 0, SCREEN_W, SCREEN_H, 0xFF000000); fillRect(0, 0, 1, 1, 0xFF112233);`),
   `CHECK(screenSaveBmp("build/tests/shot.bmp"))`; read it back with `fopen`/`fread` into `uint8_t data[54 + SCREEN_W * SCREEN_H * 3]`
   and check: `fread` returned 172854 bytes; `data[0] == 'B' && data[1] == 'M'`; the width at byte 18 is 320 and the height at 22 is 180
-  (`data[18] + data[19] * 256`, `data[22]`); the last 3 bytes of the file (the top-left pixel, since rows are bottom-up) are
+  (`data[18] + data[19] * 256`, `data[22]`); the first 3 bytes of the file's last row (`data[size - 960]` on, the top-left pixel, since rows are bottom-up) are
   `0x33, 0x22, 0x11` (blue, green, red); the first 3 pixel bytes (offset 54, bottom-left) are 0.
 - `CHECK(!screenSaveBmp("build/tests/no-such-folder/shot.bmp"))`.
 - `make test` must pass. Then, once on the Mac, run `sips -g pixelWidth -g pixelHeight build/tests/shot.bmp`; it must report 320x180.
@@ -156,3 +157,12 @@ Run `python3 .claude/skills/game-docs/scripts/check_docs.py docs` at the end and
 ## Done when
 - `make test` passes, `make ps3` builds, `check_docs.py` is clean.
 - `make launch`, `make pad BUTTONS='start'`, `make shot` (a PNG of the running game appears in `shots/`) and `make quit` all work on the PS3 with no controller touched, proven by the log lines in step 6.
+
+## Built (2026-11-17)
+Done and checked on the PS3 with no controller touched: `make launch` (`/play.ps3?NMGM00001`, twice), `make pad` (button 4, 9),
+`make shot` (the log showed `button 13` and `shot: ... saved`; `shots/shot.png` showed the run), `make quit` ("nameGame exiting").
+Changes made while building:
+- Launch uses `/play.ps3?NMGM00001`, not the full path (see above). Docs, Makefile and the `ps3-homebrew-setup` skill say so.
+- The first `SHOT_SIZE := 172854   # comment` kept the spaces before `#`, so the size check never matched: no trailing comments on make variables.
+- The test for the top-left pixel reads the first 3 bytes of the file's last row (`data[size - 960]`), not the last 3 bytes.
+- `make launch` doesn't wait for the game: watch `make log` for `nameGame started`.

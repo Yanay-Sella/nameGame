@@ -8,18 +8,27 @@ Full setup history, debugging toolkit and new-project checklist: `docs/ps3-new-p
 ## Hardware setup
 - PS3 at `192.168.1.200` (override with `PS3_IP=`), firmware 4.93, PS3HEN + webMAN MOD.
 - HEN turns off on every PS3 reboot: if the PS3 doesn't respond (no FTP/HTTP), ask the user to restart it and re-enable HEN.
+- Quit a running game remotely with `make quit` (`/xmb.ps3$exit`); `make launch` starts it again.
 - If only the game is stuck, webMAN still answers: restart remotely with `curl http://192.168.1.200/restart.ps3`.
   If webMAN doesn't answer either, ask the user to hold the power button ~10 s (never unplug).
 - Never install while an app/game is running (it froze the PS3 once); `make deploy` checks for this.
 - Never print or commit the console's PSID/IDPS, which webMAN's status pages show.
+  Every webMAN reply (even `/play.ps3` and `/pad.ps3`) can contain them: send curl output to `/dev/null` or filter it.
 
 ## Commands (run on the Mac)
 - `make ps3` — full rebuild in Docker → `build/nameGame.pkg`. Uses image `namegame-ps3dev` (`docker/Dockerfile`:
   `zeldin/ps3dev-docker` + SDL2 rebuilt with `docker/sdl2-psl1ght-render.patch`), built automatically by `make image`.
 - `make deploy` — build, upload via FTP to `/dev_hdd0/packages/`, install with webMAN (`/install.ps3/...`).
-  The user then launches NAME game from the PS3's Game menu; webMAN can't start installed hdd0 games remotely.
-- `make log` — print the game's UDP log lines (port 18195). Run it before the user launches the game.
+  Then `make launch` starts NAME game on the PS3 (no controller needed).
+- `make log` — print the game's UDP log lines (port 18195). Run it before launching the game.
   `make ps3` deletes `build/`, so don't redirect the log into `build/`.
+  A stale `make log` (python on UDP 18195) makes the next one fail with "Address already in use": `lsof -nP -iUDP:18195`, then kill that PID.
+- `make launch` / `make quit` — start the installed game (`/play.ps3?NMGM00001`; takes 10-15 s, the log shows "nameGame started") and
+  quit it to the XMB (`/xmb.ps3$exit`). `make launch` refuses while an app runs. `/play.ps3/dev_hdd0/game/NMGM00001` did NOT start it.
+- `make pad BUTTONS='cross|1|circle'` — press virtual-pad buttons through webMAN (`/pad.ps3?...`, `|n|` waits n s). The game sees them
+  as a normal controller (Start, Cross, Circle and L1 confirmed in the log), so Claude can play and navigate the menus.
+- `make shot` — dev builds only: L1 on the virtual pad makes the game write `shot.bmp` (its 320x180 picture); fetched over FTP to
+  `shots/shot.png` (gitignored). Read the PNG to see the screen. webMAN's own `/xmb.ps3$ingame_screenshot` saved nothing.
 - `make release` — release build (no dev aids, logs to 127.0.0.1, song required) → `dist/NAME-game-<VERSION>.pkg` and the README.
 - `make deploy SOURCES=prototypes/<idea>` — build and install a throwaway prototype instead of `source/` (same app ID).
 - `make music MUSIC_SRC=<song>` — convert a song to `pkgfiles/USRDIR/music.ogg` (gitignored), packaged next to EBOOT.BIN.

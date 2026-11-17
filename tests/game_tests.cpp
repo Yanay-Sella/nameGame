@@ -372,6 +372,22 @@ static void waveBonusSkipsAPlayerWhoIsOut() {
     CHECK(game.players[0].score == 1000 && game.players[1].score == 0);
 }
 
+static void screenshotIsAValidBmp() {
+    fillRect(0, 0, SCREEN_W, SCREEN_H, 0xFF000000);
+    fillRect(0, 0, 1, 1, 0xFF112233);
+    CHECK(screenSaveBmp("build/tests/shot.bmp"));
+    static uint8_t data[54 + SCREEN_W * SCREEN_H * 3 + 1];
+    FILE* file = fopen("build/tests/shot.bmp", "rb");
+    size_t size = file ? fread(data, 1, sizeof data, file) : 0;
+    if (file) fclose(file);
+    CHECK(size == 172854);
+    CHECK(data[0] == 'B' && data[1] == 'M');
+    CHECK(data[18] + data[19] * 256 == 320 && data[22] == 180);
+    CHECK(data[size - 960] == 0x33 && data[size - 959] == 0x22 && data[size - 958] == 0x11);   // top-left pixel starts the last row; B, G, R
+    CHECK(data[54] == 0 && data[55] == 0 && data[56] == 0);                              // bottom-left pixel
+    CHECK(!screenSaveBmp("build/tests/no-such-folder/shot.bmp"));
+}
+
 static void weaponLevelsFireTheirPattern() {
     Game game;
     startSafeGame(game);
@@ -786,6 +802,7 @@ int main() {
     secondPlayerJoinsBlinkingWithAFreshRun();
     coOpRunEndsWhenBothPlayersAreOut();
     waveBonusSkipsAPlayerWhoIsOut();
+    screenshotIsAValidBmp();
     printf(failures ? "%d check(s) failed\n" : "all tests passed\n", failures);
     return failures ? 1 : 0;
 }

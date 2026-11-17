@@ -4,7 +4,7 @@
 #include <debugnet.h>
 
 // Button indices from SDL_PSL1GHT's joystick driver (src/joystick/psl1ght/SDL_sysjoystick.c), see CLAUDE.md.
-enum { BTN_LEFT = 0, BTN_DOWN = 1, BTN_RIGHT = 2, BTN_UP = 3, BTN_START = 4, BTN_SELECT = 7, BTN_CROSS = 9, BTN_CIRCLE = 10, BTN_TRIANGLE = 11, BTN_R1 = 12, BTN_R2 = 14,
+enum { BTN_LEFT = 0, BTN_DOWN = 1, BTN_RIGHT = 2, BTN_UP = 3, BTN_START = 4, BTN_SELECT = 7, BTN_CROSS = 9, BTN_CIRCLE = 10, BTN_TRIANGLE = 11, BTN_R1 = 12, BTN_L1 = 13, BTN_R2 = 14,
        BUTTON_COUNT = 16 };
 
 static SDL_Joystick* joysticks[MAX_PLAYERS];
@@ -54,6 +54,7 @@ Actions inputRead(int player) {
     a.confirm = pressed[player][BTN_CROSS] || pressed[player][BTN_START];
     a.stress = pressed[player][BTN_TRIANGLE];
     a.autopilot = pressed[player][BTN_SELECT];
+    a.screenshot = pressed[player][BTN_L1];
     a.up = pressed[player][BTN_UP];
     a.down = pressed[player][BTN_DOWN];
     a.left = pressed[player][BTN_LEFT];

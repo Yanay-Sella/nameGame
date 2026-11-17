@@ -14,6 +14,7 @@ struct Actions {
     bool up, down, left, right;   // D-pad pressed or left stick flicked (menus)
     bool back;                    // Circle pressed
     bool autopilot;               // Select pressed: dev autopilot toggle (main.cpp)
+    bool screenshot;              // L1 pressed: dev screenshot (main.cpp)
     bool connected;               // this player's controller is open
 };
 
