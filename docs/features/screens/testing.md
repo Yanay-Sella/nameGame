@@ -8,11 +8,11 @@
 - [x] The menu cursor `>` has a font glyph. *(`tests/game_tests.cpp` › menuCursorHasAGlyph)*
 - [ ] Menu up/down works with the D-pad and the stick, one flick per item. *(partly: the log shows D-pad presses and scene changes main menu → settings → main menu → playing; the stick isn't logged)*
 - [ ] Settings → music off → Back → Classic gives a silent run with sound effects. *(PS3 check pending)*
-- [ ] Start → Settings → music on starts the song; Circle → Resume continues the run. *(partly: the log shows paused → settings, "music on (saved)", then paused → playing; the song and Circle are not in the log)*
+- [ ] Start → Settings → music on starts the song; Circle → Resume continues the run. *(partly: the log shows paused → settings, "music on (saved)", and Circle taking paused → playing; that the song starts is not in the log)*
 - [x] Start → Return to menu shows the main menu. *(PS3 log 2026-11-17: scene paused → main menu; that the music stops is not in the log)*
 - [ ] The music setting is kept after quitting and relaunching. *(PS3 check pending)*
-- [ ] Losing a run, then Circle at game over, shows the main menu. *(PS3 check pending)*
-- [ ] Circle is button 10 on the PS3. *(PS3 check pending)*
+- [x] Losing a run, then Circle at game over, shows the main menu. *(PS3 log 2026-11-17: game over → button 10 → scene: main menu)*
+- [x] Circle is button 10 on the PS3. *(PS3 log 2026-11-17: "button 10" on every Circle press)*
 - [x] 60 fps in the menus and in play. *(PS3 log 2026-11-17: fps 59.7 in the main menu, 60.0 in play, slowest frame 6 ms)*
 
 ## Playtest checks

@@ -45,5 +45,5 @@ Full setup history, debugging toolkit and new-project checklist: `docs/ps3-new-p
 - Audio device is 48 kHz stereo float; open the mixer at 48000 Hz to avoid resampling.
 - Controller (from the port's `SDL_sysjoystick.c`): buttons 0 left, 1 down, 2 right, 3 up, 4 start, 5 R3, 6 L3, 7 select,
   8 square, 9 cross, 10 circle, 11 triangle, 12 R1, 13 L1, 14 R2, 15 L2; axes 0/1 left stick x/y, 2/3 right stick x/y.
-  Confirmed on the PS3: 0, 1, 2, 3, 4, 9, 11, 12, 14; the rest is from the source.
+  Confirmed on the PS3: 0, 1, 2, 3, 4, 9, 10, 11, 12, 14; the rest is from the source.
 - No `SDL_JOYDEVICEADDED`/`REMOVED` events: open controllers yourself from `SDL_NumJoysticks()` (see `source/input.cpp`).
