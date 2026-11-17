@@ -1,6 +1,6 @@
 # nameGame — Game Design Document
 
-**Version:** 0.9 · **Updated:** 2026-11-17 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
+**Version:** 0.10 · **Updated:** 2026-11-17 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
 
 ## Summary
 You pilot a small ship at the bottom of the screen against waves of pixel-art aliens. Hold R1 to spray bullets, and save the scarce R2 rocket for the moment a wave gets out of hand. Waves get harder, and every 5th wave is a boss. The run ends when you lose your last life, and you chase the saved high score.
@@ -38,7 +38,7 @@ dodge + shoot (R1) → kill aliens → score and pickups → stronger gun / more
 | Enemy waves | implemented | MVP | Alien formations that sway, shoot and dive; harder each wave | [design](features/enemy-waves/design.md) |
 | Weapon upgrades | implemented | MVP | Pickups upgrade bullets: double → spread; death loses a level | [design](features/weapon-upgrades/design.md) |
 | Lives and score | implemented | MVP | 3 lives, one hit kills, respawn invincibility, extra life every 50,000 | [design](features/lives-and-score/design.md) |
-| Bosses | idea | MVP | A boss on every 5th wave, stronger each time | — |
+| Bosses | implemented | MVP | A boss on every 5th wave, stronger each time | [design](features/bosses/design.md) |
 | Music and sound | implemented | MVP | Your song looped during gameplay; synthesized retro SFX | [design](features/music-and-sound/design.md) |
 | Pixel art | implemented | MVP | 320×180 palette art: sprites, font and starfield as text grids in code | [design](features/pixel-art/design.md) |
 | Screens | in progress | MVP | Main menu (Classic, Settings), pause menu, settings with music on/off, game over | [design](features/screens/design.md) |
@@ -107,3 +107,4 @@ Boot → MAIN MENU ─ CLASSIC ──→ PLAYING ⇄ (Start) PAUSED ─ RETURN T
 **0.7 (2026-11-17):** restart freeze fixed on the PS3 (music restart 1 ms, was ~350 ms); co-op join confirmed with a second controller.
 **0.8 (2026-11-17):** main menu, pause menu and settings (D-010).
 **0.9 (2026-11-17):** weapon upgrades implemented.
+**0.10 (2026-11-17):** bosses implemented.

@@ -215,6 +215,7 @@ int main(int argc, char** argv) {
             break;
         }
         bool wasOver = game.over;
+        bool bossWasAlive = game.boss.alive;
 
         stage = "update";
         int steps = 0;
@@ -226,6 +227,8 @@ int main(int argc, char** argv) {
             steps++;
         }
         if (steps == MAX_STEPS_PER_FRAME) accumulator = 0;   // fell far behind: drop the backlog rather than spiral
+        if (game.boss.alive && !bossWasAlive) debugNetPrintf(INFO, "boss wave %d, hp %d\n", game.wave, game.boss.hp);
+        if (!game.boss.alive && bossWasAlive) debugNetPrintf(INFO, "boss down at wave %d\n", game.wave);
         if (game.over && !wasOver) {
             audioStopMusic();
             for (size_t p = 0; p < game.players.size(); p++)

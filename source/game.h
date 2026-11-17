@@ -52,6 +52,18 @@ struct Alien {
     bool alive;
 };
 
+// The wave's boss; separate from Alien because the 12x10 alien size is used in every collision.
+struct Boss {
+    float x, y, vx;          // top-left of the sprite; vx is the signed sway speed
+    float attackTimer;       // s until the next attack
+    float burstTimer;        // s until the next shot of a burst
+    int hp, maxHp;
+    int burstShotsLeft;
+    int nextAttack;          // 0: aimed burst, 1: fan
+    float flash;             // s of white hit flash left
+    bool alive;
+};
+
 struct Rocket { float x, y, speed; int owner; };
 struct Explosion { float x, y, age, radius; };
 enum PickupType { PICKUP_ROCKET, PICKUP_UPGRADE };
@@ -63,6 +75,7 @@ struct Game {
     std::vector<Player> players;
     std::vector<Shot> bullets, enemyShots;
     std::vector<Alien> aliens;
+    Boss boss;
     std::vector<Rocket> rockets;
     std::vector<Explosion> explosions;
     std::vector<Pickup> pickups;
@@ -93,3 +106,5 @@ void drawBackground(const Game& game);         // navy fill and stars
 int formationRows(int wave);        // rows of 8 aliens in a wave
 float shotChance(int wave);         // enemy shots per alien per second
 float diveInterval(int wave);       // s between dives; dives start at wave 3
+bool isBossWave(int wave);          // every 5th wave is a boss alone
+int bossHealth(int wave);           // 100 + 50 per earlier appearance

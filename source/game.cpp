@@ -39,6 +39,18 @@ const float FAST_FIRE_INTERVAL = 0.08f;   // s, level 4
 const float DOUBLE_OFFSET = 3, SPREAD_SPEED = 70;   // px, px/s
 const float UPGRADE_CHANCE = 0.03f;    // per kill, rolled together with PICKUP_CHANCE
 const int UPGRADE_MAX_POINTS = 1000;
+// Bosses (bosses/design.md)
+const int BOSS_W = 32, BOSS_H = 20;
+const float BOSS_STOP_Y = 20;          // px, where it hovers after flying in
+const int BOSS_BASE_HP = 100, BOSS_HP_PER_APPEARANCE = 50;
+const float BOSS_BASE_SPEED = 40, BOSS_SPEED_PER_APPEARANCE = 10, BOSS_MAX_SPEED = 80;   // px/s
+const float BOSS_BASE_INTERVAL = 2.5f, BOSS_INTERVAL_STEP = 0.3f, BOSS_MIN_INTERVAL = 1.2f;   // s
+const int BOSS_BURST_SHOTS = 3, BOSS_FAN_SHOTS = 5;
+const float BOSS_BURST_GAP = 0.15f;    // s
+const float BOSS_AIMED_SPEED = 90, BOSS_FAN_DOWN_SPEED = 70, BOSS_FAN_SIDEWAYS = 60;   // px/s
+const int BOSS_BLAST_DAMAGE = EXPLOSION_DAMAGE, BOSS_REWARD = 5000;   // HP, points x appearance
+const float BOSS_EXPLOSION_RADIUS = 48;   // px
+const int BOSS_HEALTH_BAR_W = 120, BOSS_HEALTH_BAR_Y = 16;   // px
 // Lives and score (lives-and-score/design.md)
 const int START_LIVES = 3, MAX_LIVES = 9;
 const float RESPAWN_DELAY = 1.5f, INVINCIBLE_TIME = 2, BLINK_PERIOD = 0.1f;   // s
@@ -83,10 +95,33 @@ float diveInterval(int wave) {
     return std::max(4 - 0.2f * wave, 1.5f);
 }
 
+bool isBossWave(int wave) {
+    return wave > 0 && wave % 5 == 0;
+}
+
+int bossHealth(int wave) {
+    return BOSS_BASE_HP + BOSS_HP_PER_APPEARANCE * (wave / 5 - 1);
+}
+
+static float bossAttackInterval(int wave) {
+    return std::max(BOSS_BASE_INTERVAL - BOSS_INTERVAL_STEP * (wave / 5 - 1), BOSS_MIN_INTERVAL);
+}
+
 static void startWave(Game& game, int wave) {
     game.wave = wave;
     game.aliens.clear();
     int rows = formationRows(wave);
+    game.boss = Boss();
+    if (isBossWave(wave)) {
+        Boss& boss = game.boss;
+        boss.x = (SCREEN_W - BOSS_W) / 2.0f;
+        boss.y = -BOSS_H;
+        boss.vx = std::min(BOSS_BASE_SPEED + BOSS_SPEED_PER_APPEARANCE * (wave / 5 - 1), BOSS_MAX_SPEED);
+        boss.hp = boss.maxHp = bossHealth(wave);
+        boss.attackTimer = bossAttackInterval(wave);
+        boss.alive = true;
+        rows = 0;
+    }
     float left = (SCREEN_W - (FORMATION_COLUMNS - 1) * COLUMN_SPACING - ALIEN_W) / 2;
     for (int row = 0; row < rows; row++) {
         // Tougher aliens take the top rows once their wave is reached.
@@ -188,6 +223,28 @@ static void damageAlien(Game& game, Alien& alien, int damage, int owner) {
     game.soundRequested[SOUND_ALIEN_DEATH] = true;
 }
 
+static void damageBoss(Game& game, int damage, int owner) {
+    Boss& boss = game.boss;
+    boss.hp -= damage;
+    boss.flash = HIT_FLASH;
+    if (boss.hp > 0) {
+        game.soundRequested[SOUND_ALIEN_HIT] = true;
+        return;
+    }
+    boss.alive = false;
+    boss.burstShotsLeft = 0;
+    if (owner >= 0) addScore(game, game.players[owner], BOSS_REWARD * (game.wave / 5));
+    float cx = boss.x + BOSS_W / 2.0f, cy = boss.y + BOSS_H / 2.0f;
+    Explosion explosion = {cx, cy, 0, BOSS_EXPLOSION_RADIUS};
+    game.explosions.push_back(explosion);
+    spawnParticles(game, cx, cy, 24, paletteColor('g'), 70);
+    spawnParticles(game, cx, cy, 16, paletteColor('o'), 50);
+    game.pickups.push_back({cx - 12 - 4, cy - 4, PICKUP_UPGRADE});
+    game.pickups.push_back({cx + 12 - 4, cy - 4, PICKUP_ROCKET});
+    game.soundRequested[SOUND_ALIEN_DEATH] = true;
+    game.soundRequested[SOUND_EXPLOSION] = true;
+}
+
 // A rocket blast: every alien whose centre is within the radius (plus half an alien) takes the damage once.
 static void explode(Game& game, float x, float y, int owner) {
     Explosion explosion = {x, y, 0, EXPLOSION_RADIUS};
@@ -197,6 +254,11 @@ static void explode(Game& game, float x, float y, int owner) {
         float dx = alien.x + ALIEN_W / 2.0f - x, dy = alien.y + ALIEN_H / 2.0f - y;
         if (alien.alive && dx * dx + dy * dy <= reach * reach) damageAlien(game, alien, EXPLOSION_DAMAGE, owner);
     }
+    // The boss is hit when the circle overlaps its rectangle.
+    float nearestX = std::max(game.boss.x, std::min(x, game.boss.x + BOSS_W));
+    float nearestY = std::max(game.boss.y, std::min(y, game.boss.y + BOSS_H));
+    if (game.boss.alive && (nearestX - x) * (nearestX - x) + (nearestY - y) * (nearestY - y) <= EXPLOSION_RADIUS * EXPLOSION_RADIUS)
+        damageBoss(game, BOSS_BLAST_DAMAGE, owner);
     game.soundRequested[SOUND_EXPLOSION] = true;
 }
 
@@ -326,6 +388,55 @@ static void updateAlien(Game& game, Alien& alien, float dt) {
     }
 }
 
+// Flies in, then sways and alternates an aimed burst and a fan; holds fire with no living ship.
+static void updateBoss(Game& game, float dt) {
+    Boss& boss = game.boss;
+    boss.flash = std::max(0.0f, boss.flash - dt);
+    if (boss.y < BOSS_STOP_Y) {
+        boss.y = std::min(boss.y + ENTRY_SPEED * dt, BOSS_STOP_Y);
+        return;
+    }
+    boss.x += boss.vx * dt;
+    if (boss.x < 0 || boss.x > SCREEN_W - BOSS_W) {
+        boss.x = std::max(0.0f, std::min(boss.x, (float)(SCREEN_W - BOSS_W)));
+        boss.vx = -boss.vx;
+    }
+
+    const Player* target = NULL;
+    float centreX = boss.x + BOSS_W / 2.0f, bottomY = boss.y + BOSS_H;
+    for (const Player& p : game.players)
+        if (p.alive && (!target || fabsf(p.x - centreX) < fabsf(target->x - centreX))) target = &p;
+    if (!target) {
+        boss.burstShotsLeft = 0;
+        return;
+    }
+
+    boss.attackTimer -= dt;
+    if (boss.attackTimer <= 0) {
+        boss.attackTimer = bossAttackInterval(game.wave);
+        if (boss.nextAttack == 0) {
+            boss.burstShotsLeft = BOSS_BURST_SHOTS;
+            boss.burstTimer = 0;
+        } else {
+            for (int i = 0; i < BOSS_FAN_SHOTS; i++) {
+                float sideways = (i - (BOSS_FAN_SHOTS - 1) / 2.0f) / ((BOSS_FAN_SHOTS - 1) / 2.0f) * BOSS_FAN_SIDEWAYS;
+                game.enemyShots.push_back({centreX - 1, bottomY, BOSS_FAN_DOWN_SPEED, -1, sideways});
+            }
+        }
+        boss.nextAttack = 1 - boss.nextAttack;
+    }
+    if (boss.burstShotsLeft > 0) {
+        boss.burstTimer -= dt;
+        if (boss.burstTimer <= 0) {
+            float dx = target->x + SHIP_W / 2.0f - centreX, dy = target->y + SHIP_H / 2.0f - bottomY;
+            float length = sqrtf(dx * dx + dy * dy) + 0.001f;
+            game.enemyShots.push_back({centreX - 1, bottomY, dy / length * BOSS_AIMED_SPEED, -1, dx / length * BOSS_AIMED_SPEED});
+            boss.burstShotsLeft--;
+            boss.burstTimer = BOSS_BURST_GAP;
+        }
+    }
+}
+
 static void startDive(Game& game) {
     std::vector<Alien*> candidates;
     for (Alien& alien : game.aliens) {
@@ -365,6 +476,7 @@ void updateGame(Game& game, const Actions* actions, float dt) {
     }
     for (Alien& alien : game.aliens)
         if (alien.alive) updateAlien(game, alien, dt);
+    if (game.boss.alive) updateBoss(game, dt);
     if (game.wave >= 3 && anyPlayerAlive && !game.over) {
         game.diveTimer -= dt;
         if (game.diveTimer <= 0) {
@@ -382,6 +494,11 @@ void updateGame(Game& game, const Actions* actions, float dt) {
             bullet.y = -100;   // spent; removed below
             break;
         }
+        if (bullet.y > -50 && game.boss.alive && game.boss.y + BOSS_H >= 0 &&
+            overlap(bullet.x, bullet.y, 2, 4, game.boss.x, game.boss.y, BOSS_W, BOSS_H)) {
+            damageBoss(game, 1, bullet.owner);
+            bullet.y = -100;   // spent; removed below
+        }
     }
 
     for (Rocket& rocket : game.rockets) {
@@ -390,6 +507,7 @@ void updateGame(Game& game, const Actions* actions, float dt) {
         bool hit = rocket.y < 0;
         for (const Alien& alien : game.aliens)
             if (alien.alive && alien.y + ALIEN_H >= 0 && overlap(rocket.x, rocket.y, 4, 8, alien.x, alien.y, ALIEN_W, ALIEN_H)) hit = true;
+        if (game.boss.alive && game.boss.y + BOSS_H >= 0 && overlap(rocket.x, rocket.y, 4, 8, game.boss.x, game.boss.y, BOSS_W, BOSS_H)) hit = true;
         if (hit) {
             explode(game, rocket.x + 2, std::max(rocket.y, 0.0f) + 4, rocket.owner);
             rocket.y = -1000;   // spent; removed below
@@ -415,6 +533,7 @@ void updateGame(Game& game, const Actions* actions, float dt) {
             }
             for (const Alien& alien : game.aliens)
                 if (alien.alive && overlap(alien.x, alien.y, ALIEN_W, ALIEN_H, hx, hy, HITBOX, HITBOX)) hit = true;
+            if (game.boss.alive && overlap(game.boss.x, game.boss.y, BOSS_W, BOSS_H, hx, hy, HITBOX, HITBOX)) hit = true;
             if (hit) {
                 killPlayer(game, player);
                 continue;
@@ -455,7 +574,7 @@ void updateGame(Game& game, const Actions* actions, float dt) {
     if (game.over) return;
 
     // The next wave waits for a living ship (lives-and-score edge case).
-    bool anyAlienAlive = std::any_of(game.aliens.begin(), game.aliens.end(), [](const Alien& a) { return a.alive; });
+    bool anyAlienAlive = game.boss.alive || std::any_of(game.aliens.begin(), game.aliens.end(), [](const Alien& a) { return a.alive; });
     if (!anyAlienAlive && game.nextWaveTimer == 0) {
         game.nextWaveTimer = WAVE_PAUSE;
         for (Player& player : game.players)
@@ -507,6 +626,11 @@ void drawGame(const Game& game) {
         if (alien.flash > 0) drawSpriteSolid(sprite, (int)alien.x, (int)alien.y, paletteColor('w'));
         else drawSprite(sprite, (int)alien.x, (int)alien.y);
     }
+    if (game.boss.alive) {
+        const Sprite& sprite = frame ? BOSS_B : BOSS_A;
+        if (game.boss.flash > 0) drawSpriteSolid(sprite, (int)game.boss.x, (int)game.boss.y, paletteColor('w'));
+        else drawSprite(sprite, (int)game.boss.x, (int)game.boss.y);
+    }
     for (const Pickup& pickup : game.pickups)
         drawSprite(pickup.type == PICKUP_ROCKET ? ROCKET_PICKUP : UPGRADE_PICKUP, (int)pickup.x, (int)pickup.y);
     for (const Shot& bullet : game.bullets) drawSprite(BULLET, (int)bullet.x, (int)bullet.y);
@@ -534,6 +658,11 @@ void drawGame(const Game& game) {
         for (int i = 0; i < player.lives - 1; i++) drawSprite(LIFE_ICON, right ? SCREEN_W - 9 - i * 9 : 2 + i * 9, 9);
         for (int i = 0; i < player.rockets; i++) drawSprite(ROCKET_ICON, right ? SCREEN_W - 5 - i * 5 : 2 + i * 5, SCREEN_H - 7);
     }
+    if (game.boss.alive) {
+        int barX = (SCREEN_W - BOSS_HEALTH_BAR_W) / 2;
+        fillRect(barX, BOSS_HEALTH_BAR_Y, BOSS_HEALTH_BAR_W, 3, paletteColor('R'));
+        fillRect(barX, BOSS_HEALTH_BAR_Y, BOSS_HEALTH_BAR_W * std::max(game.boss.hp, 0) / game.boss.maxHp, 3, paletteColor('r'));
+    }
     if (!coOp && !game.over) drawText(SCREEN_W - 2 - textWidth("2P PRESS START"), 2, "2P PRESS START", paletteColor('s'));
 
     if (game.over) {
@@ -545,7 +674,7 @@ void drawGame(const Game& game) {
         drawCentredText(86, text, paletteColor('w'), 1);
         if (game.time - game.overTime > GAME_OVER_INPUT_LOCK) drawCentredText(100, "X PLAY AGAIN   O MENU", paletteColor('y'), 1);
     } else if (game.bannerTimer > 0) {
-        snprintf(text, sizeof text, "WAVE %d", game.wave);
+        snprintf(text, sizeof text, isBossWave(game.wave) ? "BOSS" : "WAVE %d", game.wave);
         drawCentredText(84, text, paletteColor('y'), 2);
     }
 }

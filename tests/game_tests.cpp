@@ -50,14 +50,14 @@ static Alien parkedAlien(float x, float y) {
 
 static void spritesHaveTheirSize() {
     const Sprite* sprites[] = {&SHIP_A, &SHIP_B, &SHIP2_A, &SHIP2_B, &GREEN_ALIEN_A, &GREEN_ALIEN_B, &BLUE_ALIEN_A, &BLUE_ALIEN_B,
-                               &RED_ALIEN_A, &RED_ALIEN_B, &BULLET, &ENEMY_SHOT, &ROCKET, &ROCKET_PICKUP, &UPGRADE_PICKUP,
+                               &RED_ALIEN_A, &RED_ALIEN_B, &BULLET, &ENEMY_SHOT, &ROCKET, &ROCKET_PICKUP, &UPGRADE_PICKUP, &BOSS_A, &BOSS_B,
                                &LIFE_ICON, &ROCKET_ICON};
     for (const Sprite* s : sprites) CHECK((int)strlen(s->pixels) == s->w * s->h);
 }
 
 static void onlyEnemyShotsUseMagenta() {
     const Sprite* sprites[] = {&SHIP_A, &SHIP_B, &SHIP2_A, &SHIP2_B, &GREEN_ALIEN_A, &GREEN_ALIEN_B, &BLUE_ALIEN_A, &BLUE_ALIEN_B,
-                               &RED_ALIEN_A, &RED_ALIEN_B, &BULLET, &ROCKET, &ROCKET_PICKUP, &UPGRADE_PICKUP, &LIFE_ICON, &ROCKET_ICON};
+                               &RED_ALIEN_A, &RED_ALIEN_B, &BULLET, &ROCKET, &ROCKET_PICKUP, &UPGRADE_PICKUP, &BOSS_A, &BOSS_B, &LIFE_ICON, &ROCKET_ICON};
     for (const Sprite* s : sprites) CHECK(strchr(s->pixels, 'm') == NULL);
 }
 
@@ -385,6 +385,113 @@ static void deathLosesOneWeaponLevel() {
     }
 }
 
+// A safe run at the start of a boss wave: the boss has flown in and sways, nothing has fired yet.
+static void startBossGame(Game& game, int wave) {
+    startSafeGame(game);
+    game.wave = wave - 1;
+    for (Alien& alien : game.aliens) alien.alive = false;
+    run(game, noInput(), 2.5f);   // wave clear pause, then the boss enters
+    run(game, noInput(), 0.5f);
+    game.boss.attackTimer = 100;
+}
+
+static void everyFifthWaveIsABoss() {
+    Game game;
+    startSafeGame(game);
+    game.wave = 4;
+    for (Alien& alien : game.aliens) alien.alive = false;
+    run(game, noInput(), 2.2f);
+    CHECK(game.wave == 5 && game.boss.alive && game.aliens.empty() && game.bannerTimer > 0);
+    game.boss.alive = false;
+    run(game, noInput(), 2.2f);
+    CHECK(game.wave == 6 && !game.boss.alive && game.aliens.size() == 40);
+}
+
+static void bossHealthGrowsEachAppearance() {
+    CHECK(bossHealth(5) == 100 && bossHealth(10) == 150 && bossHealth(15) == 200);
+    CHECK(isBossWave(5) && isBossWave(10) && isBossWave(15));
+    CHECK(!isBossWave(0) && !isBossWave(4) && !isBossWave(6));
+    Game game;
+    startBossGame(game, 10);
+    CHECK(game.boss.hp == 150 && game.boss.maxHp == 150 && fabsf(fabsf(game.boss.vx) - 50) < 0.01f);
+}
+
+static void bulletsAndBlastsDamageTheBoss() {
+    Game game;
+    startBossGame(game, 5);
+    Boss& boss = game.boss;
+    CHECK(boss.y == 20);
+    Shot bullet = {boss.x + 10, boss.y + 5, 0, 0, 0};
+    game.bullets.push_back(bullet);
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(boss.hp == 99 && boss.flash > 0 && game.bullets.empty());
+    Rocket rocket = {boss.x + 14, boss.y + 10, 60, 0};
+    game.rockets.push_back(rocket);
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(boss.hp == 79 && game.rockets.empty());
+    game.rockets.push_back({boss.x - 80, 3, 60, 0});   // bursts at the top, 80 px beside the boss: out of reach
+    run(game, noInput(), 0.2f);
+    CHECK(boss.hp == 79);
+    game.rockets.push_back({boss.x + 14, 3, 60, 0});   // bursts at the top, 20 px above the boss: the blast reaches it
+    run(game, noInput(), 0.2f);
+    CHECK(boss.hp == 59);
+}
+
+static void killingTheBossScoresAndDropsBothPickups() {
+    Game game;
+    startBossGame(game, 10);
+    game.boss.hp = 1;
+    int before = game.players[0].score;
+    Shot bullet = {game.boss.x + 10, game.boss.y + 5, 0, 0, 0};
+    game.bullets.push_back(bullet);
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(!game.boss.alive && game.players[0].score == before + 10000 + 10 * 1000);   // 5,000 x 2 and the wave 10 clear bonus
+    int rockets = 0, upgrades = 0;
+    for (const Pickup& pickup : game.pickups) {
+        rockets += pickup.type == PICKUP_ROCKET;
+        upgrades += pickup.type == PICKUP_UPGRADE;
+    }
+    CHECK(rockets == 1 && upgrades == 1 && !game.explosions.empty());
+    run(game, noInput(), 0.1f);
+    CHECK(game.nextWaveTimer > 0);   // the normal wave-clear pause starts
+}
+
+static void bossBodyKillsTheShip() {
+    Game game;
+    startBossGame(game, 5);
+    game.boss.y = 110;   // down in the ship's movement zone
+    Player& p = game.players[0];
+    p.invincibleTimer = 0;
+    p.x = game.boss.x + 10;
+    p.y = 112;
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(!game.players[0].alive && game.players[0].lives == 2);
+}
+
+static void bossFiresBurstThenFan() {
+    Game game;
+    startBossGame(game, 5);
+    game.boss.attackTimer = 0.01f;
+    run(game, noInput(), 0.5f);
+    CHECK(game.enemyShots.size() == 3);   // burst: 0, 0.15, 0.3 s
+    for (const Shot& shot : game.enemyShots) CHECK(fabsf(sqrtf(shot.vx * shot.vx + shot.vy * shot.vy) - 90) < 0.5f && shot.vy > 0);
+    game.enemyShots.clear();
+    game.boss.attackTimer = 0.01f;
+    run(game, noInput(), 0.05f);
+    CHECK(game.enemyShots.size() == 5);   // fan
+    CHECK(game.enemyShots[0].vx == -60 && game.enemyShots[2].vx == 0 && game.enemyShots[4].vx == 60 && game.enemyShots[2].vy == 70);
+}
+
+static void bossWaitsForALivingShip() {
+    Game game;
+    startBossGame(game, 5);
+    game.players[0].alive = false;
+    game.players[0].respawnTimer = 1e9f;
+    game.boss.attackTimer = 0.01f;
+    run(game, noInput(), 3);
+    CHECK(game.enemyShots.empty());
+}
+
 static void settingsDefaultToMusicOn() {
     CHECK(settingsLoad("build/tests/missing.txt").music == true);
 }
@@ -428,6 +535,13 @@ int main() {
     weaponLevelsFireTheirPattern();
     upgradePickupRaisesLevelUpToFour();
     deathLosesOneWeaponLevel();
+    everyFifthWaveIsABoss();
+    bossHealthGrowsEachAppearance();
+    bulletsAndBlastsDamageTheBoss();
+    killingTheBossScoresAndDropsBothPickups();
+    bossBodyKillsTheShip();
+    bossFiresBurstThenFan();
+    bossWaitsForALivingShip();
     secondPlayerJoinsBlinkingWithAFreshRun();
     coOpRunEndsWhenBothPlayersAreOut();
     waveBonusSkipsAPlayerWhoIsOut();
