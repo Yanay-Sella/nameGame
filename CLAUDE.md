@@ -18,13 +18,18 @@ Full setup history, debugging toolkit and new-project checklist: `docs/ps3-new-p
 ## Commands (run on the Mac)
 - `make ps3` — full rebuild in Docker → `build/nameGame.pkg`. Uses image `namegame-ps3dev` (`docker/Dockerfile`:
   `zeldin/ps3dev-docker` + SDL2 rebuilt with `docker/sdl2-psl1ght-render.patch`), built automatically by `make image`.
+- **One PS3, many sessions:** each session works in its own git worktree (own `build/`, `pkgfiles/`, `shots/`), builds with `make ps3` outside any lock,
+  and runs every step that touches the PS3 (install, launch, pad, shot, quit) in ONE locked command, never as separate calls:
+  `scripts/ps3-lock.sh bash -c 'make install launch && make pad BUTTONS=... && make shot'`.
+  It waits while another session holds the lock (`~/.nameGame-ps3.lock`, shared by all worktrees), drops a lock whose owner died,
+  and quits the game when done. Run `make log` inside the locked command too (UDP 18195 is shared). Don't call `make deploy/launch/pad/shot` unlocked.
 - `make deploy` — build, upload via FTP to `/dev_hdd0/packages/`, install with webMAN (`/install.ps3/...`).
   Then `make launch` starts NAME game on the PS3 (no controller needed).
 - `make log` — print the game's UDP log lines (port 18195). Run it before launching the game.
   `make ps3` deletes `build/`, so don't redirect the log into `build/`.
   A stale `make log` (python on UDP 18195) makes the next one fail with "Address already in use": `lsof -nP -iUDP:18195`, then kill that PID.
-- `make launch` / `make quit` — start the installed game (`/play.ps3?NMGM00001`; takes 10-15 s, the log shows "nameGame started") and
-  quit it to the XMB (`/xmb.ps3$exit`). `make launch` refuses while an app runs. `/play.ps3/dev_hdd0/game/NMGM00001` did NOT start it.
+- `make launch` / `make quit` — start the installed game (XMB sequence: Game column, webMAN Games, down, cross; `/play.ps3?<id>` just replays the last app, e.g. HEN; takes 10-15 s, the log shows "nameGame started") and
+  quit it to the XMB (`/xmb.ps3$exit`; then waits ~10 s for the XMB icons, since launching into a reloading XMB focuses the wrong item). `make launch` refuses while an app runs. `/play.ps3/dev_hdd0/game/NMGM00001` did NOT start it.
 - `make pad BUTTONS='cross|1|circle'` — press virtual-pad buttons through webMAN (`/pad.ps3?...`, `|n|` waits n s). The game sees them
   as a normal controller (Start, Cross, Circle and L1 confirmed in the log), so Claude can play and navigate the menus.
 - `make shot` — dev builds only: L1 on the virtual pad makes the game write `shot.bmp` (its 320x180 picture); fetched over FTP to
@@ -39,7 +44,7 @@ Full setup history, debugging toolkit and new-project checklist: `docs/ps3-new-p
 - `source/*.cpp` — game code. Design docs: `docs/GDD.md` and `docs/features/`. `ps3.mk` — PSL1GHT build rules (runs inside Docker). `Makefile` — host commands.
 - Log with `debugNetPrintf(INFO, ...)`; the Mac's IP is baked in at build time (`LOG_HOST`).
 - Poll SDL events every frame: SDL turns the PS button menu's "Quit Game" into `SDL_QUIT`.
-- A watchdog thread logs where the main loop is stuck (and RSX state) after 5 s without a frame, then exits to the XMB.
+- A watchdog thread logs where the main loop is stuck (and RSX state) after 5 s without a frame, or after 20 s of only all-black frames, then exits to the XMB.
 - Debug freezes from the logs (watchdog line), not by guessing; a "hang" may be a crashed main thread.
 - Available libraries: see `$PS3DEV/portlibs/ppu/lib` in the image (SDL2, SDL2_mixer, freetype, libpng, libjpeg, zlib, curl...).
   No SDL2_image or SDL2_ttf (only SDL 1.2 versions).

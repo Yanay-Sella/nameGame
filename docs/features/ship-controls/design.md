@@ -34,3 +34,4 @@ The player flies a small ship around the bottom of the screen and holds R1 to sp
 - 2026-11-17: designed.
 - 2026-11-17: implemented in M2.
 - 2026-11-17: unplug pause added (D-014).
+- 2026-11-18: the ship glides on the glacier and drifts in the deep sea's current (D-027).

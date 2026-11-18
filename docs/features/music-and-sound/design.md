@@ -26,6 +26,20 @@ One of two songs, chosen in Settings, drives the action, and short 8-bit sound e
 | Rocket empty | square 150 Hz, 0.03 s, volume 0.2 | | |
 | Wave start | three rising notes 523, 659, 784 Hz, 0.08 s each, volume 0.25 | | |
 | Extra life | four rising notes 523, 659, 784, 1047 Hz, 0.07 s each, volume 0.3 | | |
+| Banana throw (jungle) | noise sweep 2000 → 600 Hz, 0.12 s, volume 0.2 | | gorilla throw, bunch, poop lob |
+| Screech (jungle) | three squares 1400 → 1900, 1900 → 1300, 1500 → 2000 Hz, 0.08 s each, volume 0.2 | | monkey banana throw |
+| Slip (jungle) | square 1400 → 300 Hz, 0.35 s, volume 0.3 | | slide whistle |
+| Stun (jungle) | squares 200 → 450 then 450 → 180 Hz, volume 0.3 | | boing |
+| Splat (jungle) | noise 700 → 90 Hz, 0.25 s, volume 0.4 | | poop lands |
+| Laugh (jungle) | three squares 330, 300, 270 Hz falling, 0.09 s each, volume 0.35 | | gorilla healed |
+| Pound (jungle) | three noise thumps, 0.1, 0.1, 0.15 s, volume 0.45-0.5 | | chest pound starts |
+| Sneeze (glacier) | noise 4000 → 900 Hz, 0.25 s, volume 0.4, over a square 900 → 400 Hz | | yeti ACHOO! |
+| Freeze (glacier) | noise 3500 → 5000 Hz and a square 1800 → 2600 Hz, 0.3 s | | ship frozen |
+| Crack (glacier) | two noise ticks 5000 → 3000 Hz, 0.06 s | | ice block thrown, icicles form |
+| Sizzle (volcano) | noise 6000 → 3000 Hz, 0.4 s, volume 0.25 | | ship scorched |
+| Bubble (deep sea) | squares 300 → 900 then 500 → 1100 Hz | | bubble attacks, big bubble pops |
+| Cast (deep sea) | noise 2500 → 500 Hz and a square 1200 → 400 Hz, 0.2 s | | hook cast, boot thrown |
+| Hooked (deep sea) | squares 800, 1000, then 600 → 1200 Hz | | ship hooked |
 
 ## Edge cases
 - Game over while a sound plays: it finishes; the song stops at once.
@@ -37,3 +51,5 @@ One of two songs, chosen in Settings, drives the action, and short 8-bit sound e
 - 2026-11-17: designed.
 - 2026-11-17: implemented in M2.
 - 2026-11-17: second song (DUBSTEP) and a three-way music setting (D-018).
+- 2026-11-18: jungle level (D-020): seven new sounds.
+- 2026-11-18: levels 3-5 (D-024): seven more sounds.

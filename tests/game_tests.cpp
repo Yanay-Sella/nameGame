@@ -24,8 +24,8 @@ const float DT = 1.0f / 60;
 const Actions NO_INPUT = {};
 
 // A run whose ship can't be hit, for tests that aren't about dying.
-static void startSafeGame(Game& game) {
-    startGame(game, 1, 7);
+static void startSafeGame(Game& game, int level = 1) {
+    startGame(game, 1, 7, level);
     game.players[0].invincibleTimer = 1e9f;
 }
 
@@ -46,15 +46,26 @@ static Alien parkedAlien(float x, float y) {
 }
 
 static const Sprite* const ALL_SPRITES[] = {&SHIP_A, &SHIP_B, &SHIP2_A, &SHIP2_B, &GREEN_ALIEN_A, &GREEN_ALIEN_B, &BLUE_ALIEN_A, &BLUE_ALIEN_B,
-                                            &RED_ALIEN_A, &RED_ALIEN_B, &BOSS_A, &BOSS_B, &BULLET, &ENEMY_SHOT, &ROCKET, &ROCKET_PICKUP,
-                                            &UPGRADE_PICKUP, &LIFE_ICON, &ROCKET_ICON};
+                                            &RED_ALIEN_A, &RED_ALIEN_B, &BOSS_A, &BOSS_B, &MAGE_A, &MAGE_B, &BULLET, &ENEMY_SHOT, &ROCKET, &ROCKET_PICKUP,
+                                            &UPGRADE_PICKUP, &LIFE_ICON, &ROCKET_ICON, &LEAFHOPPER_A, &LEAFHOPPER_B, &BEETLE_A, &BEETLE_B,
+                                            &STAG_A, &STAG_B, &RHINO_A, &RHINO_B, &MONKEY_A, &MONKEY_B, &GORILLA_A, &GORILLA_B,
+                                            &GORILLA_LAUGH, &GORILLA_POUND, &BANANA_A, &BANANA_B, &COCONUT, &PEEL, &POOP,
+                                            &FLAKE_A, &FLAKE_B, &ICEBAT_A, &ICEBAT_B, &FROSTSKULL_A, &FROSTSKULL_B, &YETICLOUD_A,
+                                            &YETICLOUD_B, &YETI_A, &YETI_B, &YETI_SNEEZE, &GOLEM_A, &GOLEM_B, &EMBER_A, &EMBER_B,
+                                            &FIREBAT_A, &FIREBAT_B, &MAGMASKULL_A, &MAGMASKULL_B, &PHOENIX_A, &PHOENIX_B, &IMP_A,
+                                            &IMP_B, &FIRELORD_A, &FIRELORD_B, &PIRANHA_A, &PIRANHA_B, &PUFFER_A, &PUFFER_B,
+                                            &LIONFISH_A, &LIONFISH_B, &SHARK_A, &SHARK_B, &ANGLER_A, &ANGLER_B, &FISHERMAN_A,
+                                            &FISHERMAN_B, &SNOWBALL, &ICICLE, &FIREBALL_A, &FIREBALL_B, &BUBBLE, &BIG_BUBBLE, &BOOT,
+                                            &ICE_BLOCK, &ICE_CUBE, &LAVA_DROP, &HOOK};
 
 static void spritesHaveTheirSize() {
     for (const Sprite* s : ALL_SPRITES) CHECK((int)strlen(s->pixels) == s->w * s->h);
 }
 
-static void onlyEnemyShotsUseMagenta() {
-    for (const Sprite* s : ALL_SPRITES) CHECK((s == &ENEMY_SHOT) == (strchr(s->pixels, 'm') != NULL));
+static void onlyDeadlyShotsUseMagenta() {
+    for (const Sprite* s : ALL_SPRITES)
+        CHECK((s == &ENEMY_SHOT || s == &BANANA_A || s == &BANANA_B || s == &COCONUT || s == &SNOWBALL || s == &ICICLE ||
+               s == &FIREBALL_A || s == &FIREBALL_B || s == &BUBBLE || s == &BIG_BUBBLE || s == &BOOT) == (strchr(s->pixels, 'm') != NULL));
 }
 
 static void deadzoneIsRadialAndRescaled() {
@@ -472,13 +483,13 @@ static void deathLosesOneWeaponLevel() {
 }
 
 // A safe run at the start of a boss wave: the boss has flown in and sways, nothing has fired yet.
-static void startBossGame(Game& game, int wave) {
-    startSafeGame(game);
+static void startBossGame(Game& game, int wave, int level = 1) {
+    startSafeGame(game, level);
     game.wave = wave - 1;
     for (Alien& alien : game.aliens) alien.alive = false;
     run(game, NO_INPUT, 2.5f);   // wave clear pause, then the boss enters
     run(game, NO_INPUT, 0.5f);
-    game.boss.attackTimer = 100;
+    for (Boss& boss : game.bosses) boss.attackTimer = 100;
 }
 
 static void everyFifthWaveIsABoss() {
@@ -487,25 +498,24 @@ static void everyFifthWaveIsABoss() {
     game.wave = 4;
     for (Alien& alien : game.aliens) alien.alive = false;
     run(game, NO_INPUT, 2.2f);
-    CHECK(game.wave == 5 && game.boss.alive && game.aliens.empty() && game.bannerTimer > 0);
-    game.boss.alive = false;
+    CHECK(game.wave == 5 && game.bosses.size() == 1 && game.bosses[0].alive && game.aliens.empty() && game.bannerTimer > 0);
+    game.bosses[0].alive = false;
     run(game, NO_INPUT, 2.2f);
-    CHECK(game.wave == 6 && !game.boss.alive && game.aliens.size() == 40);
+    CHECK(game.wave == 6 && game.bosses.empty() && game.aliens.size() == 40);
 }
 
-static void bossHealthGrowsEachAppearance() {
-    CHECK(bossHealth(5) == 100 && bossHealth(10) == 150 && bossHealth(15) == 200);
+static void bossWavesFollowTheTable() {
+    CHECK(bossHealth(1, 5) == 100 && bossHealth(1, 10) == 100 && bossHealth(1, 15) == 200 && bossHealth(1, 20) == 200);
+    CHECK(bossCount(5) == 1 && bossCount(10) == 2 && bossCount(15) == 1 && bossCount(20) == 2);
+    CHECK(bossType(1, 5) == BOSS_CLASSIC && bossType(1, 10) == BOSS_CLASSIC && bossType(1, 15) == BOSS_MAGE && bossType(1, 20) == BOSS_MAGE);
     CHECK(isBossWave(5) && isBossWave(10) && isBossWave(15));
     CHECK(!isBossWave(0) && !isBossWave(4) && !isBossWave(6));
-    Game game;
-    startBossGame(game, 10);
-    CHECK(game.boss.hp == 150 && game.boss.maxHp == 150 && fabsf(fabsf(game.boss.vx) - 50) < 0.01f);
 }
 
 static void bulletsAndBlastsDamageTheBoss() {
     Game game;
     startBossGame(game, 5);
-    Boss& boss = game.boss;
+    Boss& boss = game.bosses[0];
     CHECK(boss.y == 20);
     Shot bullet = {boss.x + 10, boss.y + 5, 0, 0, 0};
     game.bullets.push_back(bullet);
@@ -525,13 +535,13 @@ static void bulletsAndBlastsDamageTheBoss() {
 
 static void killingTheBossScoresAndDropsBothPickups() {
     Game game;
-    startBossGame(game, 10);
-    game.boss.hp = 1;
+    startBossGame(game, 5);
+    game.bosses[0].hp = 1;
     int before = game.players[0].score;
-    Shot bullet = {game.boss.x + 10, game.boss.y + 5, 0, 0, 0};
+    Shot bullet = {game.bosses[0].x + 10, game.bosses[0].y + 5, 0, 0, 0};
     game.bullets.push_back(bullet);
     updateGame(game, &NO_INPUT, DT);
-    CHECK(!game.boss.alive && game.players[0].score == before + 10000 + 10 * 1000);   // 5,000 x 2 and the wave 10 clear bonus
+    CHECK(!game.bosses[0].alive && game.players[0].score == before + 5000 + 5 * 1000);   // 5,000 x 1 and the wave 5 clear bonus
     int rockets = 0, upgrades = 0;
     for (const Pickup& pickup : game.pickups) {
         rockets += pickup.type == PICKUP_ROCKET;
@@ -545,10 +555,10 @@ static void killingTheBossScoresAndDropsBothPickups() {
 static void bossBodyKillsTheShip() {
     Game game;
     startBossGame(game, 5);
-    game.boss.y = 110;   // down in the ship's movement zone
+    game.bosses[0].y = 110;   // down in the ship's movement zone
     Player& p = game.players[0];
     p.invincibleTimer = 0;
-    p.x = game.boss.x + 10;
+    p.x = game.bosses[0].x + 10;
     p.y = 112;
     updateGame(game, &NO_INPUT, DT);
     CHECK(!game.players[0].alive && game.players[0].lives == 2);
@@ -557,12 +567,12 @@ static void bossBodyKillsTheShip() {
 static void bossFiresBurstThenFan() {
     Game game;
     startBossGame(game, 5);
-    game.boss.attackTimer = 0.01f;
+    game.bosses[0].attackTimer = 0.01f;
     run(game, NO_INPUT, 0.5f);
     CHECK(game.enemyShots.size() == 3);   // burst: 0, 0.15, 0.3 s
     for (const Shot& shot : game.enemyShots) CHECK(fabsf(sqrtf(shot.vx * shot.vx + shot.vy * shot.vy) - 90) < 0.5f && shot.vy > 0);
     game.enemyShots.clear();
-    game.boss.attackTimer = 0.01f;
+    game.bosses[0].attackTimer = 0.01f;
     run(game, NO_INPUT, 0.05f);
     CHECK(game.enemyShots.size() == 5);   // fan
     CHECK(game.enemyShots[0].vx == -60 && game.enemyShots[2].vx == 0 && game.enemyShots[4].vx == 60 && game.enemyShots[2].vy == 70);
@@ -573,9 +583,113 @@ static void bossWaitsForALivingShip() {
     startBossGame(game, 5);
     game.players[0].alive = false;
     game.players[0].respawnTimer = 1e9f;
-    game.boss.attackTimer = 0.01f;
+    game.bosses[0].attackTimer = 0.01f;
     run(game, NO_INPUT, 3);
     CHECK(game.enemyShots.empty());
+}
+
+static void twinBossesSwayInTheirOwnHalves() {
+    Game game;
+    startBossGame(game, 10);
+    const Boss& left = game.bosses[0];
+    const Boss& right = game.bosses[1];
+    CHECK(game.bosses.size() == 2);
+    CHECK(left.minX == 0 && left.maxX == 128 && right.minX == 160 && right.maxX == 288 && fabsf(fabsf(left.vx) - 50) < 0.01f);
+    bool inside = true;
+    for (int step = 0; step < 600; step++) {
+        updateGame(game, &NO_INPUT, DT);
+        inside &= left.x >= 0 && left.x <= 128 && right.x >= 160 && right.x <= 288;
+    }
+    CHECK(inside);
+}
+
+static void twinBossesBothMustDie() {
+    Game game;
+    startBossGame(game, 10);
+    int before = game.players[0].score;
+    game.bosses[0].hp = 1;
+    Shot bullet = {game.bosses[0].x + 10, game.bosses[0].y + 5, 0, 0, 0};
+    game.bullets.push_back(bullet);
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(!game.bosses[0].alive && game.bosses[1].alive && game.players[0].score == before + 10000);
+    run(game, NO_INPUT, 0.3f);
+    CHECK(game.nextWaveTimer == 0 && game.wave == 10);
+    game.bosses[1].hp = 1;
+    bullet = {game.bosses[1].x + 10, game.bosses[1].y + 5, 0, 0, 0};
+    game.bullets.push_back(bullet);
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(game.players[0].score == before + 10000 + 10000 + 10 * 1000);
+    int rockets = 0, upgrades = 0;
+    for (const Pickup& pickup : game.pickups) {
+        rockets += pickup.type == PICKUP_ROCKET;
+        upgrades += pickup.type == PICKUP_UPGRADE;
+    }
+    CHECK(rockets == 2 && upgrades == 2);
+    run(game, NO_INPUT, 0.1f);
+    CHECK(game.nextWaveTimer > 0);
+}
+
+static void mageBallBeamsItsColumnAfterOneAndAHalfSeconds() {
+    for (int offset : {0, 20}) {
+        Game game;
+        startBossGame(game, 15);
+        Boss& mage = game.bosses[0];
+        Player& p = game.players[0];
+        CHECK(game.bosses.size() == 1 && mage.type == BOSS_MAGE && mage.hp == 200);
+        p.invincibleTimer = 0;
+        mage.ballX = p.x + 8 + offset;
+        mage.ballY = 21;
+        mage.ballTimer = 1.5f;
+        run(game, NO_INPUT, 1.4f);
+        CHECK(p.alive && mage.beamTimer == 0);
+        run(game, NO_INPUT, 0.2f);
+        CHECK(mage.beamTimer > 0 && p.alive == (offset == 20));
+        run(game, NO_INPUT, 1);
+        CHECK(mage.beamTimer == 0);
+    }
+}
+
+static void deadMageCastsNoBeam() {
+    Game game;
+    startBossGame(game, 15);
+    Boss& mage = game.bosses[0];
+    Player& p = game.players[0];
+    p.invincibleTimer = 0;
+    mage.ballX = p.x + 8;
+    mage.ballY = 21;
+    mage.ballTimer = 1;
+    mage.hp = 1;
+    Shot bullet = {mage.x + 10, mage.y + 5, 0, 0, 0};
+    game.bullets.push_back(bullet);
+    run(game, NO_INPUT, 1.5f);
+    CHECK(game.wave == 15 && !mage.alive && mage.beamTimer == 0 && p.alive);
+}
+
+static void mageAttacksInRandomOrderAndGaps() {
+    Game game;
+    startBossGame(game, 15);
+    const Boss& mage = game.bosses[0];
+    game.bosses[0].attackTimer = 0.01f;
+    float lastAttack = -1, minGap = 1e9f, maxGap = 0;
+    int casts = 0;
+    bool shotsSeen = false, ballBefore = false;
+    for (int step = 0; step < 7200; step++) {
+        float timerBefore = mage.attackTimer;
+        updateGame(game, &NO_INPUT, DT);
+        if (mage.attackTimer > timerBefore) {
+            if (lastAttack >= 0) {
+                minGap = std::min(minGap, game.time - lastAttack);
+                maxGap = std::max(maxGap, game.time - lastAttack);
+            }
+            lastAttack = game.time;
+        }
+        if (mage.ballTimer > 0 && !ballBefore) casts++;
+        ballBefore = mage.ballTimer > 0;
+        if (!game.enemyShots.empty()) shotsSeen = true;
+    }
+    CHECK(casts >= 5 && shotsSeen);
+    CHECK(minGap >= 0.6f * 1.9f - 0.02f && maxGap <= 1.4f * 1.9f + 0.02f);
+    CHECK(minGap < 1.5f && maxGap > 2.3f);
 }
 
 static void levelBannerComesBeforeWaveOne() {
@@ -591,34 +705,36 @@ static void levelBannerComesBeforeWaveOne() {
 
 static void killingTheLevelBossClearsTheLevel() {
     Game game;
-    startBossGame(game, 20);
-    CHECK(game.boss.hp == 250);
-    game.boss.hp = 1;
+    startBossGame(game, 20, 5);
+    CHECK(game.bosses.size() == 2 && game.bosses[0].type == BOSS_FISHERMAN && game.bosses[0].hp == 420 && game.bosses[1].hp == 420);
+    game.bosses[1].alive = false;   // its twin is already down
+    game.bosses[0].hp = 1;
     Shot enemyShot = {10, 40, 0, -1, 0};   // parked away from the ship
     game.enemyShots.push_back(enemyShot);
-    Shot bullet = {game.boss.x + 10, game.boss.y + 5, 0, 0, 0};
+    Shot bullet = {game.bosses[0].x + 10, game.bosses[0].y + 5, 0, 0, 0};
     game.bullets.push_back(bullet);
     int before = game.players[0].score;
     updateGame(game, &NO_INPUT, DT);
-    CHECK(!game.boss.alive && game.levelClear && game.clearTimer == 3 && !game.over);
-    CHECK(game.players[0].score == before + 20000 + 20 * 1000);   // 5,000 x 4 and the wave 20 clear bonus
+    CHECK(!game.bosses[0].alive && game.levelClear && game.clearTimer == 3 && !game.over);
+    CHECK(game.players[0].score == before + 100000 + 20 * 1000);   // 5,000 x (4 + 16) and the wave 20 clear bonus
     CHECK(game.enemyShots.size() == 1);   // shots in the air stay
     run(game, NO_INPUT, 2.9f);
     CHECK(!game.over && game.wave == 20);   // the boss death's 0.15 s hit-stop comes first
     run(game, NO_INPUT, 0.5f);
     CHECK(game.over && game.won && game.wave == 20);
     run(game, NO_INPUT, 3);
-    CHECK(game.wave == 20 && !game.boss.alive && game.aliens.empty());
+    CHECK(game.wave == 20 && !game.bosses[0].alive && game.aliens.empty());
 }
 
 static void deathDuringTheClearOnlyLosesOnTheLastLife() {
     for (int lives : {1, 2}) {
         Game game;
-        startBossGame(game, 20);
+        startBossGame(game, 20, 5);
+        game.bosses[1].alive = false;
         game.players[0].lives = lives;
         game.players[0].nextExtraLife = MAX_SCORE;   // the boss reward must not grant a life
-        game.boss.hp = 1;
-        Shot bullet = {game.boss.x + 10, game.boss.y + 5, 0, 0, 0};
+        game.bosses[0].hp = 1;
+        Shot bullet = {game.bosses[0].x + 10, game.bosses[0].y + 5, 0, 0, 0};
         game.bullets.push_back(bullet);
         updateGame(game, &NO_INPUT, DT);
         CHECK(game.levelClear);
@@ -638,6 +754,16 @@ static void deathDuringTheClearOnlyLosesOnTheLastLife() {
 static std::vector<uint32_t> pictureOf(const Game& game) {
     drawGame(game);
     return std::vector<uint32_t>(screenPixels, screenPixels + SCREEN_W * SCREEN_H);
+}
+
+static void beamDrawsAMagentaColumn() {
+    Game game;
+    startBossGame(game, 15);
+    game.bosses[0].ballX = 100;
+    game.bosses[0].beamTimer = 0.5f;
+    std::vector<uint32_t> picture = pictureOf(game);
+    CHECK(picture[170 * SCREEN_W + 95] == paletteColor('m'));
+    CHECK(picture[170 * SCREEN_W + 100] == paletteColor('w'));
 }
 
 // A rocket 0.5 px under the top of the screen: it bursts on the next step.
@@ -812,6 +938,585 @@ static void shakeAndFlashSettingsSurviveASave() {
     CHECK(settingsLoad("build/tests/shake-settings.txt").shake == 100);   // clamped
 }
 
+static void jungleDifficultyIsFiveWavesAhead() {
+    CHECK(difficultyWave(1, 7) == 7 && difficultyWave(2, 1) == 6);
+    Game game;
+    startSafeGame(game, 2);
+    CHECK(game.level == 2 && fabsf(game.bannerTimer - 3.5f) < 1e-4f && game.aliens.size() == 40);
+    for (size_t i = 0; i < game.aliens.size(); i++) CHECK(game.aliens[i].type == (i < 16 ? ALIEN_BLUE : ALIEN_GREEN));
+}
+
+// Jungle wave 8 after a cleared wave 7: 40 aliens and one heavy beetle.
+static void startHeavyWave(Game& game) {
+    startSafeGame(game, 2);
+    game.wave = 7;
+    for (Alien& alien : game.aliens) alien.alive = false;
+    run(game, NO_INPUT, 2.2f);
+}
+
+static void heavyBeetlesComeEveryEightWaves() {
+    CHECK(heavyCount(2, 7) == 0 && heavyCount(2, 8) == 1 && heavyCount(2, 14) == 1 && heavyCount(2, 15) == 0);
+    CHECK(heavyCount(2, 16) == 2 && heavyCount(2, 19) == 2 && heavyCount(1, 16) == 0);
+    Game game;
+    startHeavyWave(game);
+    int heavies = 0;
+    for (const Alien& alien : game.aliens)
+        if (alien.type == ALIEN_HEAVY) {
+            heavies++;
+            CHECK(alien.hp == 12);
+        }
+    CHECK(game.wave == 8 && game.aliens.size() == 41 && heavies == 1);
+}
+
+static void heavyBeetleRoamsTheUpperScreen() {
+    Game game;
+    startHeavyWave(game);
+    run(game, NO_INPUT, 3);
+    float minX = 1000, maxX = -1000;
+    for (int step = 0; step < 360; step++) {
+        updateGame(game, &NO_INPUT, DT);
+        for (const Alien& alien : game.aliens)
+            if (alien.type == ALIEN_HEAVY) {
+                CHECK(alien.state == ALIEN_ROAMING && alien.y >= 18 && alien.y <= 84);
+                minX = std::min(minX, alien.x);
+                maxX = std::max(maxX, alien.x);
+            }
+    }
+    CHECK(maxX - minX > 100);
+}
+
+static void levelOneClearContinuesIntoTheJungle() {
+    Game game;
+    startBossGame(game, 20);
+    game.bosses[1].alive = false;
+    game.bosses[0].hp = 1;
+    Shot bullet = {game.bosses[0].x + 10, game.bosses[0].y + 5, 0, 0, 0};
+    game.bullets.push_back(bullet);
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(game.levelClear);
+    int scoreAtKill = game.players[0].score;
+    run(game, NO_INPUT, 3.4f);
+    CHECK(!game.over && game.level == 2 && game.wave == 1 && !game.levelClear && game.aliens.size() == 40);
+    CHECK(game.players[0].score == scoreAtKill);
+}
+
+static void pickedLevelRunEndsOnItsClear() {
+    Game game;
+    startGame(game, 1, 7, 2, true);   // the level picker's jungle
+    game.players[0].invincibleTimer = 1e9f;
+    game.wave = 19;
+    for (Alien& alien : game.aliens) alien.alive = false;
+    run(game, NO_INPUT, 3);
+    for (Boss& boss : game.bosses) boss.alive = false;
+    run(game, NO_INPUT, 0.1f);
+    CHECK(game.levelClear);
+    run(game, NO_INPUT, 3.4f);
+    CHECK(game.over && game.won && game.level == 2);
+}
+
+static void jungleBossesFollowTheTable() {
+    const int hp[4] = {150, 150, 300, 300};
+    const BossType type[4] = {BOSS_MONKEY, BOSS_MONKEY, BOSS_GORILLA, BOSS_GORILLA};
+    for (int i = 0; i < 4; i++) CHECK(bossHealth(2, 5 * (i + 1)) == hp[i] && bossType(2, 5 * (i + 1)) == type[i]);
+    CHECK(bossCount(5) == 1 && bossCount(10) == 2 && bossCount(15) == 1 && bossCount(20) == 2);
+}
+
+static void monkeyThrowsBananasStraightDownThenAPeel() {
+    Game game;
+    startBossGame(game, 5, 2);
+    game.bosses[0].attackTimer = 0.001f;
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(game.soundRequested[SOUND_SCREECH]);
+    run(game, NO_INPUT, 0.5f);
+    CHECK(game.thrown.size() == 3);
+    for (const Thrown& t : game.thrown) CHECK(t.kind == THROWN_BANANA && t.vx == 0 && t.vy == 85);
+    CHECK(game.lobs.size() == 1 && !game.lobs[0].poop);
+    CHECK(game.lobs[0].toX >= 8 && game.lobs[0].toX <= 312 && game.lobs[0].toY >= 107 && game.lobs[0].toY <= 173);
+    run(game, NO_INPUT, 0.9f);
+    const Player& p = game.players[0];
+    CHECK(game.lobs.empty() && (game.peels.size() == 1 || p.slideTimer > 0 || p.stunTimer > 0));
+}
+
+static void monkeyAlternatesWithABananaBunch() {
+    Game game;
+    startBossGame(game, 5, 2);
+    game.bosses[0].attackTimer = 0.001f;
+    run(game, NO_INPUT, 1.4f);
+    size_t before = game.thrown.size();
+    game.bosses[0].attackTimer = 0.001f;
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(game.thrown.size() == before + 5);
+    const float sideways[5] = {-50, -25, 0, 25, 50};
+    for (int i = 0; i < 5; i++) CHECK(game.thrown[before + i].vx == sideways[i]);
+}
+
+static void peelSlidesTheShipThenStunsIt() {
+    Game game;
+    startSafeGame(game);
+    Player& p = game.players[0];
+    game.peels.push_back({p.x + 5, p.y + 4, 5});
+    Actions right = {};
+    right.moveX = 1;
+    updateGame(game, &right, DT);
+    CHECK(p.slideTimer > 0 && game.peels.empty());
+    float x = p.x;
+    Actions left = {};
+    left.moveX = -1;
+    run(game, left, 0.4f);
+    CHECK(p.x > x);
+    run(game, left, 0.2f);
+    CHECK(p.stunTimer > 0);
+    x = p.x;
+    left.fire = true;
+    run(game, left, 0.5f);
+    CHECK(p.x == x && game.bullets.empty());
+    left.fire = false;
+    run(game, left, 0.6f);
+    CHECK(p.x < x);
+}
+
+static void peelLiesFiveSeconds() {
+    Game game;
+    startSafeGame(game);
+    game.peels.push_back({20, 110, 5});
+    run(game, NO_INPUT, 4.9f);
+    CHECK(game.peels.size() == 1);
+    run(game, NO_INPUT, 0.2f);
+    CHECK(game.peels.empty());
+}
+
+static void bananaKillsTheShip() {
+    Game game;
+    startSafeGame(game);
+    Player& p = game.players[0];
+    p.invincibleTimer = 0;
+    game.thrown.push_back({p.x + 5, p.y + 4, 0, 0, THROWN_BANANA, 0, 0});
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(!p.alive);
+}
+
+static void mistShotsHealTheGorilla() {
+    Game game;
+    startBossGame(game, 15, 2);
+    Boss& boss = game.bosses[0];
+    boss.hp = 100;
+    const Player& p = game.players[0];
+    game.mists.push_back({p.x + 8, p.y + 7, 1});
+    game.soundRequested[SOUND_LAUGH] = false;
+    Shot bullet = {boss.x + 10, boss.y + 5, 0, 0, 0};
+    game.bullets.push_back(bullet);
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(boss.hp == 101 && boss.laughTimer > 0 && game.soundRequested[SOUND_LAUGH]);
+    game.mists.clear();
+    game.bullets.push_back(bullet);
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(boss.hp == 100);
+}
+
+static void poopSplatsIntoAMistThatFades() {
+    Game game;
+    startSafeGame(game, 2);
+    game.lobs.push_back({100, 40, 100, 140, 0, true});
+    run(game, NO_INPUT, 0.85f);
+    CHECK(game.mists.size() == 1 && game.lobs.empty());
+    run(game, NO_INPUT, 6);
+    CHECK(game.mists.empty());
+}
+
+static void gorillaPoundDropsFiveCoconuts() {
+    Game game;
+    startBossGame(game, 15, 2);
+    game.bosses[0].windupTimer = 0.01f;
+    run(game, NO_INPUT, 0.05f);
+    CHECK(game.thrown.size() == 5);
+    for (size_t i = 0; i < game.thrown.size(); i++)
+        CHECK(game.thrown[i].kind == THROWN_COCONUT && game.thrown[i].x >= i * 62.8f && game.thrown[i].x < (i + 1) * 62.8f);
+}
+
+static void gorillaNeverPoopsPastThreeMists() {
+    Game game;
+    startBossGame(game, 15, 2);
+    for (int i = 0; i < 3; i++) game.mists.push_back({20.0f + i * 40, 30, 1});
+    bool pounded = false, peeled = false;
+    for (int i = 0; i < 40; i++) {
+        game.bosses[0].attackTimer = 0.001f;
+        updateGame(game, &NO_INPUT, DT);
+        pounded |= game.bosses[0].windupTimer > 0;
+        for (const Lob& lob : game.lobs) {
+            CHECK(!lob.poop);
+            peeled |= !lob.poop;
+        }
+    }
+    CHECK(pounded && peeled);
+}
+
+static void deadGorillaDropsNoCoconuts() {
+    Game game;
+    startBossGame(game, 15, 2);
+    Boss& boss = game.bosses[0];
+    boss.hp = 1;
+    boss.windupTimer = 0.3f;
+    Shot bullet = {boss.x + 10, boss.y + 5, 0, 0, 0};
+    game.bullets.push_back(bullet);
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(!boss.alive);
+    run(game, NO_INPUT, 1);
+    CHECK(game.thrown.empty());
+}
+
+static void levelBackgroundsStayDarkerThanTheStars() {
+    const char feature[LEVEL_COUNT] = {0, 't', 'A', 'C', '3'};   // jungle edge trunks, ice walls, lava rivers, kelp
+    for (int level = 2; level <= LEVEL_COUNT; level++) {
+        Game game;
+        startGame(game, 1, 7, level);
+        uint32_t star = paletteColor('s');
+        uint32_t starLight = (299 * (star >> 16 & 255) + 587 * (star >> 8 & 255) + 114 * (star & 255)) / 1000;
+        for (float time : {0.0f, 13.7f}) {
+            game.sceneryTime = game.time = time;
+            drawBackground(game);
+            int count = 0;
+            for (int i = 0; i < SCREEN_W * SCREEN_H; i++) {
+                uint32_t c = screenPixels[i];
+                CHECK((299 * (c >> 16 & 255) + 587 * (c >> 8 & 255) + 114 * (c & 255)) / 1000 <= starLight);
+                count += c == paletteColor(feature[level - 1]);
+            }
+            CHECK(count >= 500);
+        }
+    }
+}
+
+// Three more levels (three-levels-plan.md)
+static void levelLadderGetsHarder() {
+    CHECK(difficultyWave(3, 1) == 9 && difficultyWave(4, 1) == 12 && difficultyWave(5, 1) == 15);
+    CHECK(heavyCount(3, 5) == 0 && heavyCount(3, 6) == 1 && heavyCount(3, 12) == 2 && heavyCount(3, 18) == 3);
+    CHECK(heavyCount(4, 4) == 0 && heavyCount(4, 6) == 1 && heavyCount(4, 11) == 2 && heavyCount(4, 19) == 3);
+    CHECK(heavyCount(5, 4) == 1 && heavyCount(5, 8) == 2 && heavyCount(5, 16) == 3 && heavyCount(5, 15) == 0);
+    CHECK(heavyCount(2, 16) == 2 && heavyCount(1, 19) == 0);
+    Game game;
+    startSafeGame(game, 5);
+    CHECK(game.level == 5 && game.aliens.size() == 40);
+    for (size_t i = 0; i < game.aliens.size(); i++) CHECK(game.aliens[i].type == (i < 16 ? ALIEN_RED : i < 32 ? ALIEN_BLUE : ALIEN_GREEN));
+    for (int step = 0; step < 600 && game.enemyShots.empty(); step++) updateGame(game, &NO_INPUT, DT);
+    CHECK(!game.enemyShots.empty() && game.enemyShots[0].vy == 95);   // wave 15's 80 px/s plus the deep sea's 15
+}
+
+static void heaviesFlyInAtThreePlaces() {
+    Game game;
+    startSafeGame(game, 5);
+    game.wave = 15;
+    for (Alien& alien : game.aliens) alien.alive = false;
+    run(game, NO_INPUT, 2.2f);
+    std::vector<float> slots;
+    for (const Alien& alien : game.aliens)
+        if (alien.type == ALIEN_HEAVY) slots.push_back(alien.slotX);
+    CHECK(game.wave == 16 && slots.size() == 3 && slots[0] == 60 && slots[1] == 244 && slots[2] == 152);
+}
+
+static void levelNamesFollowTheOrder() {
+    CHECK(strcmp(levelName(1), "LEVEL 1") == 0 && strcmp(levelName(3), "GLACIER") == 0 && strcmp(levelName(5), "DEEP SEA") == 0);
+    CHECK(strcmp(levelLabel(1), "WAVE") == 0 && strcmp(levelLabel(4), "VOLCANO") == 0);
+}
+
+static void eachLevelClearContinuesToTheNext() {
+    for (int level = 2; level <= 4; level++) {
+        Game game;
+        startBossGame(game, 20, level);
+        game.bosses[1].alive = false;
+        game.bosses[0].hp = 1;
+        Shot bullet = {game.bosses[0].x + 10, game.bosses[0].y + 5, 0, 0, 0};
+        game.bullets.push_back(bullet);
+        updateGame(game, &NO_INPUT, DT);
+        CHECK(game.levelClear);
+        game.peels.push_back({20, 120, 5});   // hazards don't follow the run into the next level
+        game.thrown.push_back({20, 40, 0, 0, THROWN_ICE_BLOCK, 0, 0});
+        run(game, NO_INPUT, 3.4f);
+        CHECK(!game.over && game.level == level + 1 && game.wave == 1 && game.peels.empty() && game.thrown.empty());
+    }
+}
+
+static void newBossesFollowTheTable() {
+    const BossType types[3][2] = {{BOSS_YETI, BOSS_GOLEM}, {BOSS_IMP, BOSS_FIRELORD}, {BOSS_ANGLER, BOSS_FISHERMAN}};
+    const int hp[3][2] = {{180, 340}, {200, 380}, {220, 420}};
+    for (int level = 3; level <= 5; level++)
+        for (int wave = 5; wave <= 20; wave += 5) {
+            int big = wave >= 15;
+            CHECK(bossType(level, wave) == types[level - 3][big] && bossHealth(level, wave) == hp[level - 3][big]);
+        }
+}
+
+static float thrownSpeed(const Thrown& t) {
+    return sqrtf(t.vx * t.vx + t.vy * t.vy);
+}
+
+static int countThrown(const Game& game, ThrownKind kind) {
+    return (int)std::count_if(game.thrown.begin(), game.thrown.end(), [kind](const Thrown& t) { return t.kind == kind; });
+}
+
+static void shipGlidesOnTheGlacier() {
+    Actions right = {};
+    right.moveX = 1;
+    Game game;
+    startSafeGame(game);
+    updateGame(game, &right, DT);
+    CHECK(game.players[0].vx == 150);   // level 1: instant
+    startSafeGame(game, 3);
+    updateGame(game, &right, DT);
+    CHECK(game.players[0].vx > 10 && game.players[0].vx < 15);   // 150 x 5 / 60
+    run(game, right, 1);
+    CHECK(game.players[0].vx > 140);
+    float x = game.players[0].x;
+    run(game, NO_INPUT, 0.2f);
+    CHECK(game.players[0].x > x + 10);   // still gliding after the stick is let go
+}
+
+static void iceBlockFreezesAndMashingBreaksOut() {
+    for (int mash = 0; mash < 2; mash++) {
+        Game game;
+        startSafeGame(game, 3);
+        Player& p = game.players[0];
+        game.thrown.push_back({p.x + 4, p.y + 3, 0, 0, THROWN_ICE_BLOCK, 0, 0});
+        Actions hold = {};
+        hold.fire = !mash;   // held from before the freeze: no fresh press
+        updateGame(game, &hold, DT);
+        CHECK(p.frozenTimer > 1.5f && p.alive && game.thrown.empty() && game.soundRequested[SOUND_FREEZE]);
+        game.bullets.clear();   // fired in the step before the block landed
+        Actions push = {};
+        push.moveX = 1;
+        float x = p.x;
+        int steps = 0;
+        while (p.frozenTimer > 0 && steps < 200) {
+            push.fire = mash ? steps % 2 == 0 : true;   // a fresh press every other step, or R1 held
+            updateGame(game, &push, DT);
+            steps++;
+        }
+        CHECK(p.x == x && game.bullets.empty());
+        if (mash) CHECK(steps < 40);   // 0.15 s off per press
+        else CHECK(steps >= 95 && steps <= 97);   // 1.6 s
+    }
+}
+
+static void yetiCyclesVolleyIceBlockAndSneeze() {
+    Game game;
+    startBossGame(game, 5, 3);
+    Boss& yeti = game.bosses[0];
+    yeti.attackTimer = 0.001f;
+    run(game, NO_INPUT, 0.4f);
+    CHECK(countThrown(game, THROWN_SNOWBALL) == 3);
+    for (const Thrown& t : game.thrown) CHECK(fabsf(thrownSpeed(t) - 90) < 0.5f && t.vy > 0);
+    game.thrown.clear();
+    yeti.attackTimer = 0.001f;
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(countThrown(game, THROWN_ICE_BLOCK) == 1 && fabsf(thrownSpeed(game.thrown[0]) - 80) < 0.5f && game.soundRequested[SOUND_CRACK]);
+    game.thrown.clear();
+    yeti.attackTimer = 0.001f;
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(yeti.windupTimer > 0 && strcmp(yeti.say, "AH...") == 0 && game.thrown.empty());
+    run(game, NO_INPUT, 0.5f);
+    CHECK(countThrown(game, THROWN_SNOWBALL) == 7 && strcmp(yeti.say, "ACHOO!") == 0 && yeti.sayTimer > 0);
+    CHECK(game.thrown[0].vx == -60 && game.thrown[3].vx == 0 && game.thrown[6].vx == 60 && game.thrown[3].vy == 80);
+}
+
+static void golemIciclesHangThenFall() {
+    Game game;
+    startBossGame(game, 15, 3);
+    bool rained = false, blocks = false;
+    for (int i = 0; i < 60; i++) {
+        game.bosses[0].attackTimer = 0.001f;
+        updateGame(game, &NO_INPUT, DT);
+        blocks |= countThrown(game, THROWN_ICE_BLOCK) == 2;
+        rained |= countThrown(game, THROWN_ICICLE) == 6;
+        game.thrown.clear();
+    }
+    CHECK(rained && blocks);
+    for (int i = 0; i < 60 && countThrown(game, THROWN_ICICLE) == 0; i++) {
+        game.thrown.clear();
+        game.bosses[0].attackTimer = 0.001f;
+        updateGame(game, &NO_INPUT, DT);
+    }
+    CHECK(countThrown(game, THROWN_ICICLE) == 6);
+    int lane = 0;
+    for (const Thrown& t : game.thrown) {
+        if (t.kind != THROWN_ICICLE) continue;
+        CHECK(t.y == 0 && t.delay > 0.7f && t.x >= lane * 52.66f && t.x < (lane + 1) * 52.67f);
+        lane++;
+    }
+    game.bosses[0].attackTimer = 100;
+    run(game, NO_INPUT, 0.7f);
+    for (const Thrown& t : game.thrown) if (t.kind == THROWN_ICICLE) CHECK(t.y == 0);
+    run(game, NO_INPUT, 0.3f);
+    for (const Thrown& t : game.thrown) if (t.kind == THROWN_ICICLE) CHECK(t.y > 0);
+}
+
+static void lavaDropScorchesForDoubleDamage() {
+    Game game;
+    startSafeGame(game, 4);
+    game.aliens.clear();
+    game.aliens.push_back(parkedAlien(100, 20));
+    game.aliens[0].type = ALIEN_RED;
+    game.aliens[0].hp = 4;
+    game.swayDirection = 0;
+    game.diveTimer = 1e9f;   // it stays parked
+    Player& p = game.players[0];
+    game.thrown.push_back({p.x + 5, p.y + 4, 0, 0, THROWN_LAVA_DROP, 0, 0});
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(p.scorchTimer > 2.9f && p.alive && game.thrown.empty() && game.soundRequested[SOUND_SIZZLE]);
+    Actions right = {};
+    right.moveX = 1;
+    float x = p.x;
+    run(game, right, 0.5f);
+    CHECK(fabsf(p.x - x - 45) < 1.5f);   // 0.6 x 150 px/s
+    Shot bullet = {104, 25, 0, 0, 0};
+    game.bullets.push_back(bullet);
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(game.aliens[0].hp == 2);
+    run(game, NO_INPUT, 2.6f);
+    CHECK(p.scorchTimer == 0);
+    game.bullets.push_back(bullet);
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(game.aliens[0].hp == 1);
+}
+
+static void impCyclesFireballsLavaAndFan() {
+    Game game;
+    startBossGame(game, 5, 4);
+    Boss& imp = game.bosses[0];
+    imp.attackTimer = 0.001f;
+    run(game, NO_INPUT, 0.4f);
+    CHECK(countThrown(game, THROWN_FIREBALL) == 3);
+    for (const Thrown& t : game.thrown) CHECK(fabsf(thrownSpeed(t) - 95) < 0.5f);
+    game.thrown.clear();
+    imp.attackTimer = 0.001f;
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(countThrown(game, THROWN_LAVA_DROP) == 3 && game.thrown[0].vx == -30 && game.thrown[2].vx == 30 && game.thrown[1].vy == 60);
+    game.thrown.clear();
+    imp.attackTimer = 0.001f;
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(countThrown(game, THROWN_FIREBALL) == 5 && game.thrown[0].vx == -60 && game.thrown[4].vx == 60);
+}
+
+static void eruptionKillsOnlyInItsColumn() {
+    for (int offset : {0, 30}) {
+        Game game;
+        startBossGame(game, 15, 4);
+        Player& p = game.players[0];
+        p.invincibleTimer = 0;
+        Boss& lord = game.bosses[0];
+        lord.ballX = p.x + 8 + offset;   // the ship's centre
+        lord.ballTimer = 0.5f;
+        run(game, NO_INPUT, 0.45f);
+        CHECK(p.alive && lord.beamTimer == 0);   // the warning doesn't hurt
+        run(game, NO_INPUT, 0.3f);
+        CHECK(p.alive == (offset != 0));
+    }
+}
+
+static void fireLordRollsAllFourAttacks() {
+    Game game;
+    startBossGame(game, 15, 4);
+    bool volley = false, rain = false, erupt = false;
+    for (int i = 0; i < 60; i++) {
+        game.thrown.clear();
+        game.bosses[0].ballTimer = game.bosses[0].beamTimer = 0;
+        game.bosses[0].attackTimer = 0.001f;
+        updateGame(game, &NO_INPUT, DT);
+        volley |= game.bosses[0].burstShotsLeft > 0;
+        rain |= countThrown(game, THROWN_LAVA_DROP) == 5;
+        erupt |= game.bosses[0].ballTimer > 0;
+    }
+    CHECK(volley && rain && erupt);
+}
+
+static void currentPushesShipsInTheDeepSea() {
+    for (int level : {1, 5}) {
+        Game game;
+        startSafeGame(game, level);
+        float x = game.players[0].x;
+        run(game, NO_INPUT, 3);
+        float drift = game.players[0].x - x;
+        if (level == 1) CHECK(drift == 0);
+        else CHECK(drift > 27 && drift < 35);   // 18 / 0.45 x (1 - cos 1.35)
+    }
+}
+
+static void anglerCyclesStreamBigBubbleAndFan() {
+    Game game;
+    startBossGame(game, 5, 5);
+    Boss& angler = game.bosses[0];
+    angler.attackTimer = 0.001f;
+    run(game, NO_INPUT, 0.6f);
+    CHECK(countThrown(game, THROWN_BUBBLE) == 5);
+    game.thrown.clear();
+    angler.attackTimer = 0.001f;
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(countThrown(game, THROWN_BIG_BUBBLE) == 1);
+    run(game, NO_INPUT, 1.5f);
+    CHECK(countThrown(game, THROWN_BIG_BUBBLE) == 0 && countThrown(game, THROWN_BUBBLE) == 8 && game.soundRequested[SOUND_BUBBLE]);
+    game.thrown.clear();
+    angler.attackTimer = 0.001f;
+    updateGame(game, &NO_INPUT, DT);
+    CHECK(countThrown(game, THROWN_BUBBLE) == 7 && game.thrown[0].vx == -70 && game.thrown[6].vx == 70);
+}
+
+// A fisherman whose hook drops at the ship; its other attacks held.
+static void castAtTheShip(Game& game) {
+    startBossGame(game, 15, 5);
+    Boss& boss = game.bosses[0];
+    boss.hookState = HOOK_DOWN;
+    boss.hookX = game.players[0].x + 8;   // the ship's centre
+    boss.hookY = boss.y + 1;
+}
+
+static void hookLiftsAndStunsTheShip() {
+    Game game;
+    castAtTheShip(game);
+    Player& p = game.players[0];
+    p.invincibleTimer = 0;
+    float y = p.y;
+    Boss& boss = game.bosses[0];
+    for (int step = 0; step < 78; step++) {   // the current drifts the ship: the hook follows it down
+        if (boss.hookState == HOOK_DOWN) boss.hookX = p.x + 8;
+        updateGame(game, &NO_INPUT, DT);
+    }
+    CHECK(p.alive && p.hookedTimer > 1.4f && boss.hookState == HOOK_HOLD && strcmp(boss.say, "GOT ONE!") == 0);
+    CHECK(game.soundRequested[SOUND_HOOKED]);
+    Actions push = {};
+    push.moveX = 1;
+    push.fire = true;
+    float x = p.x;
+    run(game, push, 0.6f);
+    CHECK(p.x == x && fabsf(p.y - (y - 24)) < 0.5f && game.bullets.empty());   // lifted 24 px, can't move or shoot
+    run(game, push, 1.1f);
+    CHECK(p.hookedTimer == 0 && boss.hookState == HOOK_REEL && p.x > x && !game.bullets.empty());
+}
+
+static void invincibleShipsSlipOffTheHook() {
+    Game game;
+    castAtTheShip(game);
+    run(game, NO_INPUT, 3.5f);
+    CHECK(game.players[0].hookedTimer == 0 && game.bosses[0].hookState == HOOK_NONE);
+}
+
+static void emptyCastsSometimesBringABoot() {
+    Game game;
+    startBossGame(game, 15, 5);
+    Boss& boss = game.bosses[0];
+    int boots = 0;
+    for (int cast = 0; cast < 40; cast++) {
+        game.thrown.clear();
+        boss.hookState = HOOK_DOWN;
+        boss.hookX = 4;   // far from the ship
+        boss.hookY = boss.y + 1;
+        boss.hookCaught = false;
+        boss.attackTimer = 100;
+        while (boss.hookState != HOOK_NONE) updateGame(game, &NO_INPUT, DT);
+        if (countThrown(game, THROWN_BOOT) == 1) {
+            boots++;
+            CHECK(strcmp(boss.say, "OLD BOOT") == 0 && game.thrown.size() == 1 && fabsf(thrownSpeed(game.thrown[0]) - 85) < 0.5f);
+        }
+    }
+    CHECK(boots >= 6 && boots <= 24);   // 35 % of 40
+}
+
 static void menuCursorHasAGlyph() {
     CHECK(fontGlyph('>') != 0);
 }
@@ -826,7 +1531,7 @@ int main() {
     highScoreSurvivesASave();
     highScoreIsClamped();
     menuCursorHasAGlyph();
-    onlyEnemyShotsUseMagenta();
+    onlyDeadlyShotsUseMagenta();
     deadzoneIsRadialAndRescaled();
     holdingFireShootsEvery012Seconds();
     shipStaysInsideMovementZone();
@@ -851,15 +1556,56 @@ int main() {
     upgradePickupRaisesLevelUpToFour();
     deathLosesOneWeaponLevel();
     everyFifthWaveIsABoss();
-    bossHealthGrowsEachAppearance();
+    bossWavesFollowTheTable();
     bulletsAndBlastsDamageTheBoss();
     killingTheBossScoresAndDropsBothPickups();
     bossBodyKillsTheShip();
     bossFiresBurstThenFan();
     bossWaitsForALivingShip();
+    twinBossesSwayInTheirOwnHalves();
+    twinBossesBothMustDie();
+    mageBallBeamsItsColumnAfterOneAndAHalfSeconds();
+    deadMageCastsNoBeam();
+    mageAttacksInRandomOrderAndGaps();
+    beamDrawsAMagentaColumn();
     levelBannerComesBeforeWaveOne();
     killingTheLevelBossClearsTheLevel();
     deathDuringTheClearOnlyLosesOnTheLastLife();
+    jungleDifficultyIsFiveWavesAhead();
+    heavyBeetlesComeEveryEightWaves();
+    heavyBeetleRoamsTheUpperScreen();
+    levelOneClearContinuesIntoTheJungle();
+    pickedLevelRunEndsOnItsClear();
+    jungleBossesFollowTheTable();
+    monkeyThrowsBananasStraightDownThenAPeel();
+    monkeyAlternatesWithABananaBunch();
+    peelSlidesTheShipThenStunsIt();
+    peelLiesFiveSeconds();
+    bananaKillsTheShip();
+    mistShotsHealTheGorilla();
+    poopSplatsIntoAMistThatFades();
+    gorillaPoundDropsFiveCoconuts();
+    gorillaNeverPoopsPastThreeMists();
+    deadGorillaDropsNoCoconuts();
+    levelBackgroundsStayDarkerThanTheStars();
+    levelLadderGetsHarder();
+    heaviesFlyInAtThreePlaces();
+    levelNamesFollowTheOrder();
+    eachLevelClearContinuesToTheNext();
+    newBossesFollowTheTable();
+    shipGlidesOnTheGlacier();
+    iceBlockFreezesAndMashingBreaksOut();
+    yetiCyclesVolleyIceBlockAndSneeze();
+    golemIciclesHangThenFall();
+    lavaDropScorchesForDoubleDamage();
+    impCyclesFireballsLavaAndFan();
+    eruptionKillsOnlyInItsColumn();
+    fireLordRollsAllFourAttacks();
+    currentPushesShipsInTheDeepSea();
+    anglerCyclesStreamBigBubbleAndFan();
+    hookLiftsAndStunsTheShip();
+    invincibleShipsSlipOffTheHook();
+    emptyCastsSometimesBringABoot();
     overlappingHitStopsTakeTheLongest();
     shootingAndKillsNeverShake();
     traumaDecaysToZero();

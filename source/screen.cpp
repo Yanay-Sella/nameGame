@@ -24,8 +24,11 @@ void drawSprite(const Sprite& sprite, int x, int y) {
         if (py < 0 || py >= SCREEN_H) continue;
         for (int col = 0; col < sprite.w; col++) {
             int px = x + col;
-            uint32_t color = paletteColor(sprite.pixels[row * sprite.w + col]);
-            if (color && px >= 0 && px < SCREEN_W) screenPixels[py * SCREEN_W + px] = color;
+            char c = sprite.pixels[row * sprite.w + col];
+            uint32_t color = paletteColor(c);
+            if (!color || px < 0 || px >= SCREEN_W) continue;
+            uint32_t& pixel = screenPixels[py * SCREEN_W + px];
+            pixel = c == '~' ? 0xFF000000 | (((pixel >> 1) & 0x7F7F7F) + ((pixel >> 2) & 0x3F3F3F) + ((color >> 2) & 0x3F3F3F)) : color;
         }
     }
 }

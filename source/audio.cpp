@@ -110,6 +110,24 @@ void audioOpen(const char* folder) {
                                            {0.16f, 0.08f, 784, 784, 0.25f, false}});
     sounds[SOUND_EXTRA_LIFE] = synthesize({{0, 0.07f, 523, 523, 0.3f, false}, {0.07f, 0.07f, 659, 659, 0.3f, false},
                                            {0.14f, 0.07f, 784, 784, 0.3f, false}, {0.21f, 0.07f, 1047, 1047, 0.3f, false}});
+    sounds[SOUND_BANANA_THROW] = synthesize({{0, 0.12f, 2000, 600, 0.2f, true}});
+    sounds[SOUND_SCREECH] = synthesize({{0, 0.08f, 1400, 1900, 0.2f, false}, {0.08f, 0.08f, 1900, 1300, 0.2f, false},
+                                        {0.18f, 0.08f, 1500, 2000, 0.2f, false}});
+    sounds[SOUND_SLIP] = synthesize({{0, 0.35f, 1400, 300, 0.3f, false}});
+    sounds[SOUND_STUN] = synthesize({{0, 0.12f, 200, 450, 0.3f, false}, {0.12f, 0.15f, 450, 180, 0.3f, false}});
+    sounds[SOUND_SPLAT] = synthesize({{0, 0.25f, 700, 90, 0.4f, true}});
+    sounds[SOUND_LAUGH] = synthesize({{0, 0.09f, 330, 260, 0.35f, false}, {0.13f, 0.09f, 300, 240, 0.35f, false},
+                                      {0.26f, 0.09f, 270, 210, 0.35f, false}});
+    sounds[SOUND_POUND] = synthesize({{0, 0.1f, 300, 80, 0.45f, true}, {0.2f, 0.1f, 300, 80, 0.45f, true},
+                                      {0.4f, 0.15f, 250, 60, 0.5f, true}});
+    sounds[SOUND_SNEEZE] = synthesize({{0, 0.25f, 4000, 900, 0.4f, true}, {0, 0.1f, 900, 400, 0.25f, false}});
+    sounds[SOUND_FREEZE] = synthesize({{0, 0.3f, 3500, 5000, 0.25f, true}, {0, 0.3f, 1800, 2600, 0.15f, false}});
+    sounds[SOUND_CRACK] = synthesize({{0, 0.06f, 5000, 3000, 0.3f, true}, {0.08f, 0.06f, 4500, 2500, 0.25f, true}});
+    sounds[SOUND_SIZZLE] = synthesize({{0, 0.4f, 6000, 3000, 0.25f, true}});
+    sounds[SOUND_BUBBLE] = synthesize({{0, 0.08f, 300, 900, 0.25f, false}, {0.09f, 0.06f, 500, 1100, 0.2f, false}});
+    sounds[SOUND_CAST] = synthesize({{0, 0.2f, 2500, 500, 0.2f, true}, {0, 0.2f, 1200, 400, 0.15f, false}});
+    sounds[SOUND_HOOKED] = synthesize({{0, 0.08f, 800, 800, 0.3f, false}, {0.1f, 0.08f, 1000, 1000, 0.3f, false},
+                                       {0.2f, 0.15f, 600, 1200, 0.3f, false}});
     debugNetPrintf(INFO, "audio: %d Hz, format 0x%x, %d channels, mizrahit %s, dubstep %s\n", freq, format, channels,
                    songs[MUSIC_MIZRAHIT] ? "loaded" : "missing", songs[MUSIC_DUBSTEP] ? "loaded" : "missing");
 }

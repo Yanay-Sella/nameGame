@@ -1,5 +1,6 @@
 // nameGame: startup, the scenes (menus, play, pause), the main loop (fixed 60 Hz game steps), and copying the picture to the TV.
 #include <SDL.h>
+#include <algorithm>
 #include <debugnet.h>
 #include <net/net.h>
 #include <sys/thread.h>
@@ -20,29 +21,43 @@ const float STEP = 1.0f / 60;   // s per game update
 const int MAX_STEPS_PER_FRAME = 4;
 const bool DEV_AIDS = !RELEASE;   // Triangle stress test, Select autopilot and L1 screenshot; off in make release
 
-enum Scene { SCENE_MAIN_MENU, SCENE_SETTINGS, SCENE_PLAYING, SCENE_PAUSED };
-const char* const SCENE_NAMES[] = {"main menu", "settings", "playing", "paused"};
-const char* const MAIN_ITEMS[] = {"CLASSIC", "SETTINGS"};          // game modes are added above SETTINGS
+enum Scene { SCENE_MAIN_MENU, SCENE_LEVEL_PICKER, SCENE_SETTINGS, SCENE_PLAYING, SCENE_PAUSED };
+const char* const SCENE_NAMES[] = {"main menu", "level picker", "settings", "playing", "paused"};
+const char* const MAIN_ITEMS[] = {"CLASSIC", "LEVEL PICKER", "SETTINGS"};   // classic plays every level in order
+const int PICKER_ITEM = 1, SETTINGS_ITEM = 2;
+const char* const PICKER_NAMES[LEVEL_COUNT] = {"SPACE", "JUNGLE", "GLACIER", "VOLCANO", "DEEP SEA"};
+const float PICKER_SPIN_TIME = 0.12f;   // s for the picker wheel to turn one row
+const char* const BOSS_NAMES[] = {"classic", "mage", "monkey", "gorilla", "yeti", "golem", "imp", "fire lord", "angler",
+                                  "fisherman"};   // log names, by BossType
 const char* const PAUSE_ITEMS[] = {"RESUME", "SETTINGS", "RETURN TO MENU"};
 const char* const MUSIC_NAMES[] = {"off", "mizrahit", "dubstep"};                          // log names, indexed by Music
 const char* const MUSIC_LABELS[] = {"MUSIC: OFF", "MUSIC: MIZRAHIT", "MUSIC: DUBSTEP"};   // settings item, indexed by Music
 
 // Progress markers the main loop updates, read by the watchdog thread.
 static volatile unsigned frame = 0;
+static volatile unsigned visibleFrames = 0;   // frames presented with at least one non-black pixel
 static const char* volatile stage = "startup";
+const int STALL_EXIT_SECONDS = 5;
+const int BLACK_SCREEN_EXIT_SECONDS = 20;
 
-// Dev aid: if the main loop stops advancing for 5 s, log where it is stuck and quit back to the XMB.
-static void watchdog(void* arg) {
-    unsigned lastFrame = frame;
-    int stalledSeconds = 0;
+// Quits back to the XMB when the main loop stops for 5 s or nothing but black is presented for 20 s.
+static void watchdog(void*) {
+    unsigned lastFrame = frame, lastVisible = visibleFrames;
+    int stalledSeconds = 0, blackSeconds = 0;
     while (true) {
         sysUsleep(1000000);
         stalledSeconds = (frame == lastFrame) ? stalledSeconds + 1 : 0;
+        blackSeconds = (visibleFrames == lastVisible) ? blackSeconds + 1 : 0;
         lastFrame = frame;
-        if (stalledSeconds == 5) {
+        lastVisible = visibleFrames;
+        if (stalledSeconds == STALL_EXIT_SECONDS || blackSeconds == BLACK_SCREEN_EXIT_SECONDS) {
             gcmControlRegister* rsx = gcmGetControlRegister();
-            debugNetPrintf(ERROR, "watchdog: stuck in '%s' at frame %u; RSX put=0x%x get=0x%x flipStatus=%u\n",
-                           stage, frame, rsx->put, rsx->get, gcmGetFlipStatus());
+            if (stalledSeconds == STALL_EXIT_SECONDS)
+                debugNetPrintf(ERROR, "watchdog: stuck in '%s' at frame %u; RSX put=0x%x get=0x%x flipStatus=%u\n",
+                               stage, frame, rsx->put, rsx->get, gcmGetFlipStatus());
+            else
+                debugNetPrintf(ERROR, "watchdog: screen black for %d s in '%s' at frame %u; RSX put=0x%x get=0x%x flipStatus=%u\n",
+                               BLACK_SCREEN_EXIT_SECONDS, stage, frame, rsx->put, rsx->get, gcmGetFlipStatus());
             debugNetPrintf(ERROR, "watchdog: exiting\n");
             sysProcessExit(1);
         }
@@ -117,6 +132,9 @@ int main(int argc, char** argv) {
     startGame(game, 1, (uint32_t)SDL_GetPerformanceCounter());   // gives the menu its stars; a second player joins with Start (co-op)
     Scene scene = SCENE_MAIN_MENU, settingsBack = SCENE_MAIN_MENU;
     int selected = 0;
+    int runLevel = 1;   // the level the menu started; play again restarts there
+    bool runSingleLevel = false;   // a level picker run: play again replays just that level
+    float pickerSpin = 0;   // rows the picker wheel still has to turn: + after Down, - after Up
     bool autopilot = false;
     float bossStart = 0;   // game time the current boss appeared
     bool running = true;
@@ -154,7 +172,7 @@ int main(int argc, char** argv) {
         int lostController = -1;
         for (int p = (int)game.players.size() - 1; p >= 0; p--)
             if (!actions[p].connected) lostController = p;
-        int itemCount = scene == SCENE_SETTINGS ? 4 : scene == SCENE_PAUSED ? 3 : 2;
+        int itemCount = scene == SCENE_SETTINGS ? 4 : scene == SCENE_LEVEL_PICKER ? LEVEL_COUNT : 3;
         if (scene != SCENE_PLAYING) {
             if (menu.up) selected = (selected + itemCount - 1) % itemCount;
             if (menu.down) selected = (selected + 1) % itemCount;
@@ -163,18 +181,43 @@ int main(int argc, char** argv) {
         switch (scene) {
         case SCENE_MAIN_MENU:
             if (menu.confirm && selected == 0) {
+                runLevel = 1;
+                runSingleLevel = false;
                 startGame(game, 1, (uint32_t)SDL_GetPerformanceCounter());
                 audioStartMusic(settings.music);
+                debugNetPrintf(INFO, "classic run starts\n");
                 setScene(SCENE_PLAYING);
-            } else if (menu.confirm && selected == 1) {
+            } else if (menu.confirm && selected == PICKER_ITEM) {
+                selected = runSingleLevel ? runLevel - 1 : 0;   // back on the last picked level
+                pickerSpin = 0;
+                setScene(SCENE_LEVEL_PICKER);
+            } else if (menu.confirm && selected == SETTINGS_ITEM) {
                 settingsBack = SCENE_MAIN_MENU;
                 selected = 0;
                 setScene(SCENE_SETTINGS);
             }
             break;
+        case SCENE_LEVEL_PICKER:
+            // The wheel shows the picked level in the middle; it starts a run of just that level.
+            if (menu.down) pickerSpin = SDL_min(pickerSpin + 1, 2.0f);
+            if (menu.up) pickerSpin = SDL_max(pickerSpin - 1, -2.0f);
+            game.level = selected + 1;   // the background previews the picked level
+            if (menu.confirm) {
+                runLevel = selected + 1;
+                runSingleLevel = true;
+                startGame(game, 1, (uint32_t)SDL_GetPerformanceCounter(), runLevel, true);
+                audioStartMusic(settings.music);
+                debugNetPrintf(INFO, "picked level %d starts\n", runLevel);
+                setScene(SCENE_PLAYING);
+            } else if (menu.back) {
+                game.level = 1;
+                selected = PICKER_ITEM;
+                setScene(SCENE_MAIN_MENU);
+            }
+            break;
         case SCENE_SETTINGS:
             if (menu.back || (menu.confirm && selected == 3)) {
-                selected = 1;   // the SETTINGS item in both menus
+                selected = settingsBack == SCENE_MAIN_MENU ? SETTINGS_ITEM : 1;   // the SETTINGS item
                 setScene(settingsBack);
             } else if (selected < 3 && (menu.confirm || menu.left || menu.right)) {
                 if (selected == 0) {
@@ -231,7 +274,7 @@ int main(int argc, char** argv) {
                 // Game over: after the input lock, X or Start begins a new run and Circle goes to the main menu.
                 if (game.over && game.time - game.overTime > GAME_OVER_INPUT_LOCK) {
                     if (actions[p].confirm) {
-                        startGame(game, (int)game.players.size(), (uint32_t)SDL_GetPerformanceCounter());   // co-op runs stay co-op
+                        startGame(game, (int)game.players.size(), (uint32_t)SDL_GetPerformanceCounter(), runLevel, runSingleLevel);   // co-op runs stay co-op
                         Uint64 musicStart = SDL_GetPerformanceCounter();
                         audioStartMusic(settings.music);
                         debugNetPrintf(INFO, "new run (music restart took %.0f ms)\n", (SDL_GetPerformanceCounter() - musicStart) * 1000.0 / counterHz);
@@ -256,35 +299,81 @@ int main(int argc, char** argv) {
         }
 
         bool wasOver = game.over;
-        bool bossWasAlive = game.boss.alive;
+        int bossesBefore = 0;
+        bool beamBefore[2] = {};
+        for (size_t i = 0; i < game.bosses.size(); i++) {
+            bossesBefore += game.bosses[i].alive;
+            if (i < 2) beamBefore[i] = game.bosses[i].beamTimer > 0;
+        }
         bool clearBefore = game.levelClear;
         int waveBefore = game.wave;
+        int levelBefore = game.level;
+        size_t mistsBefore = game.mists.size();
+        bool laughBefore[2] = {};
+        for (size_t i = 0; i < game.bosses.size() && i < 2; i++) laughBefore[i] = game.bosses[i].laughTimer > 0;
         int livesBefore[MAX_PLAYERS] = {};
-        for (size_t p = 0; p < game.players.size(); p++) livesBefore[p] = game.players[p].lives;
+        bool slidingBefore[MAX_PLAYERS] = {}, frozenBefore[MAX_PLAYERS] = {}, scorchedBefore[MAX_PLAYERS] = {}, hookedBefore[MAX_PLAYERS] = {};
+        for (size_t p = 0; p < game.players.size(); p++) {
+            livesBefore[p] = game.players[p].lives;
+            slidingBefore[p] = game.players[p].slideTimer > 0;
+            frozenBefore[p] = game.players[p].frozenTimer > 0;
+            scorchedBefore[p] = game.players[p].scorchTimer > 0;
+            hookedBefore[p] = game.players[p].hookedTimer > 0;
+        }
+        bool bootBefore = std::any_of(game.thrown.begin(), game.thrown.end(), [](const Thrown& t) { return t.kind == THROWN_BOOT; });
 
         stage = "update";
         int steps = 0;
         while (accumulator >= STEP && steps < MAX_STEPS_PER_FRAME) {
             if (scene == SCENE_PLAYING) updateGame(game, actions, STEP);
-            else if (scene == SCENE_MAIN_MENU || (scene == SCENE_SETTINGS && settingsBack == SCENE_MAIN_MENU)) updateBackground(game, STEP);
+            else if (scene == SCENE_MAIN_MENU || scene == SCENE_LEVEL_PICKER || (scene == SCENE_SETTINGS && settingsBack == SCENE_MAIN_MENU))
+                updateBackground(game, STEP);
+            if (pickerSpin > 0) pickerSpin = SDL_max(0.0f, pickerSpin - STEP / PICKER_SPIN_TIME);
+            if (pickerSpin < 0) pickerSpin = SDL_min(0.0f, pickerSpin + STEP / PICKER_SPIN_TIME);
             for (Actions& a : actions) a.rocket = false;   // a press counts once, in the first step
             accumulator -= STEP;
             steps++;
         }
         if (steps == MAX_STEPS_PER_FRAME) accumulator = 0;   // fell far behind: drop the backlog rather than spiral
-        if (game.wave != waveBefore)
+        if (game.level != levelBefore) debugNetPrintf(INFO, "level %d starts at %.1f s\n", game.level, game.time);
+        if (game.wave != waveBefore) {
             for (size_t p = 0; p < game.players.size(); p++)
-                debugNetPrintf(INFO, "wave %d start at %.0f s: player %d lives %d, rockets %d, weapon %d, score %d\n", game.wave, game.time,
-                               (int)p + 1, game.players[p].lives, game.players[p].rockets, game.players[p].weaponLevel, game.players[p].score);
+                debugNetPrintf(INFO, "level %d wave %d start at %.0f s: player %d lives %d, rockets %d, weapon %d, score %d\n", game.level,
+                               game.wave, game.time, (int)p + 1, game.players[p].lives, game.players[p].rockets, game.players[p].weaponLevel,
+                               game.players[p].score);
+            if (heavyCount(game.level, game.wave) > 0)
+                debugNetPrintf(INFO, "wave %d: %d heavies\n", game.wave, heavyCount(game.level, game.wave));
+        }
+        for (size_t p = 0; p < game.players.size(); p++)
+            if (game.players[p].slideTimer > 0 && !slidingBefore[p]) debugNetPrintf(INFO, "player %d slipped on a peel\n", (int)p + 1);
+        for (size_t p = 0; p < game.players.size(); p++) {
+            const Player& player = game.players[p];
+            if (player.frozenTimer > 0 && !frozenBefore[p]) debugNetPrintf(INFO, "player %d frozen\n", (int)p + 1);
+            if (player.scorchTimer > 0 && !scorchedBefore[p]) debugNetPrintf(INFO, "player %d scorched\n", (int)p + 1);
+            if (player.hookedTimer > 0 && !hookedBefore[p]) debugNetPrintf(INFO, "player %d hooked\n", (int)p + 1);
+        }
+        if (!bootBefore && std::any_of(game.thrown.begin(), game.thrown.end(), [](const Thrown& t) { return t.kind == THROWN_BOOT; }))
+            debugNetPrintf(INFO, "boot thrown\n");
+        if (game.mists.size() > mistsBefore)
+            debugNetPrintf(INFO, "stink mist at %.0f,%.0f\n", game.mists.back().x, game.mists.back().y);
+        for (size_t i = 0; i < game.bosses.size() && i < 2; i++)
+            if (game.bosses[i].laughTimer > 0 && !laughBefore[i]) debugNetPrintf(INFO, "gorilla healed to %d hp\n", game.bosses[i].hp);
         for (size_t p = 0; p < game.players.size(); p++)
             if (game.players[p].lives < livesBefore[p])
                 debugNetPrintf(INFO, "player %d died at wave %d (%d lives left)\n", (int)p + 1, game.wave, game.players[p].lives);
-        if (game.boss.alive && !bossWasAlive) {
+        int bossesAlive = 0;
+        for (const Boss& boss : game.bosses) bossesAlive += boss.alive;
+        if (bossesAlive > 0 && bossesBefore == 0) {
             bossStart = game.time;
-            debugNetPrintf(INFO, "boss wave %d, hp %d\n", game.wave, game.boss.hp);
+            debugNetPrintf(INFO, "boss wave %d: %d %s, hp %d\n", game.wave, bossesAlive,
+                           BOSS_NAMES[game.bosses[0].type], game.bosses[0].hp);
         }
-        if (!game.boss.alive && bossWasAlive) debugNetPrintf(INFO, "boss down at wave %d after %.0f s\n", game.wave, game.time - bossStart);
-        if (game.levelClear && !clearBefore) debugNetPrintf(INFO, "level 1 clear at %.1f s\n", game.time);
+        if (bossesAlive < bossesBefore)
+            debugNetPrintf(INFO, "boss down at wave %d after %.0f s, %d left\n", game.wave, game.time - bossStart, bossesAlive);
+        for (size_t i = 0; i < game.bosses.size() && i < 2; i++)
+            if (game.bosses[i].beamTimer > 0 && !beamBefore[i])
+                debugNetPrintf(INFO, "%s at x %.0f\n", game.bosses[i].type == BOSS_FIRELORD ? "eruption" : "mage beam", game.bosses[i].ballX);
+        if (game.levelClear && !clearBefore) debugNetPrintf(INFO, "level %d clear at %.1f s\n", game.level, game.time);
         if (game.over && !wasOver) {
             audioStopMusic();
             int best = 0;
@@ -312,11 +401,30 @@ int main(int argc, char** argv) {
         stage = "draw";
         if (scene == SCENE_MAIN_MENU) {
             drawBackground(game);
-            drawMenu("NAME GAME", MAIN_ITEMS, 2, selected, "X SELECT");
+            drawMenu("NAME GAME", MAIN_ITEMS, SETTINGS_ITEM + 1, selected, "X SELECT");
             char best[24];
             snprintf(best, sizeof best, "HI %07d", highScore);
-            drawText((SCREEN_W - textWidth(best)) / 2, 124, best, paletteColor('y'));
+            drawText((SCREEN_W - textWidth(best)) / 2, 150, best, paletteColor('y'));
             drawText(SCREEN_W - 2 - textWidth("V" GAME_VERSION), SCREEN_H - 7, "V" GAME_VERSION, paletteColor('s'));
+        } else if (scene == SCENE_LEVEL_PICKER) {
+            // A wheel: the picked level big in the middle, two levels above and below it smaller, wrapping around.
+            drawBackground(game);
+            const int panelW = 150, panelH = 120, panelX = (SCREEN_W - panelW) / 2, panelY = (SCREEN_H - panelH) / 2;
+            const int rowH = 14, middleY = panelY + 58;   // middleY: centre of the picked row
+            fillRect(panelX, panelY, panelW, panelH, paletteColor('n'));
+            fillRect(panelX + 1, panelY + 1, panelW - 2, panelH - 2, paletteColor('k'));
+            drawText((SCREEN_W - textWidth("LEVEL", 2)) / 2, panelY + 8, "LEVEL", 0xFFFFFFFF, 2);
+            for (int offset = -3; offset <= 3; offset++) {
+                float row = offset + pickerSpin;   // rows from the middle, while the wheel turns
+                if (row <= -2.5f || row > 2.5f) continue;   // 5 rows, so a level never shows twice
+                const char* name = PICKER_NAMES[(selected + offset + 2 * LEVEL_COUNT) % LEVEL_COUNT];
+                float distance = row < 0 ? -row : row;
+                int scale = distance < 0.5f ? 2 : 1;
+                uint32_t color = distance < 0.5f ? paletteColor('y') : distance < 1.5f ? 0xFFFFFFFF : paletteColor('s');
+                int y = middleY + (int)(row * rowH) - 5 * scale / 2;
+                drawText((SCREEN_W - textWidth(name, scale)) / 2, y, name, color, scale);
+            }
+            drawText((SCREEN_W - textWidth("X PLAY  O BACK")) / 2, panelY + panelH - 9, "X PLAY  O BACK", paletteColor('s'));
         } else if (scene == SCENE_SETTINGS) {
             if (settingsBack == SCENE_PAUSED) drawGame(game);
             else drawBackground(game);
@@ -341,6 +449,8 @@ int main(int argc, char** argv) {
         }
 
         stage = "present";
+        bool visible = false;   // an all-black picture counts towards the watchdog's black-screen exit
+        for (int i = 0; i < SCREEN_W * SCREEN_H && !visible; i++) visible = (screenPixels[i] & 0xFFFFFF) != 0;
         SDL_UpdateTexture(picture, NULL, screenPixels, SCREEN_W * sizeof(uint32_t));
         if (frame < 2) {   // borders are never drawn over, so clearing both screen buffers once is enough
             SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
@@ -349,6 +459,7 @@ int main(int argc, char** argv) {
         SDL_RenderCopy(renderer, picture, NULL, &pictureRect);
         float workMs = (float)((SDL_GetPerformanceCounter() - frameStart) * 1000.0 / counterHz);
         SDL_RenderPresent(renderer);
+        if (visible) visibleFrames++;
 
         // Every 5 s: frames per second and the worst work time (the 60 fps budget is 16.7 ms).
         framesSinceStats++;

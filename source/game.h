@@ -21,7 +21,9 @@ struct Actions {
 // Sounds the game asks for during a step; main.cpp plays each requested one once.
 enum Sound {
     SOUND_SHOOT, SOUND_ALIEN_HIT, SOUND_ALIEN_DEATH, SOUND_ROCKET_LAUNCH, SOUND_EXPLOSION, SOUND_PICKUP,
-    SOUND_PLAYER_DEATH, SOUND_ROCKET_EMPTY, SOUND_WAVE_START, SOUND_EXTRA_LIFE, SOUND_COUNT
+    SOUND_PLAYER_DEATH, SOUND_ROCKET_EMPTY, SOUND_WAVE_START, SOUND_EXTRA_LIFE,
+    SOUND_BANANA_THROW, SOUND_SCREECH, SOUND_SLIP, SOUND_STUN, SOUND_SPLAT, SOUND_LAUGH, SOUND_POUND,
+    SOUND_SNEEZE, SOUND_FREEZE, SOUND_CRACK, SOUND_SIZZLE, SOUND_BUBBLE, SOUND_CAST, SOUND_HOOKED, SOUND_COUNT
 };
 
 // One ship and its owner's run state; players are an array so co-op only adds entries (GDD D-007).
@@ -36,12 +38,22 @@ struct Player {
     int lives, rockets, score;
     int weaponLevel;         // 1..4: single, double, spread, fast spread
     int nextExtraLife;       // score that gives the next extra life
+    float slideTimer;        // s left of a banana-peel slide (jungle)
+    float slideVX, slideVY;  // slide direction, a unit vector
+    float stunTimer;         // s the ship can't move, shoot or fire rockets after a slide
+    bool inMist;             // the ship's centre is in a stink mist: this player's bullets heal gorillas
+    float vx, vy;            // current speed, px/s: on the glacier it eases toward the stick's
+    float frozenTimer;       // s left frozen in an ice block: no moving, shooting or rockets
+    bool fireWasHeld;        // R1 was held last step: a fresh press chips at the ice
+    float scorchTimer;       // s left scorched by a lava drop: slower, bullets do double damage
+    float hookedTimer;       // s left dangling on the fisherman's hook: no moving, shooting or rockets
+    float hookLiftTo;        // y the hook lifts the ship to
 };
 
 struct Shot { float x, y, vy; int owner; float vx; };   // owner: player index for bullets, -1 for enemy shots
 
-enum AlienType { ALIEN_GREEN, ALIEN_BLUE, ALIEN_RED };
-enum AlienState { ALIEN_ENTERING, ALIEN_IN_FORMATION, ALIEN_DIVING, ALIEN_RETURNING };
+enum AlienType { ALIEN_GREEN, ALIEN_BLUE, ALIEN_RED, ALIEN_HEAVY };   // roles; each level draws them its own way
+enum AlienState { ALIEN_ENTERING, ALIEN_IN_FORMATION, ALIEN_DIVING, ALIEN_RETURNING, ALIEN_ROAMING };
 
 struct Alien {
     AlienType type;
@@ -49,21 +61,39 @@ struct Alien {
     float slotX, slotY;   // place in the formation, before the sway
     float x, y;           // where it is drawn and hit
     float vx;             // sideways speed while diving
+    float vy;             // roaming heavy: vertical speed
     float entryDelay;     // s before it starts flying in
     int hp;
     float flash;          // s of white hit flash left
     bool alive;
 };
 
+enum BossType { BOSS_CLASSIC, BOSS_MAGE, BOSS_MONKEY, BOSS_GORILLA, BOSS_YETI, BOSS_GOLEM, BOSS_IMP, BOSS_FIRELORD,
+                BOSS_ANGLER, BOSS_FISHERMAN };
+enum HookState { HOOK_NONE, HOOK_DOWN, HOOK_WAIT, HOOK_HOLD, HOOK_REEL };
 // The wave's boss; separate from Alien because the 12x10 alien size is used in every collision.
 struct Boss {
+    BossType type;
     float x, y, vx;          // top-left of the sprite; vx is the signed sway speed
+    float minX, maxX;        // sway range: the full width alone, its own half as a twin
     float attackTimer;       // s until the next attack
     float burstTimer;        // s until the next shot of a burst
     int hp, maxHp;
     int burstShotsLeft;
-    int nextAttack;          // 0: aimed burst, 1: fan
+    int nextAttack;          // small bosses: the next attack of their fixed cycle
     float flash;             // s of white hit flash left
+    float ballX, ballY;      // mage: centre of the power ball; fire lord: x of the eruption
+    float ballTimer;         // s until the ball fires its beam (or the eruption bursts); 0 when none
+    float beamTimer;         // s of beam (or eruption) left; 0 when none
+    float laughTimer;        // gorilla: s of laughing left after a heal
+    float windupTimer;       // s left of a gorilla's chest pound or a yeti's sneeze; the attack comes at 0
+    float sayTimer;          // s the speech under the boss stays up
+    const char* say;         // ACHOO!, GOT ONE!, OLD BOOT
+    HookState hookState;     // fisherman: its hook
+    float hookX, hookY;      // top centre of the hook
+    float hookTimer;         // s the hook waits at the bottom
+    int hookPlayer;          // the ship on the hook while HOOK_HOLD
+    bool hookCaught;         // this cast caught a ship (no boot on the way back)
     bool alive;
 };
 
@@ -71,6 +101,13 @@ struct Rocket { float x, y, speed; int owner; };
 struct Explosion { float x, y, age, radius; };
 enum PickupType { PICKUP_ROCKET, PICKUP_UPGRADE };
 struct Pickup { float x, y; PickupType type; };
+enum ThrownKind { THROWN_BANANA, THROWN_COCONUT, THROWN_SNOWBALL, THROWN_ICE_BLOCK, THROWN_ICICLE, THROWN_FIREBALL,
+                  THROWN_LAVA_DROP, THROWN_BUBBLE, THROWN_BIG_BUBBLE, THROWN_BOOT };
+// A thrown hazard, top-left of its sprite; all kill except the ice block (freezes) and the lava drop (scorches).
+struct Thrown { float x, y, vx, vy; ThrownKind kind; float delay, age; };   // delay: s it hangs first; age: s moving
+struct Lob { float fromX, fromY, toX, toY, age; bool poop; };    // a harmless peel or poop in flight; waits while age < 0
+struct Peel { float x, y, life; };                               // a peel lying in the ship zone; top-left of its 8x6 sprite
+struct Mist { float x, y, age; };                                // a stink mist centred at x, y
 struct Particle { float x, y, vx, vy, life; uint32_t color; };
 struct Star { float x, y; int layer; };
 
@@ -78,15 +115,22 @@ struct Game {
     std::vector<Player> players;
     std::vector<Shot> bullets, enemyShots;
     std::vector<Alien> aliens;
-    Boss boss;
+    std::vector<Boss> bosses;   // this wave's bosses; empty on formation waves
+    std::vector<Thrown> thrown;   // deadly bananas and coconuts
+    std::vector<Lob> lobs;        // peels and poops in flight
+    std::vector<Peel> peels;      // peels lying in the ship zone
+    std::vector<Mist> mists;      // stink mists
     std::vector<Rocket> rockets;
     std::vector<Explosion> explosions;
     std::vector<Pickup> pickups;
     std::vector<Particle> particles;
     std::vector<Star> stars;
     int wave;
+    int level;   // 1 space, 2 jungle, 3 glacier, 4 volcano, 5 deep sea
+    bool singleLevel;      // a level picker run: it ends on this level's clear instead of going on to the next
     float time;            // game time, s
     float swayOffset, swayDirection;
+    float sceneryTime;     // s the level background has scrolled
     float diveTimer;       // s until the next alien dives (from wave 3)
     float bannerTimer;     // s the "WAVE n" banner stays up
     float nextWaveTimer;   // s until the next wave once this one is cleared; 0 while a wave is on
@@ -94,9 +138,9 @@ struct Game {
     int highScore;         // draw-only: the saved best, copied in by main.cpp
     bool newHighScore;     // draw-only: this run beat it, set by main.cpp at game over
     float overTime;        // game time when the run ended
-    bool levelClear;       // the level boss is dead: the "LEVEL 1 CLEAR" banner runs, then the run ends
-    float clearTimer;      // s left of the "LEVEL 1 CLEAR" banner
-    bool won;              // the run ended on the level clear, not on the last life
+    bool levelClear;       // the level boss is dead: the "<LEVEL> CLEAR" banner runs, then the next level or the end
+    float clearTimer;      // s left of the level clear banner
+    bool won;              // the run ended on its last level's clear (deep sea, or the picked level), not on the last life
     bool soundRequested[SOUND_COUNT];
     uint32_t random;       // xorshift state
     float trauma;          // 0..1 screen shake, decays in real time
@@ -111,8 +155,9 @@ struct Game {
 const float GAME_OVER_INPUT_LOCK = 1.5f;   // s before X or Start can start a new run
 const int MAX_SCORE = 9999999;             // the score display and the saved high score stop here
 const int MAX_PLAYERS = 2;                 // player 2 drops in from a second controller (co-op)
+const int LEVEL_COUNT = 5;                 // level 1, jungle, glacier, volcano, deep sea; a classic run goes through them in order
 
-void startGame(Game& game, int playerCount, uint32_t seed);
+void startGame(Game& game, int playerCount, uint32_t seed, int level = 1, bool singleLevel = false);   // classic from level 1, or one picked level
 void joinGame(Game& game);   // adds the next player to a running game, arriving like a respawn
 void updateGame(Game& game, const Actions* actions, float dt);   // actions: one per player
 void drawGame(const Game& game);
@@ -124,4 +169,10 @@ float shotChance(int wave);         // enemy shots per alien per second
 float enemyShotSpeed(int wave);     // px/s; rises after wave 10
 float diveInterval(int wave);       // s between dives; dives start at wave 3
 bool isBossWave(int wave);          // every 5th wave is a boss alone
-int bossHealth(int wave);           // 100 + 50 per earlier appearance
+int bossHealth(int level, int wave);       // HP of each boss, from the level's table
+int bossCount(int wave);            // 2 on waves 10 and 20, else 1
+BossType bossType(int level, int wave);    // the level's small boss on waves 5 and 10, its big boss from wave 15
+int difficultyWave(int level, int wave);   // the level-1 wave whose formation numbers a wave uses (jungle n plays as n + 5)
+int heavyCount(int level, int wave);       // roaming heavies on a formation wave: wave / the level's step, at most 3
+const char* levelName(int level);          // banner and clear name: LEVEL 1, JUNGLE, GLACIER, VOLCANO, DEEP SEA
+const char* levelLabel(int level);         // HUD and end-screen label before the wave: WAVE, JUNGLE, GLACIER ...

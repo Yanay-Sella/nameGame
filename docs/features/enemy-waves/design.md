@@ -36,7 +36,11 @@ Aliens fly in, line up in a formation at the top of the screen, sway side to sid
 - A rocket kills the last alien: the wave clears normally.
 - Past wave 15 only the sway keeps rising; everything else is capped.
 
+Jungle waves use the same formulas at wave n + 5 and add roaming heavy beetles: see [Jungle](../jungle/design.md). The glacier, volcano and deep sea play 8, 11 and 14 waves ahead, add heavies every 6, 5 and 4 waves (at most 3) and speed the formation's shots up by 5, 10 and 15 px/s (D-025).
+
 ## History
 - 2026-11-17: designed; alien size set to 12 × 10 with the pixel art.
 - 2026-11-17: implemented in M2.
 - 2026-11-17: difficulty extended to wave 20 (D-013).
+- 2026-11-18: jungle level (D-021): jungle waves use the difficulty wave (n + 5) and add roaming heavy beetles.
+- 2026-11-18: levels 3-5 (D-025): the difficulty ladder.

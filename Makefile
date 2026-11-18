@@ -12,7 +12,7 @@ APP_FOLDER := /dev_hdd0/game/NMGM00001/USRDIR
 # A shot is a 54-byte BMP header + 320*180*3 pixel bytes (no trailing comment: make would keep the spaces in the value).
 SHOT_SIZE  := 172854
 
-.PHONY: ps3 image deploy release log clean music test launch quit pad shot
+.PHONY: ps3 image deploy install release log clean music test launch quit pad shot
 
 # Compile and package build/nameGame.pkg inside the container (always a full rebuild so LOG_HOST/LOG_PORT changes apply).
 # SOURCES=prototypes/<idea> builds a prototype instead of the game.
@@ -26,7 +26,11 @@ image:
 
 # Upload the pkg over FTP and install it with webMAN; refuses while an app/game runs (installing then can freeze the PS3),
 # and when webMAN doesn't answer, since then it can't check.
-deploy: ps3
+deploy: ps3 install
+
+# Upload and install the already built pkg (no rebuild): run it under scripts/ps3-lock.sh so only one session uses the PS3.
+install:
+	@test -f $(PKG) || { echo "$(PKG) is missing; run make ps3 first."; exit 1; }
 	@status=$$(curl -sS --fail -m 10 http://$(PS3_IP)/home.ps3mapi) \
 		|| { echo "webMAN didn't answer, so it can't check for a running game; try again."; exit 1; }; \
 	echo "$$status" | grep -io '[0-9A-F]\{8\}_[^<" ]*\.\(self\|bin\|elf\)' | grep -qv main_vsh \
@@ -61,12 +65,20 @@ launch:
 		|| { echo "webMAN didn't answer; try again."; exit 1; }; \
 	echo "$$status" | grep -io '[0-9A-F]\{8\}_[^<" ]*\.\(self\|bin\|elf\)' | grep -qv main_vsh \
 		&& { echo "An app or game is already running on the PS3; make quit first."; exit 1; } || true
-	curl -sS --fail -m 20 -o /dev/null "http://$(PS3_IP)/play.ps3?NMGM00001"
+	@# /play.ps3?<id> replays the last app (HEN), so open the newest Game-column item through the XMB: webMAN Games, down, cross.
+	curl -sS --fail -m 20 -o /dev/null 'http://$(PS3_IP)/xmb.ps3$$focus_category%20game'; sleep 2
+	curl -sS --fail -m 20 -o /dev/null 'http://$(PS3_IP)/xmb.ps3$$focus_index%2010'; sleep 2
+	curl -sS --fail -m 30 -o /dev/null 'http://$(PS3_IP)/pad.ps3?down|1|cross'
 	@echo "Launching NAME game (takes 10-15 s); watch make log for 'nameGame started'."
 
-# Quit the running game to the XMB.
+# Quit the running game to the XMB, then wait until the game is gone and the XMB has redrawn its icons (~10 s),
+# because make launch's XMB navigation lands on the wrong item while the XMB is still reloading.
 quit:
 	curl -sS --fail -m 10 -o /dev/null 'http://$(PS3_IP)/xmb.ps3$$exit'
+	@for i in $$(seq 30); do \
+		curl -sS -m 10 http://$(PS3_IP)/home.ps3mapi 2>/dev/null | grep -io '[0-9A-F]\{8\}_[^<" ]*\.\(self\|bin\|elf\)' | grep -qv main_vsh || break; \
+		sleep 1; \
+	done; sleep 10
 
 # Press virtual-pad buttons: make pad BUTTONS='cross|1|circle' (names: up down left right cross circle square triangle
 # l1 l2 r1 r2 select start; |n| waits n seconds).
