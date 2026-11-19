@@ -556,9 +556,11 @@ static void damageBoss(Game& game, Boss& boss, int damage, int owner) {
         game.explosions.push_back({cx + (randomUnit(game) - 0.5f) * BOSS_W, cy + (randomUnit(game) - 0.5f) * BOSS_H, -0.12f * i, BOSS_EXPLOSION_RADIUS / 2});
     spawnParticles(game, cx, cy, 24, paletteColor('g'), 70);
     spawnParticles(game, cx, cy, 16, paletteColor('o'), 50);
-    game.pickups.push_back({cx - 12 - 4, cy - 4, PICKUP_UPGRADE, 0});
-    game.pickups.push_back({cx + 12 - 4, cy - 4, PICKUP_ROCKET, 0});
-    if (game.wave >= BIG_BOSS_WAVE) game.pickups.push_back({cx - BUFF_PICKUP_SIZE / 2.0f, cy + 8, PICKUP_BUFF, game.level});   // big bosses drop the level buff
+    int upgrades = game.wave >= BIG_BOSS_WAVE ? 4 : 2;   // big bosses drop 4 upgrades, the others 2, in a row 12 px apart
+    for (int i = 0; i < upgrades; i++)
+        game.pickups.push_back({cx + (i - (upgrades - 1) / 2.0f) * 12 - 4, cy - 4, PICKUP_UPGRADE, 0});
+    game.pickups.push_back({cx + 12 - 4, cy + 8, PICKUP_ROCKET, 0});
+    if (game.wave >= BIG_BOSS_WAVE) game.pickups.push_back({cx - 12 - BUFF_PICKUP_SIZE / 2.0f, cy + 8, PICKUP_BUFF, game.level});   // big bosses drop the level buff
     game.soundRequested[SOUND_ALIEN_DEATH] = true;
     game.soundRequested[SOUND_EXPLOSION] = true;
 }

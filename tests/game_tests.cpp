@@ -623,7 +623,7 @@ static void killingTheBossScoresAndDropsBothPickups() {
         rockets += pickup.type == PICKUP_ROCKET;
         upgrades += pickup.type == PICKUP_UPGRADE;
     }
-    CHECK(rockets == 1 && upgrades == 1 && !game.explosions.empty());
+    CHECK(rockets == 1 && upgrades == 2 && !game.explosions.empty());
     run(game, NO_INPUT, 0.1f);
     CHECK(game.nextWaveTimer > 0);   // the normal wave-clear pause starts
 }
@@ -700,7 +700,7 @@ static void twinBossesBothMustDie() {
         rockets += pickup.type == PICKUP_ROCKET;
         upgrades += pickup.type == PICKUP_UPGRADE;
     }
-    CHECK(rockets == 2 && upgrades == 2);
+    CHECK(rockets == 2 && upgrades == 4);   // two twins, 2 upgrades each
     run(game, NO_INPUT, 0.1f);
     CHECK(game.nextWaveTimer > 0);
 }
@@ -1733,6 +1733,9 @@ static void bigBossesDropTheLevelBuff() {
     for (const Pickup& pickup : game.pickups)
         if (pickup.type == PICKUP_BUFF) { buffs++; level = pickup.level; }
     CHECK(buffs == 1 && level == 3);
+    int bigUpgrades = 0;
+    for (const Pickup& pickup : game.pickups) bigUpgrades += pickup.type == PICKUP_UPGRADE;
+    CHECK(bigUpgrades == 4);   // a big boss drops 4 upgrades
     startBossGame(game, 10, 3);
     for (Boss& boss : game.bosses) boss.hp = 1;
     for (const Boss& boss : game.bosses) {
