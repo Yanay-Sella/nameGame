@@ -5,6 +5,7 @@
 #include <string.h>
 #include <vector>
 #include "game.h"
+#include "formations.h"
 #include "input.h"
 #include "screen.h"
 #include "settings.h"
@@ -158,8 +159,8 @@ static void lateDifficultyAddsHpAndMovement() {
     float minOffset = 0, maxOffset = 0;
     for (int step = 0; step < 120; step++) {
         updateGame(game, &NO_INPUT, DT);
-        const Alien& a = game.aliens[0];
-        if (a.state == ALIEN_IN_FORMATION) {
+        for (const Alien& a : game.aliens) {   // any alien may be off diving at the time, so look at them all
+            if (a.state != ALIEN_IN_FORMATION) continue;
             minOffset = std::min(minOffset, a.y - a.slotY);
             maxOffset = std::max(maxOffset, a.y - a.slotY);
         }
@@ -167,24 +168,48 @@ static void lateDifficultyAddsHpAndMovement() {
     CHECK(minOffset < -1.2f && maxOffset > 1.2f && maxOffset <= bobAmplitude(21) + 0.01f);
 }
 
-// Wave patterns (enemy-waves rule 8): every shape and entry turns up, fits the screen and settles into formation.
+// Wave patterns (enemy-waves rule 8): shapes and entries vary, fit the screen and settle into formation.
 static void wavesUseRandomPatterns() {
     bool shapes[SHAPE_COUNT] = {}, entries[ENTRY_COUNT] = {};
-    for (uint32_t seed = 1; seed <= 60; seed++) {
-        Game game;
-        startGame(game, 1, seed, 5);   // 40 aliens
-        game.players[0].invincibleTimer = 1e9f;
-        shapes[game.formationShape] = entries[game.entryStyle] = true;
-        for (size_t i = 0; i < game.aliens.size(); i++) {
-            const Alien& a = game.aliens[i];
-            CHECK(a.type == (i < 16 ? ALIEN_RED : i < 32 ? ALIEN_BLUE : ALIEN_GREEN));   // the rows keep their types
-            CHECK(a.slotX - 40 >= 0 && a.slotX + 40 + 12 <= SCREEN_W && a.slotY >= 18 && a.slotY + 10 + 4 <= 100);
+    for (int level : {1, 5}) {   // 16 aliens, then 40
+        for (uint32_t seed = 1; seed <= 150; seed++) {
+            Game game;
+            startGame(game, 1, seed, level);
+            game.players[0].invincibleTimer = 1e9f;
+            shapes[game.formationShape] = entries[game.entryStyle] = true;
+            for (size_t i = 0; i < game.aliens.size(); i++) {
+                const Alien& a = game.aliens[i];
+                CHECK(a.type == (level == 1 ? ALIEN_GREEN : i < 16 ? ALIEN_RED : i < 32 ? ALIEN_BLUE : ALIEN_GREEN));   // the rows keep their types
+                CHECK(a.slotX - 40 >= 0 && a.slotX + 40 + 12 <= SCREEN_W && a.slotY >= 18 && a.slotY + 10 + 4 <= 100);
+            }
+            run(game, NO_INPUT, 5);
+            for (const Alien& a : game.aliens) CHECK(a.state != ALIEN_ENTERING);
         }
-        run(game, NO_INPUT, 5);
-        for (const Alien& a : game.aliens) CHECK(a.state != ALIEN_ENTERING);
     }
-    for (bool seen : shapes) CHECK(seen);
+    int seen = 0;
+    for (bool shape : shapes) seen += shape;
+    CHECK(seen >= 24);
     for (bool seen : entries) CHECK(seen);
+}
+
+// Every traced shape draws clearly with some alien count: slots in the box, apart, in rows of 8 from the top.
+static void tracedShapesFit() {
+    for (int shape = SHAPE_FIRST_TRACED; shape < SHAPE_COUNT; shape++) {
+        bool fitsSomewhere = false;
+        for (int count = 16; count <= 40; count += 8) {
+            std::vector<Slot> slots;
+            if (!traceFormation(shape, shape == SHAPE_WORD ? "NAME" : "ABC", count, slots)) continue;
+            fitsSomewhere = true;
+            CHECK((int)slots.size() == count);
+            for (int i = 0; i < count; i++) {
+                CHECK(slots[i].x >= 40 && slots[i].x + 12 <= SCREEN_W - 40 && slots[i].y >= 18 && slots[i].y + 10 + 4 <= 100);
+                if (i % 8) CHECK(slots[i].x >= slots[i - 1].x);
+                if (i >= 8 && i % 8 == 0) CHECK(slots[i].y >= slots[i - 1].y);   // a row starts below the one before it
+                for (int j = 0; j < i; j++) CHECK(fabsf(slots[i].x - slots[j].x) >= 12 || fabsf(slots[i].y - slots[j].y) >= 10);
+            }
+        }
+        CHECK(fitsSomewhere);
+    }
 }
 
 static void aliensFlyInBeforeTheyCanShoot() {
@@ -1984,6 +2009,7 @@ int main() {
     weaponLevelsFireTheirPattern();
     lateDifficultyAddsHpAndMovement();
     wavesUseRandomPatterns();
+    tracedShapesFit();
     killDropsFollowTheRoll();
     upgradePickupRaisesLevelUpToFour();
     deathLosesOneWeaponLevel();

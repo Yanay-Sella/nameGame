@@ -46,3 +46,9 @@ Highlight NAME game in the Game column, press Triangle, then choose Delete.
 ## For developers
 
 See `CLAUDE.md` and `docs/ps3-new-project-guide.md`.
+
+## Music and legal
+
+- The songs are not in this repository and the code can't play any without you adding them: `make music MUSIC_SRC=<your song>` converts a file you have the rights to. Don't publish builds that contain music you don't own.
+- This is a hobby project. It is not affiliated with Sony. It uses only the open-source ps3dev/PSL1GHT toolchain and SDL2, with no Sony SDK code. Running it on a PS3 needs custom firmware (PS3HEN) that you set up yourself, at your own risk.
+- Code and art are under the MIT License (`LICENSE`).

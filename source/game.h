@@ -66,13 +66,25 @@ struct Player {
     float beamX, beamBottom; // the beam's centre x and the y it rises from
 };
 
-struct Shot { float x, y, vy; int owner; float vx; };   // owner: player index for bullets, -1 for enemy shots
+// owner: player index for bullets, -1 for enemy shots. Jungle bullets pierce: pierced hits so far, damage owed, enemies already hit.
+struct Shot {
+    float x, y, vy; int owner; float vx; int pierced = 0; float owed = 0; std::vector<const void*> hitList;
+    Shot(float x, float y, float vy, int owner, float vx) : x(x), y(y), vy(vy), owner(owner), vx(vx) {}
+};
 
 enum AlienType { ALIEN_GREEN, ALIEN_BLUE, ALIEN_RED, ALIEN_HEAVY };   // roles; each level draws them its own way
 enum AlienState { ALIEN_ENTERING, ALIEN_IN_FORMATION, ALIEN_DIVING, ALIEN_RETURNING, ALIEN_ROAMING };
 
 // Random per formation wave (enemy-waves rule 8): the slots' layout and where the aliens fly in from.
-enum FormationShape { SHAPE_BLOCK, SHAPE_STAGGER, SHAPE_V, SHAPE_ARROW, SHAPE_WAVE, SHAPE_SPLIT, SHAPE_COUNT };
+// The first six bend the 8-column grid; the rest are traced by formations.cpp (and need a fitting alien count).
+enum FormationShape {
+    SHAPE_BLOCK, SHAPE_STAGGER, SHAPE_V, SHAPE_ARROW, SHAPE_WAVE, SHAPE_SPLIT,
+    SHAPE_DIAGONALS_R, SHAPE_DIAGONALS_L, SHAPE_ZIGZAG, SHAPE_ZIGZAGS, SHAPE_X, SHAPE_X3, SHAPE_HEART, SHAPE_HEARTS,
+    SHAPE_DIAMOND, SHAPE_DIAMONDS, SHAPE_CHEVRONS, SHAPE_TRIANGLE, SHAPE_TRIANGLE_DOWN, SHAPE_BOX, SHAPE_CIRCLES, SHAPE_TWINS,
+    SHAPE_OVAL, SHAPE_OVALS, SHAPE_WAVES, SHAPE_SPIRAL, SHAPE_PLUSES, SHAPE_POINTER,
+    SHAPE_BOWTIE, SHAPE_CROWN, SHAPE_RAINBOW, SHAPE_BOWL, SHAPE_PYRAMID, SHAPE_LETTERS, SHAPE_WORD, SHAPE_COUNT
+};
+const int SHAPE_FIRST_TRACED = SHAPE_DIAGONALS_R;
 enum EntryStyle { ENTRY_TOP, ENTRY_LEFT, ENTRY_RIGHT, ENTRY_PINCER, ENTRY_SCATTER, ENTRY_COUNT };
 
 struct Alien {

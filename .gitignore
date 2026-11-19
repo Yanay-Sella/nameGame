@@ -4,3 +4,4 @@ shots/
 .DS_Store
 pkgfiles/USRDIR/music.ogg
 pkgfiles/USRDIR/dubstep.ogg
+local.mk

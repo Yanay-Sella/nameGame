@@ -92,7 +92,7 @@ enum Music { MUSIC_OFF, MUSIC_MIZRAHIT, MUSIC_DUBSTEP, MUSIC_CHOICES };   // sav
 - `.gitignore`: add `pkgfiles/USRDIR/dubstep.ogg` under `pkgfiles/USRDIR/music.ogg` (the song isn't committed).
 - Convert the song (the PS3 can't play MP3):
   ```bash
-  make music MUSIC_SRC="/Users/yanaysella/Downloads/SKRILLEX - KYOTO (FT. SIRAH).mp3" MUSIC_OUT=dubstep.ogg
+  make music MUSIC_SRC="<your-song>.mp3" MUSIC_OUT=dubstep.ogg
   ffprobe -v error -show_entries format=duration -of default=nw=1 pkgfiles/USRDIR/dubstep.ogg
   ```
   The duration must be about 200 s.

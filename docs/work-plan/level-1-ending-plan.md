@@ -175,9 +175,9 @@ The autopilot run will overwrite the saved high score on the PS3; the user agree
 2. If `lsof -nP -iUDP:18195` shows a stale python, kill it. Start `make log` in the background, redirected to a file in your
    scratchpad directory (not `build/`). `make quit` if a game runs, then `make deploy`, then `make launch`; wait for
    `nameGame started` in the log.
-3. LEVEL 1 banner: delete the old shot (`curl -s -m 10 -o /dev/null -Q "DELE /dev_hdd0/game/NMGM00001/USRDIR/shot.bmp" ftp://192.168.1.200/`),
+3. LEVEL 1 banner: delete the old shot (`curl -s -m 10 -o /dev/null -Q "DELE /dev_hdd0/game/NMGM00001/USRDIR/shot.bmp" ftp://$PS3_IP/`),
    then `make pad BUTTONS='cross|1|l1'` (CLASSIC is the selected item at boot), then fetch it:
-   `curl -s -m 10 -o shots/shot.bmp ftp://192.168.1.200/dev_hdd0/game/NMGM00001/USRDIR/shot.bmp && sips -s format png shots/shot.bmp --out shots/shot.png`.
+   `curl -s -m 10 -o shots/shot.bmp ftp://$PS3_IP/dev_hdd0/game/NMGM00001/USRDIR/shot.bmp && sips -s format png shots/shot.bmp --out shots/shot.png`.
    Read `shots/shot.png`: it shows `LEVEL 1`. The log shows `scene: playing`.
 4. `make pad BUTTONS='select'` → log `autopilot on`. Wait (use Monitor on the log file, until `level clear at` or
    `game over at` appears; about 8–10 min): the log shows `boss wave 20, hp 250`, `boss down at wave 20`,

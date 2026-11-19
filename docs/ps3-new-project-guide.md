@@ -142,7 +142,7 @@ Verified on a real PS3; the Makefile wraps these as `make launch|quit|pad|shot`.
   ```json
   { "permissions": { "allow": [
       "Bash(make ps3)", "Bash(make deploy)", "Bash(make -s log)", "Bash(make clean)",
-      "Bash(curl * ftp://192.168.1.200/*)", "Bash(curl * http://192.168.1.200/*)" ] } }
+      "Bash(curl * ftp://<PS3_IP>/*)", "Bash(curl * http://<PS3_IP>/*)" ] } }
   ```
 - Typical test round: Claude runs `make deploy` and starts `make log`, you launch the game and describe the screen, Claude reads the logs.
 

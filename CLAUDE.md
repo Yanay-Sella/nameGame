@@ -6,10 +6,10 @@ The game's title is "NAME game" (GDD D-012); the repo, app ID NMGM00001, build/n
 Full setup history, debugging toolkit and new-project checklist: `docs/ps3-new-project-guide.md`.
 
 ## Hardware setup
-- PS3 at `192.168.1.200` (override with `PS3_IP=`), firmware 4.93, PS3HEN + webMAN MOD.
+- PS3 address: `PS3_IP` in the gitignored `local.mk` (the Makefile reads it; or pass `PS3_IP=`). In curl commands use that address (`grep PS3_IP local.mk`). Firmware 4.93, PS3HEN + webMAN MOD.
 - HEN turns off on every PS3 reboot: if the PS3 doesn't respond (no FTP/HTTP), ask the user to restart it and re-enable HEN.
 - Quit a running game remotely with `make quit` (`/xmb.ps3$exit`); `make launch` starts it again.
-- If only the game is stuck, webMAN still answers: restart remotely with `curl http://192.168.1.200/restart.ps3`.
+- If only the game is stuck, webMAN still answers: restart remotely with `curl http://$PS3_IP/restart.ps3`.
   If webMAN doesn't answer either, ask the user to hold the power button ~10 s (never unplug).
 - Never install while an app/game is running (it froze the PS3 once); `make deploy` checks for this.
 - Never print or commit the console's PSID/IDPS, which webMAN's status pages show.

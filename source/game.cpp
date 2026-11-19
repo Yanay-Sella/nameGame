@@ -1,5 +1,6 @@
 // Game rules and drawing. Every tuning number comes from a design note in docs/features/.
 #include "game.h"
+#include "formations.h"
 #include "screen.h"
 #include "sprites.h"
 #include <algorithm>
@@ -11,7 +12,7 @@
 const float SHIP_SPEED = 150;          // px/s
 const float FIRE_INTERVAL = 0.12f;     // s
 const float BULLET_SPEED = 320;        // px/s
-const float MOVE_ZONE_TOP = 100;       // px
+const float MOVE_ZONE_TOP = 0;         // px
 // Enemy waves (enemy-waves/design.md)
 const int FORMATION_COLUMNS = 8;
 const float COLUMN_SPACING = 18, ROW_SPACING = 14, FORMATION_TOP = 18;   // px
@@ -184,7 +185,7 @@ const float SEA_BUBBLE_SPEED = 25;     // px/s
 // Level buffs (level-buffs/design.md)
 const int BUFF_PICKUP_SIZE = 11, BUFF_HELD_POINTS = 5000;   // px; points for a buff already held
 const float MAGIC_CHARGE_TIME = 0.8f, MAGIC_BEAM_TIME = 0.4f;   // s
-const int MAGIC_BEAM_W = BEAM_W / 2, MAGIC_BEAM_CORE_W = 4, MAGIC_DAMAGE = 30;   // px, px, HP per enemy
+const int MAGIC_BEAM_W = BEAM_W / 2, MAGIC_BEAM_CORE_W = 4, MAGIC_DAMAGE = 3 * EXPLOSION_DAMAGE;   // px, px, HP per enemy: 3x a rocket
 const int SHIP_WAND_X = 14, SHIP_WAND_Y = 3;   // px in the ship: the wand's star (the WAND sprite is drawn at +13, +2)
 const float FROST_TIME = 3, FROST_RING_TIME = 0.4f, FROST_RING_SPEED = 450, FROST_THAW_BLINK = 0.5f;   // s, s, px/s, s
 const float VOLCANO_FIRE_FACTOR = 0.8f;   // x the fire interval: 25 % faster
@@ -329,8 +330,24 @@ static void startWave(Game& game, int wave) {
         }
         rows = 0;
     }
+    std::vector<Slot> tracedSlots;   // the slots of a traced shape, rows of 8
     if (rows > 0) {
-        game.formationShape = (int)(randomUnit(game) * SHAPE_COUNT);
+        static const char* const WORDS[] = {"GO", "ZAP", "PEW", "WIN", "UFO", "NAME", "GAME", "BOOM", "FIRE"};
+        game.formationShape = SHAPE_BLOCK;
+        for (int tries = 0; tries < 30; tries++) {   // a traced shape needs the right alien count: draw again if it doesn't fit
+            int shape = (int)(randomUnit(game) * SHAPE_COUNT);
+            char letters[4] = {};
+            const char* word = letters;
+            if (shape == SHAPE_LETTERS) {
+                for (int i = 0; i < 3; i++) letters[i] = 'A' + (int)(randomUnit(game) * 26);
+            } else if (shape == SHAPE_WORD) {
+                word = WORDS[(int)(randomUnit(game) * (sizeof(WORDS) / sizeof(WORDS[0])))];
+            }
+            if (shape < SHAPE_FIRST_TRACED || traceFormation(shape, word, rows * FORMATION_COLUMNS, tracedSlots)) {
+                game.formationShape = shape;
+                break;
+            }
+        }
         game.entryStyle = (int)(randomUnit(game) * ENTRY_COUNT);
     }
     float left = (SCREEN_W - (FORMATION_COLUMNS - 1) * COLUMN_SPACING - ALIEN_WIDTH[ALIEN_GREEN]) / 2;
@@ -352,6 +369,11 @@ static void startWave(Game& game, int wave) {
                 case SHAPE_ARROW: alien.slotY += (3.5f - fabsf(fromCentre)) * SHAPE_STEP_Y; break;
                 case SHAPE_WAVE: alien.slotY += 4 + 4 * sinf(col * 1.3f); break;
                 case SHAPE_SPLIT: alien.slotX += fromCentre < 0 ? -SPLIT_GAP : SPLIT_GAP; break;
+            }
+            if (game.formationShape >= SHAPE_FIRST_TRACED) {
+                alien.slotX = tracedSlots[row * FORMATION_COLUMNS + col].x;
+                alien.slotY = tracedSlots[row * FORMATION_COLUMNS + col].y;
+                fromCentre = (alien.slotX + ALIEN_WIDTH[type] / 2.0f - SCREEN_W / 2.0f) / COLUMN_SPACING;
             }
             alien.x = alien.slotX + game.swayOffset;
             alien.y = alien.slotY - ENTRY_DISTANCE;
@@ -576,7 +598,7 @@ static void killPlayer(Game& game, Player& player) {
     player.lives--;
     player.respawnTimer = RESPAWN_DELAY;
     player.rocketPressedAt = -1;
-    player.weaponLevel = std::max(1, player.weaponLevel - 1);
+    if (player.buffs == 0) player.weaponLevel = std::max(1, player.weaponLevel - 1);   // a level buff takes the hit instead of the weapon
     player.upgradeParts = 0;
     player.upgradeTimer = 0;
     player.buffs = player.strongAttack = 0;   // dying loses every buff
@@ -1237,26 +1259,38 @@ void updateGame(Game& game, const Actions* actions, float dt) {
     for (Shot& bullet : game.bullets) {
         bullet.x += bullet.vx * dt;
         bullet.y += bullet.vy * dt;
-        int damage = game.players[bullet.owner].scorchTimer > 0 ? SCORCH_DAMAGE : 1;   // a scorched ship's bullets burn
+        // Jungle bullets pierce: each enemy passed halves the damage (fractions carry in `owed`).
+        bool pierce = game.players[bullet.owner].buffs & BUFF_JUNGLE;
+        float power = (game.players[bullet.owner].scorchTimer > 0 ? SCORCH_DAMAGE : 1) / (float)(1 << std::min(bullet.pierced, 20));
         for (Alien& alien : game.aliens) {
-            if (!alien.alive || alien.y + ALIEN_HEIGHT[alien.type] < 0 || !overlap(bullet.x, bullet.y, 2, 4, alien.x, alien.y, ALIEN_WIDTH[alien.type], ALIEN_HEIGHT[alien.type])) continue;
-            damageAlien(game, alien, damage, bullet.owner);
+            if (bullet.y <= -50 || !alien.alive || alien.y + ALIEN_HEIGHT[alien.type] < 0 || !overlap(bullet.x, bullet.y, 2, 4, alien.x, alien.y, ALIEN_WIDTH[alien.type], ALIEN_HEIGHT[alien.type])) continue;
+            if (std::find(bullet.hitList.begin(), bullet.hitList.end(), &alien) != bullet.hitList.end()) continue;
+            bullet.owed += power;
+            int damage = (int)bullet.owed;
+            bullet.owed -= damage;
+            if (damage > 0) damageAlien(game, alien, damage, bullet.owner);
             spawnHitSparks(game, bullet.x + 1, bullet.y);
-            bullet.y = -100;   // spent; removed below
-            break;
+            if (pierce) { bullet.hitList.push_back(&alien); bullet.pierced++; power /= 2; }
+            else bullet.y = -100;   // spent; removed below
         }
         for (Boss& boss : game.bosses) {
             if (bullet.y <= -50 || !boss.alive || boss.y + BOSS_H < 0 || !overlap(bullet.x, bullet.y, 2, 4, boss.x, boss.y, BOSS_W, BOSS_H)) continue;
+            if (std::find(bullet.hitList.begin(), bullet.hitList.end(), &boss) != bullet.hitList.end()) continue;
             if (boss.type == BOSS_GORILLA && game.players[bullet.owner].inMist) {   // stink mist: the shot heals
                 boss.hp = std::min(boss.hp + 1, boss.maxHp);
                 if (boss.laughTimer == 0) game.soundRequested[SOUND_LAUGH] = true;
                 boss.laughTimer = LAUGH_TIME;
                 spawnParticles(game, bullet.x + 1, bullet.y, 2, paletteColor('l'), 30);
+                bullet.y = -100;   // spent; removed below
             } else {
-                damageBoss(game, boss, damage, bullet.owner);
+                bullet.owed += power;
+                int damage = (int)bullet.owed;
+                bullet.owed -= damage;
+                if (damage > 0) damageBoss(game, boss, damage, bullet.owner);
                 spawnHitSparks(game, bullet.x + 1, bullet.y);
+                if (pierce) { bullet.hitList.push_back(&boss); bullet.pierced++; power /= 2; }
+                else bullet.y = -100;   // spent; removed below
             }
-            bullet.y = -100;   // spent; removed below
         }
         for (Fish& f : game.fish) {
             if (bullet.y <= -50 || f.life <= 0 || !overlap(bullet.x, bullet.y, 2, 4, f.x, f.y, FISH_W, FISH_H)) continue;

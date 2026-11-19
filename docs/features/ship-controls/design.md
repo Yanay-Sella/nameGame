@@ -6,7 +6,7 @@ The player flies a small ship around the bottom of the screen and holds R1 to sp
 
 ## Rules
 1. The left stick and the D-pad both drive the `move` action. The stick gets a radial deadzone, rescaled past it; the D-pad gives full speed. Diagonals are no faster than straight moves.
-2. The ship moves only inside the movement zone (bottom of the screen) and never leaves the screen.
+2. The ship moves over the whole screen and never leaves it.
 3. Holding R1 (`fire`, read as held) fires one volley every fire interval, starting on the press frame.
 4. Bullets fly straight up (or along their spread angle) and disappear on hitting an enemy or leaving the screen.
 5. The gun has upgrade levels (see Weapon upgrades in the GDD index); level 1 fires one bullet.
@@ -19,7 +19,7 @@ The player flies a small ship around the bottom of the screen and holds R1 to sp
 | Ship size | 16 × 16 | px | hitbox feels fair |
 | Ship hitbox | 6 × 6, centred | px | deaths feel deserved [ASSUMPTION] |
 | Ship speed | 150 | px/s | can dodge a shot after seeing it [ASSUMPTION] |
-| Movement zone | y 100–180 | px | room to dodge vs crowding the aliens [ASSUMPTION] |
+| Movement zone | y 0–180 (whole screen) | px | room to dodge vs crowding the aliens [ASSUMPTION] |
 | Stick deadzone | 0.2 | stick length | no drift at rest [ASSUMPTION] |
 | Fire interval | 0.12 | s | steady but not a laser [ASSUMPTION] |
 | Bullet speed | 320 | px/s | [ASSUMPTION] |

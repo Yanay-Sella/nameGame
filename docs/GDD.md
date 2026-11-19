@@ -124,6 +124,7 @@ Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN ME
 | D-031 | 2026-11-18 | A ship skin per level on the same 16×14 body and hitbox; player 2 keeps a gold copy | recolour only | user's PDF; same hitbox keeps dodging fair | [pixel art](features/pixel-art/design.md), [co-op](features/co-op/design.md), [level buffs](features/level-buffs/design.md) |
 | D-032 | 2026-11-18 | Beams grow from their ball in 0.1 s, spark, and end in shards; the eruption grows too; beams, the frost wave and the shield pop shake the screen; the player's beam hits when it reaches the top | beams appearing at once; kick-only shake; hit-stop on the shield pop | user's request: beams felt flat and trauma 0.3 rounded to no visible shake | [level buffs](features/level-buffs/design.md), [bosses](features/bosses/design.md), [volcano](features/volcano/design.md), [game feel](features/game-feel/design.md) |
 | D-033 | 2026-11-18 | Upgrades drop at 1 % and level n takes n parts, shown by a HUD gauge and a pop-up; formation waves pick a random shape and entry; difficulty waves run 1-20 in level 1 and step back 15 at each new level (to 21-40 in the deep sea), adding HP, sway, divers and a bob past wave 15 | keep 3 % drops; one fixed formation; per-level offsets 5, 8, 11, 14 | user's request: rarer, earned upgrades; varied waves; a classic run that eases off at each new world then climbs higher | [weapon upgrades](features/weapon-upgrades/design.md), [enemy waves](features/enemy-waves/design.md) |
+| D-034 | 2026-11-19 | Formation waves also pick from 29 traced shapes (lines, X, heart, <>, circles, zigzag, letters, words...) drawn by spacing the wave's aliens along strokes; a shape that doesn't fit the alien count is redrawn | only the 6 grid shapes; fixed bitmaps with their own alien counts | user's request for many more shapes; keeping 16-40 aliens per wave leaves the difficulty untouched | [enemy waves](features/enemy-waves/design.md) |
 
 ## Open questions
 - **Assumptions to confirm:** sprites as text grids in code (D-006); every number marked `[ASSUMPTION]` in the feature notes.
@@ -159,3 +160,4 @@ Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN ME
 **0.25 (2026-11-18):** level buffs and a ship skin per level (D-030, D-031).
 **0.26 (2026-11-18):** beam build-up, shards and strong-attack shake (D-032).
 **0.27 (2026-11-18):** upgrade parts and gauge, random wave patterns, classic difficulty ramp (D-033).
+**0.28 (2026-11-19):** 29 traced formation shapes (D-034).

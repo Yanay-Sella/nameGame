@@ -1,5 +1,7 @@
 # Host-side commands: build in Docker, deploy to the PS3 over the LAN, read its logs.
-PS3_IP   ?= 192.168.1.200
+# Your PS3 address goes in local.mk (gitignored): PS3_IP = <address>; or pass PS3_IP= on the command line.
+-include local.mk
+PS3_IP   ?= 192.168.1.100
 LOG_HOST ?= $(shell ipconfig getifaddr en0)
 LOG_PORT ?= 18195
 SOURCES  ?= source
@@ -52,7 +54,7 @@ release:
 # Build and run the game-rule tests on the Mac (game.cpp and screen.cpp have no SDL or PS3 code).
 test:
 	mkdir -p build/tests
-	c++ -std=c++14 -Wall -Wextra -Isource tests/game_tests.cpp source/game.cpp source/screen.cpp source/settings.cpp -o build/tests/game_tests
+	c++ -std=c++14 -Wall -Wextra -Isource tests/game_tests.cpp source/game.cpp source/formations.cpp source/screen.cpp source/settings.cpp -o build/tests/game_tests
 	build/tests/game_tests
 
 # Native Mac build for fast testing (SDL2 from Homebrew, silent, keyboard pads): game logic and drawing are the real code,
@@ -62,7 +64,7 @@ mac:
 	mkdir -p build/mac
 	c++ -std=c++14 -O2 -Wall -Wextra -Wno-unused-parameter -DNAMEGAME_MAC -DRELEASE=0 -DGAME_VERSION=\"$(VERSION)\" \
 		-DLOG_HOST=\"127.0.0.1\" -DLOG_PORT=$(LOG_PORT) $$(sdl2-config --cflags) -Isource \
-		source/main.cpp source/game.cpp source/screen.cpp source/settings.cpp host/input_keyboard.cpp host/audio_silent.cpp \
+		source/main.cpp source/game.cpp source/formations.cpp source/screen.cpp source/settings.cpp host/input_keyboard.cpp host/audio_silent.cpp \
 		$$(sdl2-config --libs) -o $(MAC_BIN)
 
 # Run the Mac build; BUTTONS='cross|1|l1|1|quit' plays a script like make pad (plus hold 'right:2', chord 'l2+l3', 'quit'),

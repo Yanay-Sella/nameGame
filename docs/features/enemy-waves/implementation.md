@@ -9,6 +9,7 @@
 | File / module | Role in this feature |
 |---|---|
 | `source/game.cpp` › `startWave`, `formationRows` | formation layout and alien types |
+| `source/formations.cpp` › `traceFormation` | traced shapes: strokes, even spacing, overlap push, rows of 8 |
 | `source/game.cpp` › `updateAlien`, `startDive` | fly-in, sway, dives, return, enemy shots |
 | `source/game.cpp` › `updateGame` | wave clear bonus, pause between waves, next wave |
 | `source/game.cpp` › `shotChance`, `enemyShotSpeed`, `diveInterval` | the difficulty formulas |

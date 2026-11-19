@@ -73,7 +73,7 @@ int main() {
 ```
 Build and view (run from the scratchpad):
 ```bash
-c++ -std=c++14 -I/Users/yanaysella/git/nameGame/source render.cpp /Users/yanaysella/git/nameGame/source/game.cpp /Users/yanaysella/git/nameGame/source/screen.cpp -o render && ./render
+c++ -std=c++14 -Isource render.cpp source/game.cpp source/screen.cpp -o render && ./render
 python3 -c "import sys;from PIL import Image;[Image.open(p).resize((960,540),Image.NEAREST).save(p[:-4]+'.png') for p in sys.argv[1:]]" frame*.ppm
 ```
 
