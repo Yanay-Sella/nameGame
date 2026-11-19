@@ -12,7 +12,7 @@ APP_FOLDER := /dev_hdd0/game/NMGM00001/USRDIR
 # A shot is a 54-byte BMP header + 320*180*3 pixel bytes (no trailing comment: make would keep the spaces in the value).
 SHOT_SIZE  := 172854
 
-.PHONY: ps3 image deploy install release log clean music test launch quit pad shot
+.PHONY: ps3 image deploy install release log clean music test launch quit pad shot mac mac-run
 
 # Compile and package build/nameGame.pkg inside the container (always a full rebuild so LOG_HOST/LOG_PORT changes apply).
 # SOURCES=prototypes/<idea> builds a prototype instead of the game.
@@ -54,6 +54,23 @@ test:
 	mkdir -p build/tests
 	c++ -std=c++14 -Wall -Wextra -Isource tests/game_tests.cpp source/game.cpp source/screen.cpp source/settings.cpp -o build/tests/game_tests
 	build/tests/game_tests
+
+# Native Mac build for fast testing (SDL2 from Homebrew, silent, keyboard pads): game logic and drawing are the real code,
+# but not the PS3's SDL port, audio or controller, so confirm anything final on the PS3.
+MAC_BIN := build/mac/nameGame
+mac:
+	mkdir -p build/mac
+	c++ -std=c++14 -O2 -Wall -Wextra -Wno-unused-parameter -DNAMEGAME_MAC -DRELEASE=0 -DGAME_VERSION=\"$(VERSION)\" \
+		-DLOG_HOST=\"127.0.0.1\" -DLOG_PORT=$(LOG_PORT) $$(sdl2-config --cflags) -Isource \
+		source/main.cpp source/game.cpp source/screen.cpp source/settings.cpp host/input_keyboard.cpp host/audio_silent.cpp \
+		$$(sdl2-config --libs) -o $(MAC_BIN)
+
+# Run the Mac build; BUTTONS='cross|1|l1|1|quit' plays a script like make pad (plus hold 'right:2', chord 'l2+l3', 'quit'),
+# and an l1 in it leaves shots/shot.png. Without BUTTONS you play with the keyboard (keys: host/input_keyboard.cpp).
+mac-run: mac
+	rm -f build/mac/shot.bmp
+	NAMEGAME_PAD='$(BUTTONS)' $(MAC_BIN)
+	@if [ -f build/mac/shot.bmp ]; then mkdir -p shots && sips -s format png --resampleWidth 960 build/mac/shot.bmp --out shots/shot.png >/dev/null && echo "shots/shot.png"; fi
 
 # Print the game's UDP log output (Ctrl+C to stop).
 log:

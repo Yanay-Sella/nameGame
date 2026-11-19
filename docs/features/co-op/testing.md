@@ -14,6 +14,8 @@
 1. Start a run with one controller, then press Start on the second: player 2 appears blinking at the right, the log shows "player 2 joined".
 2. Let player 1 lose all lives while player 2 plays on; the run continues. Lose player 2's last life: game over shows both scores.
 3. Press X at game over: the new run has both ships.
+4. Player 2's ship is gold (`playerTwoShipIsGold`, ticked) and looks right on the PS3 (unticked: PS3 look check).
+
 
 ## History
 - 2026-11-17: criteria written.

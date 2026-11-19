@@ -14,6 +14,8 @@
 - [x] `make ps3` builds without warnings (2026-11-18).
 - [ ] PS3 autopilot run from GLACIER at 60 fps, log lines `run starts at level 3`, `boss wave 5: 1 yeti`, `player 1 frozen`.
 - [ ] One hand-played glacier run judges the gliding and the freeze (user's verdict).
+- [x] A 24 px ice block freezes from its corner and is see-through. *(bigIceBlockFreezesFromItsCorner, seeThroughIceTintsWhatIsUnder)*
+- [ ] PS3: the big see-through ice blocks and the ice cube look right.
 
 ## History
 - 2026-11-18: criteria written.

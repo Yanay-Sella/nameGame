@@ -1322,6 +1322,341 @@ const Sprite LIVE_FISH_R_B = {9, 6,
     ".mmOOOOO."
     "..m.ZZZ.."};
 
+// Ship skins per level (same 16x14 body and hitbox): jungle wood and leaves, glacier ice, volcano obsidian, deep-sea submarine.
+const Sprite SHIP_JUNGLE_A = {16, 14,
+    ".......cc......."
+    "......cwwc......"
+    "......hwwh......"
+    ".....hHHHHh....."
+    ".....hBhhBh....."
+    "..l..hBhhBh..l.."
+    ".llg.hBhhBh.gll."
+    "lggghhBccBhhgggl"
+    ".lgghHHccHHhggl."
+    "..lghhhhhhhhgl.."
+    "...hhhhhhhhhh..."
+    "....hh....hh...."
+    "....oo....oo...."
+    ".....o....o....."};
+const Sprite SHIP_JUNGLE_B = {16, 14,
+    ".......cc......."
+    "......cwwc......"
+    "......hwwh......"
+    ".....hHHHHh....."
+    ".....hBhhBh....."
+    "..l..hBhhBh..l.."
+    ".llg.hBhhBh.gll."
+    "lggghhBccBhhgggl"
+    ".lgghHHccHHhggl."
+    "..lghhhhhhhhgl.."
+    "...hhhhhhhhhh..."
+    "....hh....hh...."
+    "....yo....oy...."
+    "................"};
+const Sprite SHIP_GLACIER_A = {16, 14,
+    ".......cc......."
+    "......cwwc......"
+    "......cwwc......"
+    ".....iIwwIi....."
+    "....iIIIIIIi...."
+    ".i..IIqIIqII..i."
+    ".iI.IqIIIIqI.Ii."
+    "iIIiIIIccIIIiIIi"
+    ".IIIIIIccIIIIII."
+    "..qIIIIIIIIIIq.."
+    "...qIiIIIIiIq..."
+    "....qq....qq...."
+    "....oo....oo...."
+    ".....o....o....."};
+const Sprite SHIP_GLACIER_B = {16, 14,
+    ".......cc......."
+    "......cwwc......"
+    "......cwwc......"
+    ".....iIwwIi....."
+    "....iIIIIIIi...."
+    ".i..IIqIIqII..i."
+    ".iI.IqIIIIqI.Ii."
+    "iIIiIIIccIIIiIIi"
+    ".IIIIIIccIIIIII."
+    "..qIIIIIIIIIIq.."
+    "...qIiIIIIiIq..."
+    "....qq....qq...."
+    "....yo....oy...."
+    "................"};
+const Sprite SHIP_VOLCANO_A = {16, 14,
+    ".......cc......."
+    "......cwwc......"
+    "......cwwc......"
+    ".....XXwwXX....."
+    ".....XOXXOX....."
+    "..N..XXOOXX..N.."
+    "..O.XXXXXXXX.O.."
+    ".OX.XXXccXXX.XO."
+    ".XXXOXXccXXOXXX."
+    "XXXXXOXXXXOXXXXX"
+    "XXXOXXXXXXXXOXXX"
+    ".XX.OO....OO.XX."
+    "....NO....ON...."
+    ".....O....O....."};
+const Sprite SHIP_VOLCANO_B = {16, 14,
+    ".......cc......."
+    "......cwwc......"
+    "......cwwc......"
+    ".....XXwwXX....."
+    ".....XOXXOX....."
+    "..N..XXOOXX..N.."
+    "..O.XXXXXXXX.O.."
+    ".OX.XXXccXXX.XO."
+    ".XXXOXXccXXOXXX."
+    "XXXXXOXXXXOXXXXX"
+    "XXXOXXXXXXXXOXXX"
+    ".XX.OO....OO.XX."
+    "....ON....NO...."
+    "................"};
+const Sprite SHIP_SEA_A = {16, 14,
+    ".......cc......."
+    "......cwwc......"
+    "......bccb......"
+    "....bbbbbbbb...."
+    "...bbNbbbbNbb..."
+    "..bbNwNbbNwNbb.."
+    "..bbbNbbbbNbbb.."
+    ".IbbbbbccbbbbbI."
+    "IIbbbbbccbbbbbII"
+    ".IbbbbbbbbbbbbI."
+    "..bbbbbbbbbbbb.."
+    "....bb....bb...."
+    "....ii....ii...."
+    ".....i....i....."};
+const Sprite SHIP_SEA_B = {16, 14,
+    ".......cc......."
+    "......cwwc......"
+    "......bccb......"
+    "....bbbbbbbb...."
+    "...bbNbbbbNbb..."
+    "..bbNwNbbNwNbb.."
+    "..bbbNbbbbNbbb.."
+    ".IbbbbbccbbbbbI."
+    "IIbbbbbccbbbbbII"
+    ".IbbbbbbbbbbbbI."
+    "..bbbbbbbbbbbb.."
+    "....bb....bb...."
+    ".....i....i....."
+    "....i......i...."};
+// Player 2's skins: the hull gold and the cockpit orange, as SHIP2_A.
+const Sprite SHIP2_JUNGLE_A = {16, 14,
+    ".......oo......."
+    "......owwo......"
+    "......YwwY......"
+    ".....YHHHHY....."
+    ".....YBYYBY....."
+    "..l..YBYYBY..l.."
+    ".llg.YBYYBY.gll."
+    "lgggYYBooBYYgggl"
+    ".lggYHHooHHYggl."
+    "..lgYYYYYYYYgl.."
+    "...YYYYYYYYYY..."
+    "....YY....YY...."
+    "....oo....oo...."
+    ".....o....o....."};
+const Sprite SHIP2_JUNGLE_B = {16, 14,
+    ".......oo......."
+    "......owwo......"
+    "......YwwY......"
+    ".....YHHHHY....."
+    ".....YBYYBY....."
+    "..l..YBYYBY..l.."
+    ".llg.YBYYBY.gll."
+    "lgggYYBooBYYgggl"
+    ".lggYHHooHHYggl."
+    "..lgYYYYYYYYgl.."
+    "...YYYYYYYYYY..."
+    "....YY....YY...."
+    "....yo....oy...."
+    "................"};
+const Sprite SHIP2_GLACIER_A = {16, 14,
+    ".......oo......."
+    "......owwo......"
+    "......owwo......"
+    ".....iYwwYi....."
+    "....iYYYYYYi...."
+    ".i..YYqYYqYY..i."
+    ".iY.YqYYYYqY.Yi."
+    "iYYiYYYooYYYiYYi"
+    ".YYYYYYooYYYYYY."
+    "..qYYYYYYYYYYq.."
+    "...qYiYYYYiYq..."
+    "....qq....qq...."
+    "....oo....oo...."
+    ".....o....o....."};
+const Sprite SHIP2_GLACIER_B = {16, 14,
+    ".......oo......."
+    "......owwo......"
+    "......owwo......"
+    ".....iYwwYi....."
+    "....iYYYYYYi...."
+    ".i..YYqYYqYY..i."
+    ".iY.YqYYYYqY.Yi."
+    "iYYiYYYooYYYiYYi"
+    ".YYYYYYooYYYYYY."
+    "..qYYYYYYYYYYq.."
+    "...qYiYYYYiYq..."
+    "....qq....qq...."
+    "....yo....oy...."
+    "................"};
+const Sprite SHIP2_VOLCANO_A = {16, 14,
+    ".......oo......."
+    "......owwo......"
+    "......owwo......"
+    ".....YYwwYY....."
+    ".....YOYYOY....."
+    "..N..YYOOYY..N.."
+    "..O.YYYYYYYY.O.."
+    ".OY.YYYooYYY.YO."
+    ".YYYOYYooYYOYYY."
+    "YYYYYOYYYYOYYYYY"
+    "YYYOYYYYYYYYOYYY"
+    ".YY.OO....OO.YY."
+    "....NO....ON...."
+    ".....O....O....."};
+const Sprite SHIP2_VOLCANO_B = {16, 14,
+    ".......oo......."
+    "......owwo......"
+    "......owwo......"
+    ".....YYwwYY....."
+    ".....YOYYOY....."
+    "..N..YYOOYY..N.."
+    "..O.YYYYYYYY.O.."
+    ".OY.YYYooYYY.YO."
+    ".YYYOYYooYYOYYY."
+    "YYYYYOYYYYOYYYYY"
+    "YYYOYYYYYYYYOYYY"
+    ".YY.OO....OO.YY."
+    "....ON....NO...."
+    "................"};
+const Sprite SHIP2_SEA_A = {16, 14,
+    ".......oo......."
+    "......owwo......"
+    "......YooY......"
+    "....YYYYYYYY...."
+    "...YYNYYYYNYY..."
+    "..YYNwNYYNwNYY.."
+    "..YYYNYYYYNYYY.."
+    ".IYYYYYooYYYYYI."
+    "IIYYYYYooYYYYYII"
+    ".IYYYYYYYYYYYYI."
+    "..YYYYYYYYYYYY.."
+    "....YY....YY...."
+    "....ii....ii...."
+    ".....i....i....."};
+const Sprite SHIP2_SEA_B = {16, 14,
+    ".......oo......."
+    "......owwo......"
+    "......YooY......"
+    "....YYYYYYYY...."
+    "...YYNYYYYNYY..."
+    "..YYNwNYYNwNYY.."
+    "..YYYNYYYYNYYY.."
+    ".IYYYYYooYYYYYI."
+    "IIYYYYYooYYYYYII"
+    ".IYYYYYYYYYYYYI."
+    "..YYYYYYYYYYYY.."
+    "....YY....YY...."
+    ".....i....i....."
+    "....i......i...."};
+
+// Level buffs: the wand on a ship with the space buff (star centre at 1, 1), banana and fire bullets, shield bubbles.
+const Sprite WAND = {3, 7,
+    ".N."
+    "NwN"
+    ".N."
+    ".h."
+    ".h."
+    ".h."
+    ".h."};
+// Wands held by the ship for the armed strong attack: ice wand (glacier) and bubble stick (deep sea), same 3x7 box as WAND.
+const Sprite WAND_ICE = {3, 7,
+    ".i."
+    "iwi"
+    ".i."
+    ".h."
+    ".h."
+    ".h."
+    ".h."};
+const Sprite WAND_BUBBLE = {3, 7,
+    "iii"
+    "i.i"
+    "iii"
+    ".h."
+    ".h."
+    ".h."
+    ".h."};
+const Sprite PLAYER_BANANA = {3, 5,
+    ".h."
+    "..Y"
+    "..Y"
+    ".YY"
+    "YY."};
+const Sprite FIRE_BANANA = {3, 5,
+    ".N."
+    "N.Y"
+    "O.Y"
+    ".YY"
+    "YYO"};
+const Sprite FIRE_BULLET = {2, 4,
+    "NN"
+    "NO"
+    "OO"
+    "OZ"};
+const Sprite SHIELD_BUBBLE_3 = {8, 8,
+    "..iiii.."
+    ".i....i."
+    "iww....i"
+    "iw.....i"
+    "i......i"
+    "i......i"
+    ".i....i."
+    "..iiii.."};
+const Sprite SHIELD_BUBBLE_2 = {4, 4,
+    ".ii."
+    "iw.i"
+    "i..i"
+    ".ii."};
+const Sprite SHIELD_BUBBLE_1 = {2, 2,
+    "wi"
+    "ii"};
+// Level buff icons (HUD and pickup), by level: wand star, banana, snowflake, flame, bubble.
+const Sprite BUFF_ICON_SPACE = {5, 5,
+    "..N.."
+    "NNwNN"
+    ".NwN."
+    ".N.N."
+    "N...N"};
+const Sprite BUFF_ICON_JUNGLE = {5, 5,
+    "....h"
+    "...Y."
+    "..YY."
+    "YYY.."
+    ".Y..."};
+const Sprite BUFF_ICON_GLACIER = {5, 5,
+    "i.i.i"
+    ".iii."
+    "iiwii"
+    ".iii."
+    "i.i.i"};
+const Sprite BUFF_ICON_VOLCANO = {5, 5,
+    "..O.."
+    ".OO.."
+    ".ONO."
+    "ONNNO"
+    ".OOO."};
+const Sprite BUFF_ICON_SEA = {5, 5,
+    ".iii."
+    "iw..i"
+    "i...i"
+    "i...i"
+    ".iii."};
+
 // 3x5 font: 5 octal digits, one per row from the top; bit 2 of a row is its left pixel. 0 = blank.
 inline int fontGlyph(char c) {
     switch (c) {

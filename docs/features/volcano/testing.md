@@ -13,6 +13,8 @@
 - [x] `make ps3` builds without warnings (2026-11-18).
 - [ ] PS3 autopilot run from VOLCANO at 60 fps, log lines `boss wave 15: 1 fire lord`, `eruption at x`, `player 1 scorched`.
 - [ ] One hand-played volcano run judges the scorch trade-off (user's verdict).
+- [x] The imp throws one big lava drop straight down at 60 px/s. *(impCyclesFireballsLavaAndFan)*
+- [ ] PS3: the imp's big lava drop looks right.
 
 ## History
 - 2026-11-18: criteria written.

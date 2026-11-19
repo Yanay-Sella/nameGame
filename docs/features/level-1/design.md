@@ -19,7 +19,7 @@ The first world of NAME game: the game as it plays today, packaged as a level. I
 | Palette | Existing palette in `source/sprites.h`; navy background, grey stars, no new colours |
 | Background | Existing 3-layer starfield at 6 / 14 / 30 px/s |
 | Enemy roster | Green (1 HP), blue (2 HP, from wave 4), red armoured (4 HP, from wave 7); the existing divers from wave 3 |
-| Ship skin | The current ship (`SHIP_A` / `SHIP_B`); later levels re-skin it on the same 16×14 body |
+| Ship skin | The current ship (`SHIP_A` / `SHIP_B`); later levels have their own skins (D-031) |
 | Bosses | One classic at wave 5 (100 HP), two at 10 (100 HP each), a mage at 15 (200 HP), two mages at 20 (200 HP each) |
 
 ## Wave table
@@ -48,7 +48,7 @@ Numbers are what the current code does (`source/game.cpp`); intensity is a feel 
 | 19 | Same, shots 88 px/s | 5 | 0.9 | combat |
 | 20 | Level boss: 2 mages, 200 HP each, sway 70 px/s, each attacks every 1.0–2.2 s, reward 20,000 each | boss | 1.0 | climax |
 
-The alien formation sway tops out at 50 px/s from wave 15, shot speed at 90 px/s from wave 20. Two divers at once start at wave 15 (the first formation wave after it is 16).
+Shot speed tops out at 90 px/s at wave 20. Two divers at once start at wave 15 (the first formation wave after it is 16), aliens gain 1 HP from wave 15 and the formation bobs from wave 16; the sway keeps speeding up into later levels (enemy-waves rule 9, D-033).
 
 ## Numbers
 | Name | Value | Unit | What to watch in playtests |

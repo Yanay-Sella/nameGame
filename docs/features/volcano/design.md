@@ -8,12 +8,12 @@ Pictures from the game: [formation wave](../../work-plan/levels/volcano-wave.png
 
 ## Rules
 1. In Classic, beating the glacier continues the run here; VOLCANO in the level picker plays just this level (its clear is the win). The banner reads `VOLCANO`; the HUD reads `VOLCANO n`. The wave-20 clear shows `VOLCANO CLEAR` for 3 s, then in Classic the [deep sea](../deep-sea/design.md) starts.
-2. Formation wave n uses level 1's formulas at wave n + 11; the formation's shots fly 10 px/s faster.
+2. Formation wave n uses the enemy-wave formulas at difficulty wave n + 15 (D-033); the formation's shots fly 10 px/s faster.
 3. Enemies: living ember (1 HP), fire bat (2 HP), magma skull (4 HP), and a roaming phoenix (12 HP). Formation waves get `wave / 5` heavies, at most 3.
 4. Bosses: 5 one fire imp, 10 two imps, 15 one fire lord, 20 two fire lords.
-5. The fire imp cycles a fireball volley (3 aimed), a lava drip (3 drops, sideways −30, 0, 30, down 60 px/s) and a fireball fan (5).
-6. The fire lord rolls 30 % volley, 20 % fan, 25 % lava rain (5 drops, one per fifth, from the top at 70 px/s), 25 % eruption: a bubbling pool and a dotted magenta guide line at the nearest ship's x for 1.0 s, then a 16 px column of fire from the bottom to the top for 0.6 s that kills. An eruption while its own is active becomes a fan.
-7. **Lava drop:** touching it scorches the ship for 3 s: 0.6× speed, but each bullet does 2 damage (orange fire bolts), flames trail the ship and `HOT!` shows for 0.6 s. A new drop refreshes the 3 s. It doesn't kill and works on a respawning ship; the damage is decided when the bullet hits. Rockets are unchanged.
+5. The fire imp cycles a fireball volley (3 aimed), a big lava drop (one 10×12 drop straight down at 60 px/s) and a fireball fan (5).
+6. The fire lord rolls 30 % volley, 20 % fan, 25 % lava rain (5 drops, one per fifth, from the top at 70 px/s), 25 % eruption: a bubbling pool and a dotted magenta guide line at the nearest ship's x for 1.0 s, then a 16 px column of fire that rises from the bottom to the top in 0.1 s and lasts 0.6 s, shaking the screen; only its risen part kills. An eruption while its own is active becomes a fan.
+7. **Lava drops** (big or small): touching it scorches the ship for 3 s: 0.6× speed, but each bullet does 2 damage (orange fire bolts), flames trail the ship and `HOT!` shows for 0.6 s. A new drop refreshes the 3 s. It doesn't kill and works on a respawning ship; the damage is decided when the bullet hits. Rockets are unchanged.
 
 ## The level bundle
 | Part | Volcano |
@@ -22,7 +22,7 @@ Pictures from the game: [formation wave](../../work-plan/levels/volcano-wave.png
 | Palette | 8 new characters (rock browns, glowing cracks, lava river, hot orange, white-hot, deep red) |
 | Background | far layer 8 px/s (rock, three meandering lava rivers, glowing cracks), near layer 18 px/s (rock walls with glowing seams), 20 rising embers |
 | Enemy roster | ember, fire bat, magma skull, phoenix |
-| Ship skin | unchanged |
+| Ship skin | slate obsidian with glowing lava seams (D-031) |
 | Bosses | fire imp (200 HP) at 5, twin imps at 10, fire lord (380 HP) at 15, twin fire lords at 20 |
 
 ## Numbers
@@ -49,3 +49,4 @@ Pictures from the game: [formation wave](../../work-plan/levels/volcano-wave.png
 
 ## History
 - 2026-11-18: designed and implemented (D-024 to D-027).
+- 2026-11-18: beam build-up, shards and shake (D-032).

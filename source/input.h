@@ -21,3 +21,7 @@ inline void applyDeadzone(float& x, float& y, float dead) {
 
 void inputHandleEvent(const SDL_Event& event);   // call for every SDL event
 Actions inputRead(int player);                   // held state now, plus presses since the last read
+
+void inputRumblePulse(int player, float strength, float seconds);   // buzz one pad: strength 0..1, the strongest running pulse wins
+void inputRumbleUpdate(float shake, float dt);                      // call once a frame: shake 0..1 is the floor, pulses ride on top
+void inputRumbleStop();                                             // motors off, for shutdown

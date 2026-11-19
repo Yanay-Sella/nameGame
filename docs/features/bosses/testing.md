@@ -21,8 +21,10 @@
 - [x] The mage attacks in random order and gaps (0.6–1.4 × interval). *(`tests/game_tests.cpp` › mageAttacksInRandomOrderAndGaps)*
 - [x] The beam draws as a magenta column with a white core. *(`tests/game_tests.cpp` › beamDrawsAMagentaColumn)*
 - [ ] Waves 10 and 20 show two bosses, each in its half.
-- [ ] The mage's ball charges at the hat tip and the beam reads clearly; 60 fps holds.
+- [ ] The mage's ball charges at the wand's star and the beam reads clearly; 60 fps holds.
 - [ ] Twin mages at wave 20 are beatable but threatening (player report).
+- [x] The mage's ball forms at the wand's star. *(mageBallFormsAtTheWand)*
+- [ ] PS3: the mage's hat and wand look right.
 
 ## History
 - 2026-11-17: criteria written.

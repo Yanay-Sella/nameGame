@@ -2,9 +2,10 @@
 #include "input.h"
 #include <SDL.h>
 #include <debugnet.h>
+#include <io/pad.h>
 
 // Button indices from SDL_PSL1GHT's joystick driver (src/joystick/psl1ght/SDL_sysjoystick.c), see CLAUDE.md.
-enum { BTN_LEFT = 0, BTN_DOWN = 1, BTN_RIGHT = 2, BTN_UP = 3, BTN_START = 4, BTN_SELECT = 7, BTN_CROSS = 9, BTN_CIRCLE = 10, BTN_TRIANGLE = 11, BTN_R1 = 12, BTN_L1 = 13, BTN_R2 = 14,
+enum { BTN_LEFT = 0, BTN_DOWN = 1, BTN_RIGHT = 2, BTN_UP = 3, BTN_START = 4, BTN_L3 = 6, BTN_SELECT = 7, BTN_SQUARE = 8, BTN_CROSS = 9, BTN_CIRCLE = 10, BTN_TRIANGLE = 11, BTN_R1 = 12, BTN_L1 = 13, BTN_R2 = 14, BTN_L2 = 15,
        BUTTON_COUNT = 16 };
 
 static SDL_Joystick* joysticks[MAX_PLAYERS];
@@ -55,6 +56,10 @@ Actions inputRead(int player) {
     a.stress = pressed[player][BTN_TRIANGLE];
     a.autopilot = pressed[player][BTN_SELECT];
     a.screenshot = pressed[player][BTN_L1];
+    // L2+L3 held together; counts on the frame the last of them goes down
+    a.godMode = (pressed[player][BTN_L2] || pressed[player][BTN_L3])
+        && SDL_JoystickGetButton(joystick, BTN_L2) && SDL_JoystickGetButton(joystick, BTN_L3);
+    a.cycle = pressed[player][BTN_SQUARE];
     a.up = pressed[player][BTN_UP];
     a.down = pressed[player][BTN_DOWN];
     a.left = pressed[player][BTN_LEFT];
@@ -72,4 +77,38 @@ Actions inputRead(int player) {
     }
     for (bool& b : pressed[player]) b = false;
     return a;
+}
+
+static float pulseStrength[MAX_PLAYERS], pulseLeft[MAX_PLAYERS];   // the running rumble pulse: 0..1 and s left
+static int sentLarge[MAX_PLAYERS], sentSmall[MAX_PLAYERS];          // what the motors were last told
+
+void inputRumblePulse(int player, float strength, float seconds) {
+    if (player < 0 || player >= MAX_PLAYERS) return;
+    if (pulseLeft[player] <= 0 || strength >= pulseStrength[player]) {   // a weaker buzz never cuts a stronger one short
+        pulseStrength[player] = strength;
+        pulseLeft[player] = seconds;
+    }
+}
+
+void inputRumbleUpdate(float shake, float dt) {
+    for (int p = 0; p < MAX_PLAYERS; p++) {
+        pulseLeft[p] = fmaxf(0, pulseLeft[p] - dt);
+        float level = fmaxf(pulseLeft[p] > 0 ? pulseStrength[p] : 0, shake < 0.1f ? 0 : shake);
+        int large = (int)(fminf(level, 1) * 255) / 16 * 16;   // steps of 16, so a changing shake doesn't resend every frame
+        int small = pulseLeft[p] > 0 ? 1 : 0;
+        if (large == sentLarge[p] && small == sentSmall[p]) continue;
+        padActParam act = {};
+        act.small_motor = small;
+        act.large_motor = large;
+        ioPadSetActDirect(p, &act);
+        sentLarge[p] = large;
+        sentSmall[p] = small;
+    }
+}
+
+void inputRumbleStop() {
+    for (int p = 0; p < MAX_PLAYERS; p++) {
+        padActParam act = {};
+        ioPadSetActDirect(p, &act);
+    }
 }

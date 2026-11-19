@@ -1,9 +1,9 @@
 # NAME game — Game Design Document
 
-**Version:** 0.22 · **Updated:** 2026-11-18 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
+**Version:** 0.25 · **Updated:** 2026-11-18 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
 
 ## Summary
-You pilot a small ship at the bottom of the screen against waves of pixel-art aliens. Hold R1 to spray bullets, and save the scarce R2 rocket for the moment a wave gets out of hand. Waves get harder, and every 5th wave is a boss. The run goes through five levels of 20 waves each, every one harder than the last: level 1 (space), the jungle, the glacier, the volcano and the deep sea. It ends when you beat the deep sea's wave-20 bosses or lose your last life, and you chase the saved high score. Classic plays the five levels as one run; the level picker plays any single level on its own.
+You pilot a small ship at the bottom of the screen against waves of pixel-art aliens. Hold R1 to spray bullets, and save the scarce R2 rocket for the moment a wave gets out of hand. Waves get harder, and every 5th wave is a boss. The run goes through five levels of 20 waves each, every one harder than the last: level 1 (space), the jungle, the glacier, the volcano and the deep sea. It ends when you beat the deep sea's wave-20 bosses or lose your last life, and you chase the saved high score. Big bosses drop level buffs that stack until you die. Classic plays the five levels as one run; the level picker plays any single level on its own.
 
 | | |
 |---|---|
@@ -40,7 +40,7 @@ dodge + shoot (R1) → kill aliens → score and pickups → stronger gun / more
 | Lives and score | implemented | MVP | 3 lives, one hit kills, respawn invincibility, extra life every 50,000 | [design](features/lives-and-score/design.md) |
 | Bosses | implemented | MVP | A boss on every 5th wave: classic, twin classics, a mage with a power-ball beam, twin mages | [design](features/bosses/design.md) |
 | Music and sound | implemented | MVP | Two songs to choose from (Mizrahit, Dubstep) looped during gameplay; synthesized retro SFX | [design](features/music-and-sound/design.md) |
-| Pixel art | implemented | MVP | 320×180 palette art: sprites, font and starfield as text grids in code | [design](features/pixel-art/design.md) |
+| Pixel art | implemented | MVP | 320×180 palette art: sprites, font and starfield as text grids in code; a ship skin per level | [design](features/pixel-art/design.md) |
 | Screens | implemented | MVP | Main menu (Classic, Level picker, Settings), spinning level picker, pause menu, settings (music Mizrahit/Dubstep/Off, shake, flashing), high score on the title, game over | [design](features/screens/design.md) |
 | High score save | implemented | MVP | Best score saved on the PS3, shown on the title | [design](features/high-score/design.md) |
 | Game feel | implemented | MVP | Shake, hit-stop, flashes, particles by event tier; shake and flash options | [design](features/game-feel/design.md) |
@@ -48,6 +48,7 @@ dodge + shoot (R1) → kill aliens → score and pickups → stronger gun / more
 | Level 1 | implemented | MVP | First world: waves 1-20 of today's game, ends when the wave-20 boss dies; template for later themed levels | [design](features/level-1/design.md) |
 | Jungle | implemented | MVP | Level 2: insects, roaming heavy beetles, monkeys and gorillas with bananas, peels and stink mist | [design](features/jungle/design.md) |
 | Glacier | implemented | MVP | Level 3: ice monsters, a gliding ship, a sneezing yeti and an ice golem whose ice blocks freeze you | [design](features/glacier/design.md) |
+| Level buffs | implemented | MVP | Big bosses drop a level buff (wand beam, bananas, frost wave, fire bullets, bubble shield); Square picks the strong attack; death loses all | [design](features/level-buffs/design.md) |
 | Volcano | implemented | MVP | Level 4: fire monsters, an imp and a fire lord; lava drops slow you but double your bullets; eruptions | [design](features/volcano/design.md) |
 | Deep sea | implemented | MVP | Level 5: scary fish, a current, a bubble-spitting anglerfish and a fisherman fish that hooks you (or throws a boot) | [design](features/deep-sea/design.md) |
 
@@ -78,7 +79,7 @@ Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN ME
 - **Art:** pixel art drawn at 320×180 and scaled up by a whole number (×6 at 1080p, ×4 at 720p) with no smoothing. A small fixed palette; magenta marks only deadly enemy projectiles (shots, bananas, coconuts, snowballs, icicles, fireballs, eruptions, bubbles, the boot); hazards that don't kill (peels, ice blocks, lava drops, the hook) never use it. Dark starfield background that scrolls slowly.
 - **Audio:** the chosen song (Mizrahit or Dubstep, OGG copies) loops during gameplay only. Short square-wave and noise SFX for shooting, hits, explosions, pickups and death, mixed under the music.
 - **Game feel:** the [game-feel](../.claude/skills/game-feel/SKILL.md) tiers: bullet hits are small, kills and pickups medium, rocket explosions, boss hits and the player's death large. Shooting itself gets almost no feedback so held R1 doesn't buzz.
-- **Controls:** left stick or D-pad moves, R1 fires (hold), R2 rocket, Start pauses, X confirms in menus, Circle backs out in menus. Button numbers are measured in M1.
+- **Controls:** left stick or D-pad moves, R1 fires (hold), R2 strong attack (rocket or a buff's), Square picks it, Start pauses, X confirms in menus, Circle backs out in menus. Button numbers are measured in M1.
 - **Accessibility:** shake strength 0–100 % and reduce flashing in the settings screen; large flashes at most 3 per second.
 
 ## Game-level acceptance
@@ -118,6 +119,11 @@ Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN ME
 | D-026 | 2026-11-18 | Non-lethal hazards: the ice block freezes 1.6 s (R1 mashing breaks out sooner), the lava drop scorches 3 s (0.6× speed, 2× bullet damage, checked when the bullet hits), the hook lifts 24 px and stuns 1.6 s and ignores blinking ships | lethal ice blocks; scorch from the moment of firing; hook on any ship | the PDF's rules; mashing gives the frozen player something to do; a respawning ship shouldn't be hooked straight away | [glacier](features/glacier/design.md), [volcano](features/volcano/design.md), [deep sea](features/deep-sea/design.md) |
 | D-027 | 2026-11-18 | Level-wide twists: the ship glides on the glacier's ice and the deep sea's current pushes it sideways; the volcano's twist is its lava drops | none; twists on every level | small rule changes make each world feel different without new controls | [glacier](features/glacier/design.md), [deep sea](features/deep-sea/design.md), [ship controls](features/ship-controls/design.md) |
 | D-028 | 2026-11-18 | Main menu splits into CLASSIC (levels 1-5 as one run) and LEVEL PICKER (a spinning wheel; the picked level is played alone and its clear is the win) | one menu item per level, each run continuing to the end | user's request: one full run plus a way to practise any level | [screens](features/screens/design.md) |
+| D-029 | 2026-11-18 | Playtest fixes: gold player-2 ship; bigger mage hat and a wand whose star casts the power ball; brown, bulky gorilla; 24 px see-through ice blocks for both glacier bosses; the imp's lava drip is one big drop straight down; moving ships trail bubbles in the deep sea; the fisherman throws live fish (2 a throw, at most 3 out) that chase the nearest ship | ice blocks bigger for the yeti only; an aimed big drop; fish that flop and spit or hop | user's playtest notes and choices | [co-op](features/co-op/design.md), [bosses](features/bosses/design.md), [jungle](features/jungle/design.md), [glacier](features/glacier/design.md), [volcano](features/volcano/design.md), [deep sea](features/deep-sea/design.md) |
+| D-030 | 2026-11-18 | Level buffs: big bosses (waves 15, 20) drop a falling pickup; buffs stack, all lost on death; Square cycles the strong attack; beam 30 per enemy, frost 3 s (+25 % HP), bubbles 2 per hit, volcano fire rate only | wave 20 only; given automatically; all strong attacks at once or newest wins | user's PDF and choices; scarce rockets and the death loss keep pillar 2 | [level buffs](features/level-buffs/design.md), [rocket](features/rocket/design.md), [bosses](features/bosses/design.md), [ship controls](features/ship-controls/design.md) |
+| D-031 | 2026-11-18 | A ship skin per level on the same 16×14 body and hitbox; player 2 keeps a gold copy | recolour only | user's PDF; same hitbox keeps dodging fair | [pixel art](features/pixel-art/design.md), [co-op](features/co-op/design.md), [level buffs](features/level-buffs/design.md) |
+| D-032 | 2026-11-18 | Beams grow from their ball in 0.1 s, spark, and end in shards; the eruption grows too; beams, the frost wave and the shield pop shake the screen; the player's beam hits when it reaches the top | beams appearing at once; kick-only shake; hit-stop on the shield pop | user's request: beams felt flat and trauma 0.3 rounded to no visible shake | [level buffs](features/level-buffs/design.md), [bosses](features/bosses/design.md), [volcano](features/volcano/design.md), [game feel](features/game-feel/design.md) |
+| D-033 | 2026-11-18 | Upgrades drop at 1 % and level n takes n parts, shown by a HUD gauge and a pop-up; formation waves pick a random shape and entry; difficulty waves run 1-20 in level 1 and step back 15 at each new level (to 21-40 in the deep sea), adding HP, sway, divers and a bob past wave 15 | keep 3 % drops; one fixed formation; per-level offsets 5, 8, 11, 14 | user's request: rarer, earned upgrades; varied waves; a classic run that eases off at each new world then climbs higher | [weapon upgrades](features/weapon-upgrades/design.md), [enemy waves](features/enemy-waves/design.md) |
 
 ## Open questions
 - **Assumptions to confirm:** sprites as text grids in code (D-006); every number marked `[ASSUMPTION]` in the feature notes.
@@ -149,3 +155,7 @@ Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN ME
 **0.21 (2026-11-18):** jungle level (D-020 to D-023).
 **0.22 (2026-11-18):** glacier, volcano and deep sea levels (D-024 to D-027).
 **0.23 (2026-11-18):** main menu split into Classic and a spinning level picker (D-028).
+**0.24 (2026-11-18):** playtest fixes: ships, mage, gorilla, ice, lava, deep sea (D-029).
+**0.25 (2026-11-18):** level buffs and a ship skin per level (D-030, D-031).
+**0.26 (2026-11-18):** beam build-up, shards and strong-attack shake (D-032).
+**0.27 (2026-11-18):** upgrade parts and gauge, random wave patterns, classic difficulty ramp (D-033).

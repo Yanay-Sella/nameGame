@@ -12,6 +12,7 @@ R2 launches a big rocket that climbs, speeds up and explodes in a large blast on
 5. Rocket pickups drop from killed enemies and fall down; touching one adds a rocket, up to the maximum.
 6. The HUD shows the rocket count as icons.
 7. Dying doesn't remove rockets.
+8. R2 fires the armed strong attack: the rocket, or a level buff's ([level buffs](../level-buffs/design.md)).
 
 ## Numbers
 | Name | Value | Unit | What to watch in playtests |

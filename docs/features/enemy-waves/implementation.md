@@ -3,7 +3,7 @@
 **Updated:** 2026-11-17 · [Design](design.md) · [Testing](testing.md)
 
 ## Approach
-`startWave` builds the formation (rows from `formationRows`, types by row and wave) with every alien `ALIEN_ENTERING` above the screen. `updateAlien` is a small state machine: entering → in formation → diving → returning → in formation. Only aliens in formation or diving may shoot. From wave 3 a dive starts every `diveInterval(wave)` seconds if no alien is already diving.
+`startWave` picks `Game::formationShape` and `Game::entryStyle` at random, builds the formation (rows from `formationRows`, types by row and wave, slots bent by the shape) and places every alien `ALIEN_ENTERING` at its entry's start with a delay. Entering and returning aliens fly straight at their moving slot (sway plus `bobAmplitude`). `updateAlien` is a small state machine: entering → in formation → diving → returning → in formation. Only aliens in formation or diving may shoot. From wave 3 a dive starts every `diveInterval(wave)` seconds if fewer than `maxDivers(wave)` are diving. All of these take the difficulty wave (`difficultyWave`).
 
 ## Code map
 | File / module | Role in this feature |
@@ -14,7 +14,7 @@
 | `source/game.cpp` › `shotChance`, `enemyShotSpeed`, `diveInterval` | the difficulty formulas |
 
 ## Data and config
-- **Config constants:** `FORMATION_COLUMNS`, `COLUMN_SPACING`, `ROW_SPACING`, `FORMATION_TOP`, `SWAY_RANGE`, `WAVE_PAUSE`, `BANNER_TIME`, `ALIEN_HP`, `ALIEN_SCORE`, `WAVE_CLEAR_BONUS`, `ENEMY_SHOT_SPEED`, `SHOT_SPEEDUP_AFTER_WAVE`, `ENEMY_SHOT_SPEED_STEP`, `ENEMY_SHOT_MAX_SPEED`, `MORE_ARMOUR_WAVE`, `TWO_DIVERS_WAVE`, `ENTRY_DISTANCE`, `ENTRY_SPEED`, `ENTRY_COLUMN_DELAY`, `ENTRY_ROW_DELAY`, `DIVE_SPEED`, `DIVE_STEER`, `DIVE_MAX_SIDEWAYS`, `RETURN_SPEED` (all `game.cpp`).
+- **Config constants:** `FORMATION_COLUMNS`, `COLUMN_SPACING`, `ROW_SPACING`, `FORMATION_TOP`, `SWAY_RANGE`, `WAVE_PAUSE`, `BANNER_TIME`, `ALIEN_HP`, `ALIEN_SCORE`, `WAVE_CLEAR_BONUS`, `ENEMY_SHOT_SPEED`, `SHOT_SPEEDUP_AFTER_WAVE`, `ENEMY_SHOT_SPEED_STEP`, `ENEMY_SHOT_MAX_SPEED`, `MORE_ARMOUR_WAVE`, `MORE_DIVERS_EVERY`, `MAX_DIVERS`, `MAX_SWAY_SPEED`, `HP_BONUS_*`, `BOB_*`, `SHAPE_STEP_Y`, `STAGGER_X`, `SPLIT_GAP`, `SIDE_ENTRY_Y`, `STREAM_DELAY`, `SCATTER_DELAY`, `LEVEL_WAVE_STEP`, `ENTRY_DISTANCE`, `ENTRY_SPEED`, `ENTRY_COLUMN_DELAY`, `ENTRY_ROW_DELAY`, `DIVE_SPEED`, `DIVE_STEER`, `DIVE_MAX_SIDEWAYS`, `RETURN_SPEED` (all `game.cpp`).
 - **Persistence:** none.
 
 ## Deviations from design

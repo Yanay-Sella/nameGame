@@ -25,10 +25,21 @@ const float ENEMY_SHOT_SPEED = 70;     // px/s
 const int SHOT_SPEEDUP_AFTER_WAVE = 10;
 const float ENEMY_SHOT_SPEED_STEP = 2, ENEMY_SHOT_MAX_SPEED = 90;   // px/s per wave, px/s
 const int MORE_ARMOUR_WAVE = 13;       // two red and two blue rows from here
-const int TWO_DIVERS_WAVE = 15;        // two aliens may dive at once from here
+const int MORE_DIVERS_EVERY = 15;      // one more alien may dive at once every this many waves, at most 3
+const int MAX_DIVERS = 3;
+const float MAX_SWAY_SPEED = 80;       // px/s, reached at wave 30
+const int HP_BONUS_FROM = 5, HP_BONUS_EVERY = 10, MAX_HP_BONUS = 3;   // +1 HP at wave 15, 25 and 35
+const int BOB_FROM_WAVE = 16;          // the formation starts bobbing up and down here
+const float BOB_SPEED = 3, BOB_PHASE = 0.05f, MAX_BOB = 4;   // rad/s, rad per px of slot x, px
 const float ENTRY_DISTANCE = 150, ENTRY_SPEED = 150;      // px, px/s
 const float ENTRY_COLUMN_DELAY = 0.06f, ENTRY_ROW_DELAY = 0.12f;   // s
 const float DIVE_SPEED = 90, DIVE_STEER = 120, DIVE_MAX_SIDEWAYS = 70, RETURN_SPEED = 100;   // px/s, px/s^2
+// Wave patterns (enemy-waves rule 8): a random formation shape and entry per formation wave
+const float SHAPE_STEP_Y = 3;          // px lower per column from the centre (V) or toward it (arrow)
+const float STAGGER_X = 4.5f, SPLIT_GAP = 18;   // px: odd/even rows' shift; each half's move outward
+const float SIDE_ENTRY_Y = 30;         // px: side entries come in from just off the screen at this height
+const float STREAM_DELAY = 0.05f;      // s between the aliens of a side stream
+const float SCATTER_DELAY = 1.2f;      // s: a scattered entry starts each alien at random within this
 // Rocket (rocket/design.md)
 const int START_ROCKETS = 3, MAX_ROCKETS = 9;
 const float ROCKET_COOLDOWN = 0.5f, ROCKET_BUFFER = 0.15f;   // s
@@ -42,8 +53,10 @@ const float EXPLOSION_GROW = 0.1f, EXPLOSION_FADE = 0.35f;   // s
 const int MAX_WEAPON_LEVEL = 4;
 const float FAST_FIRE_INTERVAL = 0.08f;   // s, level 4
 const float DOUBLE_OFFSET = 3, SPREAD_SPEED = 70;   // px, px/s
-const float UPGRADE_CHANCE = 0.03f;    // per kill, rolled together with PICKUP_CHANCE
+const float UPGRADE_CHANCE = 0.01f;    // per kill, rolled together with PICKUP_CHANCE
 const int UPGRADE_MAX_POINTS = 1000;
+const float UPGRADE_TEXT_TIME = 0.9f;  // s the "n/m" or "POWER UP!" text rises above the ship
+const int LEVEL_UP_PARTICLES = 18;
 // Bosses (bosses/design.md)
 const int BOSS_W = 32, BOSS_H = 20;
 const float BOSS_STOP_Y = 20;          // px, where it hovers after flying in
@@ -57,7 +70,10 @@ const float MAGE_GAP_MIN = 0.6f, MAGE_GAP_MAX = 1.4f;             // x the attac
 const int WAND_TIP_X = 30, WAND_TIP_Y = 8;    // px in the mage sprite: the wand's star, where the power ball appears
 const float BALL_CHARGE_TIME = 1.5f, BEAM_TIME = 0.8f;   // s
 const int BALL_MAX_RADIUS = 5, BEAM_W = 24, BEAM_CORE_W = 8;   // px
-const float TRAUMA_BEAM = 0.3f;
+const float BEAM_GROW_TIME = 0.1f;               // s for a beam or eruption to reach its full length
+const float TRAUMA_BEAM_FIRE = 0.7f, BEAM_RUMBLE = 0.45f;   // kick when it fires; trauma floor while it's drawn
+const float BEAM_SPARK_RATE = 25;                // sparks per s off a beam's edges
+const float BEAM_SHARD_GAP = 6;                  // px of beam per shard when it ends
 const int BOSS_REWARD = 5000;          // points x (appearance + the level's reward offset)
 const float BOSS_EXPLOSION_RADIUS = 48;   // px
 const int BOSS_HEALTH_BAR_W = 120, BOSS_HEALTH_BAR_Y = 16;   // px
@@ -65,6 +81,7 @@ const int BOSS_HEALTH_BAR_W = 120, BOSS_HEALTH_BAR_Y = 16;   // px
 const float TRAUMA_DECAY = 1.5f;       // per s
 const float SHAKE_X = 4, SHAKE_Y = 3;  // px at trauma 1 and full strength
 const float FLASH_MIN_GAP = 0.33f;     // s between screen flashes
+const float TRAUMA_STRONG = 0.6f;   // frost wave and shield pop, like a rocket blast
 const float TRAUMA_BLAST = 0.6f, STOP_BLAST = 0.06f, FLASH_BLAST = 0.05f;
 const float TRAUMA_BOSS_DEATH = 1.0f, STOP_BOSS_DEATH = 0.15f, FLASH_BOSS_DEATH = 0.08f;
 const float TRAUMA_PLAYER_DEATH = 0.8f, STOP_PLAYER_DEATH = 0.12f, FLASH_PLAYER_DEATH = 0.08f;
@@ -83,7 +100,7 @@ const float LEVEL_CLEAR_TIME = 3;      // s of "LEVEL 1 CLEAR" before the end sc
 // Levels (jungle, glacier, volcano and deep-sea design notes): index level - 1; boss tables by n - 1, n = wave / 5
 const char* const LEVEL_NAMES[LEVEL_COUNT] = {"LEVEL 1", "JUNGLE", "GLACIER", "VOLCANO", "DEEP SEA"};
 const char* const LEVEL_LABELS[LEVEL_COUNT] = {"WAVE", "JUNGLE", "GLACIER", "VOLCANO", "DEEP SEA"};
-const int LEVEL_WAVE_OFFSET[LEVEL_COUNT] = {0, 5, 8, 11, 14};       // wave n uses level 1's formation numbers for n + this
+const int LEVEL_WAVE_STEP = 5;         // each level plays its wave n as difficulty wave n + 5 x (level - 1): 15 down from the last level's 20
 const int HEAVY_EVERY[LEVEL_COUNT] = {0, 8, 6, 5, 4};              // heavies per formation wave: wave / this (0: none)
 const int MAX_HEAVIES = 3;
 const float HEAVY_SLOT_X[MAX_HEAVIES] = {60, 244, 152};            // px, where each heavy flies in
@@ -141,7 +158,7 @@ const float FIRE_FAN_DOWN_SPEED = 80, FIRE_FAN_SIDEWAYS = 60;                   
 const float SCORCH_TIME = 3, SCORCH_SPEED = 0.6f, HOT_TEXT_TIME = 0.6f;          // s, x ship speed, s
 const int SCORCH_DAMAGE = 2;           // per bullet while scorched
 const float FIRELORD_VOLLEY_CHANCE = 0.3f, FIRELORD_FAN_CHANCE = 0.2f, FIRELORD_RAIN_CHANCE = 0.25f;   // the rest erupts
-const float ERUPTION_WARN = 1.0f, ERUPTION_TIME = 0.6f, TRAUMA_ERUPTION = 0.3f;   // s, s
+const float ERUPTION_WARN = 1.0f, ERUPTION_TIME = 0.6f;   // s, s
 const int ERUPTION_W = 16;             // px
 const int EMBERS = 20;
 const float EMBER_RISE_SPEED = 20;     // px/s
@@ -164,9 +181,22 @@ const float HOOK_LIFT = 24, HOOK_LIFT_SPEED = 60, HOOK_STUN = 1.6f;   // px, px/
 const float BOOT_CHANCE = 0.35f, BOOT_SPEED = 85, GOT_ONE_TIME = 1, BOOT_TEXT_TIME = 0.8f;   // per empty cast, px/s, s, s
 const int SEA_BUBBLES = 16;
 const float SEA_BUBBLE_SPEED = 25;     // px/s
+// Level buffs (level-buffs/design.md)
+const int BUFF_PICKUP_SIZE = 11, BUFF_HELD_POINTS = 5000;   // px; points for a buff already held
+const float MAGIC_CHARGE_TIME = 0.8f, MAGIC_BEAM_TIME = 0.4f;   // s
+const int MAGIC_BEAM_W = BEAM_W / 2, MAGIC_BEAM_CORE_W = 4, MAGIC_DAMAGE = 30;   // px, px, HP per enemy
+const int SHIP_WAND_X = 14, SHIP_WAND_Y = 3;   // px in the ship: the wand's star (the WAND sprite is drawn at +13, +2)
+const float FROST_TIME = 3, FROST_RING_TIME = 0.4f, FROST_RING_SPEED = 450, FROST_THAW_BLINK = 0.5f;   // s, s, px/s, s
+const float VOLCANO_FIRE_FACTOR = 0.8f;   // x the fire interval: 25 % faster
+const int SHIELD_RADIUS = 11, SHIELD_SPLIT = 3, BUBBLE_DAMAGE = 2;   // px, bubbles per burst, HP per hit
+const float SHIELD_POP_INVINCIBLE = 1, SHIELD_BUBBLE_SPREAD = 0.2f, SHIELD_BUBBLE_LIFE = 3;   // s
+const float SHIELD_BUBBLE_SPEED[4] = {0, 150, 130, 110};   // px/s by size
+const int SHIELD_BUBBLE_D[4] = {0, 2, 4, 8};               // px by size
 // Pixel art (pixel-art/design.md)
 const float ANIMATION_FRAME = 0.25f;   // s
 const float HIT_FLASH = 0.06f;         // s
+const float MUZZLE_TIME = 0.05f;       // s a shot's muzzle flash stays at the nose
+const float BOSS_SMOKE_RATE = 8;       // sparks per s off a boss below half HP
 const int STAR_COUNTS[3] = {30, 20, 10};
 const float STAR_SPEEDS[3] = {6, 14, 30};   // px/s
 const char STAR_COLORS[3] = {'n', 'd', 's'};
@@ -187,6 +217,11 @@ const Sprite* const THROWN_SPRITES[][2] = {{&BANANA_A, &BANANA_B}, {&COCONUT, &C
                                            {&ICE_BLOCK, &ICE_BLOCK}, {&ICICLE, &ICICLE}, {&FIREBALL_A, &FIREBALL_B},
                                            {&LAVA_DROP, &LAVA_DROP}, {&BUBBLE, &BUBBLE}, {&BIG_BUBBLE, &BIG_BUBBLE},
                                            {&BOOT, &BOOT}, {&BIG_LAVA_DROP, &BIG_LAVA_DROP}};   // by ThrownKind, two animation frames
+const Sprite* const SHIP_SKINS[LEVEL_COUNT][2][2] = {{{&SHIP_A, &SHIP_B}, {&SHIP2_A, &SHIP2_B}},
+    {{&SHIP_JUNGLE_A, &SHIP_JUNGLE_B}, {&SHIP2_JUNGLE_A, &SHIP2_JUNGLE_B}}, {{&SHIP_GLACIER_A, &SHIP_GLACIER_B}, {&SHIP2_GLACIER_A, &SHIP2_GLACIER_B}},
+    {{&SHIP_VOLCANO_A, &SHIP_VOLCANO_B}, {&SHIP2_VOLCANO_A, &SHIP2_VOLCANO_B}}, {{&SHIP_SEA_A, &SHIP_SEA_B}, {&SHIP2_SEA_A, &SHIP2_SEA_B}}};   // [level - 1][player][frame]
+const Sprite* const BUFF_ICONS[LEVEL_COUNT] = {&BUFF_ICON_SPACE, &BUFF_ICON_JUNGLE, &BUFF_ICON_GLACIER, &BUFF_ICON_VOLCANO, &BUFF_ICON_SEA};
+const Sprite* const SHIELD_BUBBLE_SPRITES[4] = {NULL, &SHIELD_BUBBLE_1, &SHIELD_BUBBLE_2, &SHIELD_BUBBLE_3};
 
 static float randomUnit(Game& game) {
     uint32_t& s = game.random;
@@ -213,7 +248,23 @@ float enemyShotSpeed(int wave) {
 }
 
 float diveInterval(int wave) {
-    return std::max(4 - 0.2f * wave, 1.5f);
+    return std::max(4 - 0.2f * wave, 1.0f);
+}
+
+int maxDivers(int wave) {
+    return std::min(1 + wave / MORE_DIVERS_EVERY, MAX_DIVERS);
+}
+
+int alienHpBonus(int wave) {
+    return std::min(std::max(wave - HP_BONUS_FROM, 0) / HP_BONUS_EVERY, MAX_HP_BONUS);
+}
+
+float swaySpeed(int wave) {
+    return std::min(20.0f + 2 * wave, MAX_SWAY_SPEED);
+}
+
+float bobAmplitude(int wave) {
+    return wave < BOB_FROM_WAVE ? 0 : std::min(1 + 0.15f * (wave - BOB_FROM_WAVE), MAX_BOB);
 }
 
 bool isBossWave(int wave) {
@@ -233,7 +284,7 @@ BossType bossType(int level, int wave) {
 }
 
 int difficultyWave(int level, int wave) {
-    return wave + LEVEL_WAVE_OFFSET[level - 1];
+    return wave + LEVEL_WAVE_STEP * (level - 1);
 }
 
 int heavyCount(int level, int wave) {
@@ -256,6 +307,7 @@ static float bossAttackInterval(int level, int wave) {
 static void startWave(Game& game, int wave) {
     game.wave = wave;
     game.aliens.clear();
+    auto scaleHp = [&](int hp) { return game.players.size() == 2 ? (hp * 3 + 1) / 2 : hp; };   // co-op: enemies have 1.5x HP, rounded up
     int dw = difficultyWave(game.level, wave);
     int rows = formationRows(dw);
     game.bosses.clear();
@@ -270,12 +322,16 @@ static void startWave(Game& game, int wave) {
             boss.x = (boss.minX + boss.maxX) / 2;
             boss.y = -BOSS_H;
             boss.vx = count == 2 && i == 0 ? -speed : speed;   // twins move apart first
-            boss.hp = boss.maxHp = bossHealth(game.level, wave);
+            boss.hp = boss.maxHp = scaleHp(bossHealth(game.level, wave));
             boss.attackTimer = bossAttackInterval(game.level, wave) * (i == 0 ? 1 : TWIN_FIRST_ATTACK);
             boss.alive = true;
             game.bosses.push_back(boss);
         }
         rows = 0;
+    }
+    if (rows > 0) {
+        game.formationShape = (int)(randomUnit(game) * SHAPE_COUNT);
+        game.entryStyle = (int)(randomUnit(game) * ENTRY_COUNT);
     }
     float left = (SCREEN_W - (FORMATION_COLUMNS - 1) * COLUMN_SPACING - ALIEN_WIDTH[ALIEN_GREEN]) / 2;
     for (int row = 0; row < rows; row++) {
@@ -287,13 +343,31 @@ static void startWave(Game& game, int wave) {
             Alien alien = {};
             alien.type = type;
             alien.state = ALIEN_ENTERING;
+            float fromCentre = col - (FORMATION_COLUMNS - 1) / 2.0f;   // -3.5..3.5
             alien.slotX = left + col * COLUMN_SPACING;
             alien.slotY = FORMATION_TOP + row * ROW_SPACING;
+            switch (game.formationShape) {   // every shape keeps the aliens above y 100, sway and bob included
+                case SHAPE_STAGGER: alien.slotX += row % 2 ? STAGGER_X : -STAGGER_X; break;
+                case SHAPE_V: alien.slotY += (fabsf(fromCentre) - 0.5f) * SHAPE_STEP_Y; break;
+                case SHAPE_ARROW: alien.slotY += (3.5f - fabsf(fromCentre)) * SHAPE_STEP_Y; break;
+                case SHAPE_WAVE: alien.slotY += 4 + 4 * sinf(col * 1.3f); break;
+                case SHAPE_SPLIT: alien.slotX += fromCentre < 0 ? -SPLIT_GAP : SPLIT_GAP; break;
+            }
             alien.x = alien.slotX + game.swayOffset;
             alien.y = alien.slotY - ENTRY_DISTANCE;
-            alien.vx = 0;
             alien.entryDelay = col * ENTRY_COLUMN_DELAY + row * ENTRY_ROW_DELAY;
-            alien.hp = ALIEN_HP[type];
+            bool fromLeft = game.entryStyle == ENTRY_LEFT || (game.entryStyle == ENTRY_PINCER && fromCentre < 0);
+            if (game.entryStyle == ENTRY_SCATTER) {
+                alien.entryDelay = randomUnit(game) * SCATTER_DELAY;
+            } else if (game.entryStyle != ENTRY_TOP) {   // a stream from the side, the far slots first
+                int order = game.entryStyle == ENTRY_PINCER ? row * FORMATION_COLUMNS / 2 + (int)fabsf(fromCentre)
+                                                            : row * FORMATION_COLUMNS + (fromLeft ? FORMATION_COLUMNS - 1 - col : col);
+                alien.x = fromLeft ? -ALIEN_WIDTH[type] : SCREEN_W;
+                alien.y = SIDE_ENTRY_Y;
+                alien.entryDelay = order * STREAM_DELAY;
+            }
+            alien.vx = 0;
+            alien.hp = alien.maxHp = scaleHp(ALIEN_HP[type] + alienHpBonus(dw));
             alien.flash = 0;
             alien.alive = true;
             game.aliens.push_back(alien);
@@ -310,7 +384,7 @@ static void startWave(Game& game, int wave) {
         heavy.vx = i == 1 ? -HEAVY_SPEED_X : HEAVY_SPEED_X;
         heavy.vy = HEAVY_SPEED_Y;
         heavy.entryDelay = 0.6f + 0.4f * i;
-        heavy.hp = ALIEN_HP[ALIEN_HEAVY];
+        heavy.hp = heavy.maxHp = scaleHp(ALIEN_HP[ALIEN_HEAVY] + alienHpBonus(dw));
         heavy.alive = true;
         game.aliens.push_back(heavy);
     }
@@ -383,8 +457,40 @@ static void addScore(Game& game, Player& player, int points) {
 static void spawnParticles(Game& game, float x, float y, int count, uint32_t color, float speed) {
     for (int i = 0; i < count; i++) {
         float angle = i * 6.283f / count + randomUnit(game) * 0.5f, s = speed * (0.5f + randomUnit(game));
-        Particle p = {x, y, cosf(angle) * s, sinf(angle) * s, 0.3f + randomUnit(game) * 0.2f, color};
+        Particle p = {x, y, cosf(angle) * s, sinf(angle) * s, 0.3f + randomUnit(game) * 0.2f, color, 1};
         game.particles.push_back(p);
+    }
+}
+
+// A few sparks bounce back toward the ship from where a bullet landed.
+static void spawnHitSparks(Game& game, float x, float y) {
+    for (int i = 0; i < 3; i++) {
+        game.particles.push_back({x, y, (randomUnit(game) - 0.5f) * 80, 25 + randomUnit(game) * 50,
+                                  0.1f + randomUnit(game) * 0.1f, paletteColor(i == 0 ? 'w' : 'o'), 1});
+    }
+}
+
+// How far a firing beam has grown, 0..1: fast at first, easing into its full length.
+static float beamReach(float elapsed) {
+    float t = std::min(elapsed / BEAM_GROW_TIME, 1.0f);
+    return 1 - (1 - t) * (1 - t);
+}
+
+// Now and then a spark flies sideways off a random point of the beam's edge.
+static void beamSpark(Game& game, float x, float top, float bottom, int width, uint32_t color, float dt) {
+    if (randomUnit(game) >= BEAM_SPARK_RATE * dt) return;
+    float side = randomUnit(game) < 0.5f ? -1.0f : 1.0f;
+    game.particles.push_back({x + side * width / 2.0f, top + randomUnit(game) * (bottom - top), side * (30 + randomUnit(game) * 30),
+                              (randomUnit(game) - 0.5f) * 40, 0.12f + randomUnit(game) * 0.1f,
+                              randomUnit(game) < 0.5f ? paletteColor('w') : color, 1});
+}
+
+// A finished beam breaks into small shards along its length that drift off, fall and vanish.
+static void spawnBeamShards(Game& game, float x, float top, float bottom, int width, uint32_t color) {
+    for (float y = top; y < bottom; y += BEAM_SHARD_GAP) {
+        float side = randomUnit(game) - 0.5f;   // -0.5..0.5 across the beam
+        game.particles.push_back({x + side * width, y + randomUnit(game) * BEAM_SHARD_GAP, side * 40, 5 + randomUnit(game) * 15,
+                                  0.35f + randomUnit(game) * 0.25f, randomUnit(game) < 0.5f ? paletteColor('w') : color, 2});
     }
 }
 
@@ -399,9 +505,9 @@ static void damageAlien(Game& game, Alien& alien, int damage, int owner) {
     if (owner >= 0) addScore(game, game.players[owner], ALIEN_SCORE[alien.type]);
     float cx = alien.x + ALIEN_WIDTH[alien.type] / 2.0f, cy = alien.y + ALIEN_HEIGHT[alien.type] / 2.0f;
     spawnParticles(game, cx, cy, 8, paletteColor(ALIEN_COLORS[game.level - 1][alien.type]), 50);
-    float roll = randomUnit(game);   // below 2 %: rocket pickup, below 5 %: upgrade pickup
+    float roll = randomUnit(game);   // below 2 %: rocket pickup, below 3 %: upgrade pickup
     if (roll < PICKUP_CHANCE + UPGRADE_CHANCE) {
-        Pickup pickup = {cx - 4, cy - 4, roll < PICKUP_CHANCE ? PICKUP_ROCKET : PICKUP_UPGRADE};
+        Pickup pickup = {cx - 4, cy - 4, roll < PICKUP_CHANCE ? PICKUP_ROCKET : PICKUP_UPGRADE, 0};
         game.pickups.push_back(pickup);
     }
     game.soundRequested[SOUND_ALIEN_DEATH] = true;
@@ -424,10 +530,13 @@ static void damageBoss(Game& game, Boss& boss, int damage, int owner) {
     float cx = boss.x + BOSS_W / 2.0f, cy = boss.y + BOSS_H / 2.0f;
     Explosion explosion = {cx, cy, 0, BOSS_EXPLOSION_RADIUS};
     game.explosions.push_back(explosion);
+    for (int i = 1; i <= 4; i++)   // aftershocks: smaller blasts across the body, a negative age delays each one
+        game.explosions.push_back({cx + (randomUnit(game) - 0.5f) * BOSS_W, cy + (randomUnit(game) - 0.5f) * BOSS_H, -0.12f * i, BOSS_EXPLOSION_RADIUS / 2});
     spawnParticles(game, cx, cy, 24, paletteColor('g'), 70);
     spawnParticles(game, cx, cy, 16, paletteColor('o'), 50);
-    game.pickups.push_back({cx - 12 - 4, cy - 4, PICKUP_UPGRADE});
-    game.pickups.push_back({cx + 12 - 4, cy - 4, PICKUP_ROCKET});
+    game.pickups.push_back({cx - 12 - 4, cy - 4, PICKUP_UPGRADE, 0});
+    game.pickups.push_back({cx + 12 - 4, cy - 4, PICKUP_ROCKET, 0});
+    if (game.wave >= BIG_BOSS_WAVE) game.pickups.push_back({cx - BUFF_PICKUP_SIZE / 2.0f, cy + 8, PICKUP_BUFF, game.level});   // big bosses drop the level buff
     game.soundRequested[SOUND_ALIEN_DEATH] = true;
     game.soundRequested[SOUND_EXPLOSION] = true;
 }
@@ -450,6 +559,13 @@ static void explode(Game& game, float x, float y, int owner) {
         if (boss.alive && (nearestX - x) * (nearestX - x) + (nearestY - y) * (nearestY - y) <= EXPLOSION_RADIUS * EXPLOSION_RADIUS)
             damageBoss(game, boss, EXPLOSION_DAMAGE, owner);
     }
+    for (Fish& f : game.fish) {   // live fish inside the blast die
+        float dx = f.x + FISH_W / 2.0f - x, dy = f.y + FISH_H / 2.0f - y;
+        if (f.life <= 0 || dx * dx + dy * dy > EXPLOSION_RADIUS * EXPLOSION_RADIUS) continue;
+        f.life = 0;   // removed in updateGame
+        if (owner >= 0) addScore(game, game.players[owner], FISH_SCORE);
+        spawnParticles(game, f.x + FISH_W / 2.0f, f.y + FISH_H / 2.0f, 8, paletteColor('O'), 50);
+    }
     game.soundRequested[SOUND_EXPLOSION] = true;
 }
 
@@ -461,6 +577,11 @@ static void killPlayer(Game& game, Player& player) {
     player.respawnTimer = RESPAWN_DELAY;
     player.rocketPressedAt = -1;
     player.weaponLevel = std::max(1, player.weaponLevel - 1);
+    player.upgradeParts = 0;
+    player.upgradeTimer = 0;
+    player.buffs = player.strongAttack = 0;   // dying loses every buff
+    player.shield = false;
+    player.beamCharge = player.beamTimer = 0;
     feedback(game, TRAUMA_PLAYER_DEATH, STOP_PLAYER_DEATH, FLASH_PLAYER_DEATH);
     float cx = player.x + SHIP_W / 2.0f, cy = player.y + SHIP_H / 2.0f;
     Explosion explosion = {cx, cy, 0, SHIP_EXPLOSION_RADIUS};
@@ -470,7 +591,36 @@ static void killPlayer(Game& game, Player& player) {
     game.soundRequested[SOUND_PLAYER_DEATH] = true;
 }
 
+// The glacier buff's strong attack: every enemy freezes and heals a quarter of its max HP; every incoming attack shatters.
+static void frostWave(Game& game, const Player& player) {
+    game.freezeTimer = FROST_TIME;
+    game.frostAge = 0;
+    game.frostX = player.x + SHIP_W / 2.0f;
+    game.frostY = player.y + SHIP_H / 2.0f;
+    for (Alien& alien : game.aliens)
+        if (alien.alive) alien.hp = std::min(alien.hp + (alien.maxHp + 3) / 4, alien.maxHp);
+    for (Boss& boss : game.bosses) {
+        if (!boss.alive) continue;
+        boss.hp = std::min(boss.hp + (boss.maxHp + 3) / 4, boss.maxHp);
+        boss.burstShotsLeft = 0;
+        boss.ballTimer = boss.beamTimer = boss.windupTimer = 0;
+        boss.hookState = HOOK_NONE;
+    }
+    for (Player& p : game.players) p.hookedTimer = 0;
+    for (const Shot& s : game.enemyShots) spawnParticles(game, s.x + 1, s.y + 2, 2, paletteColor('i'), 30);
+    for (const Thrown& t : game.thrown) spawnParticles(game, t.x + THROWN_W[t.kind] / 2.0f, t.y + THROWN_H[t.kind] / 2.0f, 3, paletteColor('i'), 30);
+    for (const Fish& f : game.fish) spawnParticles(game, f.x + FISH_W / 2.0f, f.y + FISH_H / 2.0f, 3, paletteColor('i'), 30);
+    game.enemyShots.clear();
+    game.thrown.clear();
+    game.lobs.clear();
+    game.fish.clear();
+    feedback(game, TRAUMA_STRONG, 0, FLASH_BLAST);
+    game.soundRequested[SOUND_FREEZE] = true;
+}
+
 static void updatePlayer(Game& game, Player& player, int index, const Actions& a, float dt) {
+    player.muzzleTimer = std::max(0.0f, player.muzzleTimer - dt);
+    player.upgradeTimer = std::max(0.0f, player.upgradeTimer - dt);
     if (!player.alive) {
         player.respawnTimer -= dt;
         if (player.respawnTimer <= 0 && player.lives > 0) {
@@ -480,6 +630,38 @@ static void updatePlayer(Game& game, Player& player, int index, const Actions& a
             player.fireTimer = 0;
         }
         return;
+    }
+    float beamBefore = player.beamTimer;
+    player.beamTimer = std::max(0.0f, player.beamTimer - dt);
+    const float reachedAt = MAGIC_BEAM_TIME - BEAM_GROW_TIME;   // beamTimer when the beam reaches the top
+    if (beamBefore > reachedAt && player.beamTimer <= reachedAt) {
+        float left = player.beamX - MAGIC_BEAM_W / 2.0f;
+        for (Alien& alien : game.aliens)
+            if (alien.alive && overlap(left, 0, MAGIC_BEAM_W, player.beamBottom, alien.x, alien.y, ALIEN_WIDTH[alien.type], ALIEN_HEIGHT[alien.type]))
+                damageAlien(game, alien, MAGIC_DAMAGE, index);
+        for (Boss& boss : game.bosses)
+            if (boss.alive && overlap(left, 0, MAGIC_BEAM_W, player.beamBottom, boss.x, boss.y, BOSS_W, BOSS_H)) damageBoss(game, boss, MAGIC_DAMAGE, index);
+        for (Fish& f : game.fish) {
+            if (f.life <= 0 || !overlap(left, 0, MAGIC_BEAM_W, player.beamBottom, f.x, f.y, FISH_W, FISH_H)) continue;
+            f.life = 0;   // removed in updateGame
+            addScore(game, player, FISH_SCORE);
+            spawnParticles(game, f.x + FISH_W / 2.0f, f.y + FISH_H / 2.0f, 8, paletteColor('O'), 50);
+        }
+    }
+    if (player.beamTimer > 0) {
+        game.trauma = std::max(game.trauma, BEAM_RUMBLE);
+        beamSpark(game, player.beamX, player.beamBottom * (1 - beamReach(MAGIC_BEAM_TIME - player.beamTimer)), player.beamBottom, MAGIC_BEAM_W, paletteColor('c'), dt);
+    }
+    if (beamBefore > 0 && player.beamTimer == 0) spawnBeamShards(game, player.beamX, 0, player.beamBottom, MAGIC_BEAM_W, paletteColor('c'));
+    if (player.beamCharge > 0) {   // the magic ball grows where R2 was pressed, then beams up its column (space buff)
+        player.beamCharge -= dt;
+        if (player.beamCharge <= 0) {   // the ball and the beam stay where R2 was pressed
+            player.beamCharge = 0;
+            player.beamTimer = MAGIC_BEAM_TIME;
+            feedback(game, TRAUMA_BEAM_FIRE, 0, 0);
+            spawnParticles(game, player.beamX, player.beamBottom, 6, paletteColor('c'), 40);
+            game.soundRequested[SOUND_EXPLOSION] = true;
+        }
     }
     player.invincibleTimer = std::max(0.0f, player.invincibleTimer - dt);
     player.scorchTimer = std::max(0.0f, player.scorchTimer - dt);
@@ -519,6 +701,14 @@ static void updatePlayer(Game& game, Player& player, int index, const Actions& a
     }
     player.x = std::max(0.0f, std::min(player.x + vx * dt, (float)(SCREEN_W - SHIP_W)));
     player.y = std::max(MOVE_ZONE_TOP, std::min(player.y + vy * dt, (float)(SCREEN_H - SHIP_H)));
+    if (game.level == 5 && a.moveX * a.moveX + a.moveY * a.moveY > 0.04f) {   // the deep sea: a moving ship leaves bubbles
+        player.trailTimer -= dt;
+        if (player.trailTimer <= 0) {
+            player.trailTimer = TRAIL_GAP;
+            float nozzleX = player.x + (randomUnit(game) < 0.5f ? 4 : 11);
+            game.particles.push_back({nozzleX, player.y + SHIP_H, (randomUnit(game) - 0.5f) * 16, -TRAIL_RISE, TRAIL_LIFE, paletteColor('i'), 1});
+        }
+    }
     if (player.slideTimer == 0 && player.stunTimer == 0) {
         for (Peel& peel : game.peels) {   // stepping on a peel starts a slide the way the stick points
             if (peel.life <= 0 || !overlap(peel.x, peel.y, PEEL_W, PEEL_H, player.x + HITBOX_X, player.y + HITBOX_Y, HITBOX, HITBOX)) continue;
@@ -546,7 +736,8 @@ static void updatePlayer(Game& game, Player& player, int index, const Actions& a
             game.bullets.push_back({noseX, noseY, -BULLET_SPEED, index, 0});
             game.bullets.push_back({noseX, noseY, -BULLET_SPEED, index, SPREAD_SPEED});
         }
-        player.fireTimer += player.weaponLevel == MAX_WEAPON_LEVEL ? FAST_FIRE_INTERVAL : FIRE_INTERVAL;
+        player.fireTimer += (player.weaponLevel == MAX_WEAPON_LEVEL ? FAST_FIRE_INTERVAL : FIRE_INTERVAL) * (player.buffs & BUFF_VOLCANO ? VOLCANO_FIRE_FACTOR : 1);
+        player.muzzleTimer = MUZZLE_TIME;
         game.soundRequested[SOUND_SHOOT] = true;
     }
     if (player.fireTimer < 0) player.fireTimer = 0;
@@ -557,12 +748,26 @@ static void updatePlayer(Game& game, Player& player, int index, const Actions& a
     player.rocketCooldown = std::max(0.0f, player.rocketCooldown - dt);
     if (player.rocketPressedAt >= 0 && player.rocketCooldown == 0) {
         player.rocketPressedAt = -1;
-        if (player.rockets > 0) {
+        bool shieldUp = player.strongAttack == 5 && player.shield;   // a second shield can't stack and costs nothing
+        if (player.rockets > 0 && !shieldUp) {
             player.rockets--;
             player.rocketCooldown = ROCKET_COOLDOWN;
-            Rocket rocket = {player.x + SHIP_W / 2 - 2, player.y - 8, ROCKET_START_SPEED, index};
-            game.rockets.push_back(rocket);
-            game.soundRequested[SOUND_ROCKET_LAUNCH] = true;
+            if (player.strongAttack == 1) {
+                player.beamCharge = MAGIC_CHARGE_TIME;
+                player.beamTimer = 0;
+                player.beamX = player.x + SHIP_WAND_X;
+                player.beamBottom = player.y + SHIP_WAND_Y;
+                game.soundRequested[SOUND_CAST] = true;
+            } else if (player.strongAttack == 3) {
+                frostWave(game, player);
+            } else if (player.strongAttack == 5) {
+                player.shield = true;
+                game.soundRequested[SOUND_BUBBLE] = true;
+            } else {
+                Rocket rocket = {player.x + SHIP_W / 2 - 2, player.y - 8, ROCKET_START_SPEED, index};
+                game.rockets.push_back(rocket);
+                game.soundRequested[SOUND_ROCKET_LAUNCH] = true;
+            }
         } else {
             game.soundRequested[SOUND_ROCKET_EMPTY] = true;
         }
@@ -571,23 +776,32 @@ static void updatePlayer(Game& game, Player& player, int index, const Actions& a
 
 static void updateAlien(Game& game, Alien& alien, float dt) {
     alien.flash = std::max(0.0f, alien.flash - dt);
+    int dw = difficultyWave(game.level, game.wave);
     float formationX = alien.slotX + game.swayOffset;
+    float formationY = alien.slotY + (alien.type == ALIEN_HEAVY ? 0 : bobAmplitude(dw) * sinf(game.time * BOB_SPEED + alien.slotX * BOB_PHASE));
     switch (alien.state) {
         case ALIEN_ENTERING:
-            alien.x = formationX;
             if (alien.entryDelay > 0) {
                 alien.entryDelay -= dt;
                 break;
             }
-            alien.y += ENTRY_SPEED * dt;
-            if (alien.y >= alien.slotY) {
-                alien.y = alien.slotY;
+            // fall through: it flies straight at its moving slot, like a returning diver but faster
+        case ALIEN_RETURNING: {
+            float speed = alien.state == ALIEN_ENTERING ? ENTRY_SPEED : RETURN_SPEED;
+            float dx = formationX - alien.x, dy = formationY - alien.y, distance = sqrtf(dx * dx + dy * dy);
+            if (distance <= speed * dt) {
                 alien.state = alien.type == ALIEN_HEAVY ? ALIEN_ROAMING : ALIEN_IN_FORMATION;
+                alien.x = formationX;
+                alien.y = formationY;
+            } else {
+                alien.x += dx / distance * speed * dt;
+                alien.y += dy / distance * speed * dt;
             }
             break;
+        }
         case ALIEN_IN_FORMATION:
             alien.x = formationX;
-            alien.y = alien.slotY;
+            alien.y = formationY;
             break;
         case ALIEN_DIVING: {
             // Steers toward the nearest living ship; with none alive, it heads back (enemy-waves edge case).
@@ -609,18 +823,6 @@ static void updateAlien(Game& game, Alien& alien, float dt) {
             }
             break;
         }
-        case ALIEN_RETURNING: {
-            float dx = formationX - alien.x, dy = alien.slotY - alien.y, distance = sqrtf(dx * dx + dy * dy);
-            if (distance <= RETURN_SPEED * dt) {
-                alien.state = ALIEN_IN_FORMATION;
-                alien.x = formationX;
-                alien.y = alien.slotY;
-            } else {
-                alien.x += dx / distance * RETURN_SPEED * dt;
-                alien.y += dy / distance * RETURN_SPEED * dt;
-            }
-            break;
-        }
         case ALIEN_ROAMING:   // the heavy beetle bounces around its box
             alien.x += alien.vx * dt;
             alien.y += alien.vy * dt;
@@ -634,7 +836,6 @@ static void updateAlien(Game& game, Alien& alien, float dt) {
             }
             break;
     }
-    int dw = difficultyWave(game.level, game.wave);
     bool canShoot = alien.state == ALIEN_IN_FORMATION || alien.state == ALIEN_DIVING || alien.state == ALIEN_ROAMING;
     float chance = shotChance(dw) * (alien.type == ALIEN_HEAVY ? HEAVY_SHOT_FACTOR : 1);
     if (canShoot && !game.over && randomUnit(game) < chance * dt) {
@@ -714,6 +915,10 @@ static void updateHook(Game& game, Boss& boss, const Player* target, float dt) {
 // Flies in, sways in its range and attacks; holds new attacks with no living ship.
 static void updateBoss(Game& game, Boss& boss, float dt) {
     boss.flash = std::max(0.0f, boss.flash - dt);
+    if (boss.hp * 2 < boss.maxHp && randomUnit(game) < BOSS_SMOKE_RATE * dt) {   // a wounded boss throws sparks off its body
+        game.particles.push_back({boss.x + randomUnit(game) * BOSS_W, boss.y + randomUnit(game) * BOSS_H, (randomUnit(game) - 0.5f) * 20,
+                                  -15 - randomUnit(game) * 15, 0.3f + randomUnit(game) * 0.2f, paletteColor(randomUnit(game) < 0.5f ? 'o' : 'y'), 1});
+    }
     boss.laughTimer = std::max(0.0f, boss.laughTimer - dt);
     boss.sayTimer = std::max(0.0f, boss.sayTimer - dt);
     if (boss.y < BOSS_STOP_Y) {
@@ -730,11 +935,19 @@ static void updateBoss(Game& game, Boss& boss, float dt) {
         if (boss.ballTimer <= 0) {
             boss.ballTimer = 0;
             boss.beamTimer = boss.type == BOSS_FIRELORD ? ERUPTION_TIME : BEAM_TIME;
-            feedback(game, boss.type == BOSS_FIRELORD ? TRAUMA_ERUPTION : TRAUMA_BEAM, 0, 0);
+            feedback(game, TRAUMA_BEAM_FIRE, 0, 0);
+            if (boss.type != BOSS_FIRELORD) spawnParticles(game, boss.ballX, boss.ballY, 6, paletteColor('m'), 40);
             game.soundRequested[SOUND_EXPLOSION] = true;
         }
     } else {
+        float before = boss.beamTimer;
         boss.beamTimer = std::max(0.0f, boss.beamTimer - dt);
+        if (before > 0 && boss.beamTimer == 0 && boss.type != BOSS_FIRELORD) spawnBeamShards(game, boss.ballX, boss.ballY, SCREEN_H, BEAM_W, paletteColor('m'));
+    }
+    if (boss.beamTimer > 0) {   // a firing beam or eruption rumbles; the mage's throws sparks
+        game.trauma = std::max(game.trauma, BEAM_RUMBLE);
+        if (boss.type != BOSS_FIRELORD)
+            beamSpark(game, boss.ballX, boss.ballY, boss.ballY + beamReach(BEAM_TIME - boss.beamTimer) * (SCREEN_H - boss.ballY), BEAM_W, paletteColor('m'), dt);
     }
 
     const Player* target = NULL;
@@ -773,12 +986,14 @@ static void updateBoss(Game& game, Boss& boss, float dt) {
     if (boss.attackTimer <= 0) {
         // Shared attack ids: 0 aimed volley (shots, bananas, snowballs, fireballs, bubbles), 1 fan (or bunch), 2 power ball.
         // Level ids: 3 poop, 4 pound; 5 ice block, 6 sneeze, 7 two ice blocks, 8 icicle rain; 9 lava drip, 10 lava rain,
-        // 11 eruption; 12 big bubble, 13 hook cast.
+        // 11 eruption; 12 big bubble, 13 hook cast, 14 live fish.
         int attack = boss.nextAttack;
         boss.attackTimer = bossAttackInterval(game.level, game.wave);
         bool big = boss.type == BOSS_MAGE || boss.type == BOSS_GORILLA || boss.type == BOSS_GOLEM ||
                    boss.type == BOSS_FIRELORD || boss.type == BOSS_FISHERMAN;   // random order and random gaps
         float roll = big ? randomUnit(game) : 0;
+        int fishOut = (int)game.fish.size();
+        for (const Lob& lob : game.lobs) fishOut += lob.fish;
         if (boss.type == BOSS_CLASSIC || boss.type == BOSS_MONKEY) {
             boss.nextAttack = 1 - boss.nextAttack;
         } else if (boss.type == BOSS_YETI || boss.type == BOSS_IMP || boss.type == BOSS_ANGLER) {   // a cycle of three
@@ -805,8 +1020,9 @@ static void updateBoss(Game& game, Boss& boss, float dt) {
             if (attack == 11 && (boss.ballTimer > 0 || boss.beamTimer > 0)) attack = 1;
         } else {   // fisherman
             attack = roll < FISHER_STREAM_CHANCE ? 0 : roll < FISHER_STREAM_CHANCE + FISHER_BIG_CHANCE ? 12
-                   : roll < FISHER_STREAM_CHANCE + FISHER_BIG_CHANCE + FISHER_FAN_CHANCE ? 1 : 13;
-            if (attack == 13 && boss.hookState != HOOK_NONE) attack = 0;
+                   : roll < FISHER_STREAM_CHANCE + FISHER_BIG_CHANCE + FISHER_FAN_CHANCE ? 1
+                   : roll < FISHER_STREAM_CHANCE + FISHER_BIG_CHANCE + FISHER_FAN_CHANCE + FISHER_FISH_CHANCE ? 14 : 13;
+            if ((attack == 13 && boss.hookState != HOOK_NONE) || (attack == 14 && fishOut >= MAX_FISH)) attack = 0;
         }
         if (big) boss.attackTimer *= MAGE_GAP_MIN + (MAGE_GAP_MAX - MAGE_GAP_MIN) * randomUnit(game);
 
@@ -816,7 +1032,7 @@ static void updateBoss(Game& game, Boss& boss, float dt) {
             if (jungle) {   // the banana throw also lobs a peel into the ship zone
                 float toX = 8 + randomUnit(game) * (SCREEN_W - 16);
                 float toY = MOVE_ZONE_TOP + 7 + randomUnit(game) * (SCREEN_H - MOVE_ZONE_TOP - 14);
-                game.lobs.push_back({centreX, bottomY, toX, toY, -PEEL_DELAY, false});
+                game.lobs.push_back({centreX, bottomY, toX, toY, -PEEL_DELAY, false, false});
                 game.soundRequested[boss.type == BOSS_MONKEY ? SOUND_SCREECH : SOUND_BANANA_THROW] = true;
             }
             if (glacier || volcano) game.soundRequested[SOUND_BANANA_THROW] = true;
@@ -847,7 +1063,7 @@ static void updateBoss(Game& game, Boss& boss, float dt) {
         } else if (attack == 3) {   // poop lobbed at the nearest ship
             float toX = std::max(8.0f, std::min(targetX, SCREEN_W - 8.0f));
             float toY = std::max(MOVE_ZONE_TOP + 7, std::min(targetY, SCREEN_H - 7.0f));
-            game.lobs.push_back({centreX, bottomY, toX, toY, 0, true});
+            game.lobs.push_back({centreX, bottomY, toX, toY, 0, true, false});
             game.soundRequested[SOUND_BANANA_THROW] = true;
         } else if (attack == 4) {
             boss.windupTimer = POUND_TIME;
@@ -869,8 +1085,9 @@ static void updateBoss(Game& game, Boss& boss, float dt) {
             for (int i = 0; i < ICICLES; i++)
                 game.thrown.push_back({(i + randomUnit(game)) * lane, 0, 0, ICICLE_SPEED, THROWN_ICICLE, ICICLE_HANG, 0});
             game.soundRequested[SOUND_CRACK] = true;
-        } else if (attack == 9) {
-            throwFan(game, THROWN_LAVA_DROP, centreX, bottomY, LAVA_DRIP_DROPS, LAVA_DRIP_SIDEWAYS, LAVA_DROP_SPEED);
+        } else if (attack == 9) {   // one big lava drop, straight down
+            game.thrown.push_back({centreX - THROWN_W[THROWN_BIG_LAVA] / 2.0f, bottomY, 0, LAVA_DROP_SPEED, THROWN_BIG_LAVA, 0, 0});
+            game.soundRequested[SOUND_BANANA_THROW] = true;
         } else if (attack == 10) {   // lava rain: one drop in each fifth of the screen
             float lane = (SCREEN_W - THROWN_W[THROWN_LAVA_DROP]) / (float)LAVA_RAIN_DROPS;
             for (int i = 0; i < LAVA_RAIN_DROPS; i++)
@@ -883,6 +1100,13 @@ static void updateBoss(Game& game, Boss& boss, float dt) {
         } else if (attack == 12) {
             throwAt(game, THROWN_BIG_BUBBLE, centreX, bottomY, targetX, targetY, BIG_BUBBLE_SPEED);
             game.soundRequested[SOUND_BUBBLE] = true;
+        } else if (attack == 14) {   // live fish lobbed from the bucket to random points of the ship zone
+            for (int i = 0; i < std::min(FISH_PER_THROW, MAX_FISH - fishOut); i++) {
+                float toX = 8 + randomUnit(game) * (SCREEN_W - 16);
+                float toY = MOVE_ZONE_TOP + 7 + randomUnit(game) * (SCREEN_H - MOVE_ZONE_TOP - 14);
+                game.lobs.push_back({boss.x + BUCKET_X, boss.y + BUCKET_Y, toX, toY, -FISH_THROW_GAP * i, false, true});
+            }
+            game.soundRequested[SOUND_BANANA_THROW] = true;
         } else {   // 13: the hook drops at the nearest ship's x
             boss.hookState = HOOK_DOWN;
             boss.hookX = std::max(4.0f, std::min(targetX, SCREEN_W - 4.0f));
@@ -915,10 +1139,18 @@ static void startDive(Game& game) {
         if (alien.alive && alien.state == ALIEN_DIVING) divers++;
         if (alien.alive && alien.state == ALIEN_IN_FORMATION) candidates.push_back(&alien);
     }
-    if (divers >= (difficultyWave(game.level, game.wave) >= TWO_DIVERS_WAVE ? 2 : 1) || candidates.empty()) return;
+    if (divers >= maxDivers(difficultyWave(game.level, game.wave)) || candidates.empty()) return;
     Alien* diver = candidates[(size_t)(randomUnit(game) * candidates.size())];
     diver->state = ALIEN_DIVING;
     diver->vx = 0;
+}
+
+// Three bubbles of `size` burst from (x, y) in random directions (deep-sea buff); they pick a target once they home.
+static void spawnShieldBubbles(Game& game, float x, float y, int size, int owner) {
+    for (int k = 0; k < SHIELD_SPLIT; k++) {
+        float angle = (k + randomUnit(game)) * 6.2831853f / SHIELD_SPLIT;
+        game.shieldBubbles.push_back({x, y, cosf(angle) * SHIELD_BUBBLE_SPEED[size], sinf(angle) * SHIELD_BUBBLE_SPEED[size], 0, size, owner, -1, -1});
+    }
 }
 
 void updateBackground(Game& game, float dt) {
@@ -936,6 +1168,21 @@ void updateGame(Game& game, const Actions* actions, float dt) {
     game.feelTime += dt;
     game.trauma = std::max(0.0f, game.trauma - TRAUMA_DECAY * dt);
     game.flashTimer = std::max(0.0f, game.flashTimer - dt);
+    for (size_t i = 0; i < game.players.size(); i++) {   // Square arms the next held strong attack: rocket, beam, frost, shield
+        Player& p = game.players[i];
+        if (!actions[i].cycle || !p.alive) continue;
+        const int ORDER[4] = {0, 1, 3, 5};
+        int at = 0;
+        while (ORDER[at] != p.strongAttack) at++;
+        for (int k = 1; k <= 4; k++) {
+            int next = ORDER[(at + k) % 4];
+            if (next == 0 || (p.buffs & (1 << (next - 1)))) {
+                p.strongAttack = next;
+                break;
+            }
+        }
+        game.soundRequested[SOUND_PICKUP] = true;
+    }
     if (game.hitStop > 0) {   // frozen: game time stands still, so a recorded R2 press keeps its buffer
         game.hitStop -= dt;
         for (size_t i = 0; i < game.players.size(); i++)
@@ -958,17 +1205,28 @@ void updateGame(Game& game, const Actions* actions, float dt) {
         }
     }
 
+    game.freezeTimer = std::max(0.0f, game.freezeTimer - dt);
+    bool frozen = game.freezeTimer > 0;
+    if (game.frostAge >= 0 && (game.frostAge += dt) > FROST_RING_TIME) game.frostAge = -1;
     int dw = difficultyWave(game.level, game.wave);
-    float swaySpeed = std::min(20.0f + 2 * dw, 50.0f);
-    game.swayOffset += game.swayDirection * swaySpeed * dt;
-    if (fabsf(game.swayOffset) > SWAY_RANGE) {
-        game.swayOffset = game.swayOffset > 0 ? SWAY_RANGE : -SWAY_RANGE;
-        game.swayDirection = -game.swayDirection;
+    if (!frozen) {
+        game.swayOffset += game.swayDirection * swaySpeed(dw) * dt;
+        if (fabsf(game.swayOffset) > SWAY_RANGE) {
+            game.swayOffset = game.swayOffset > 0 ? SWAY_RANGE : -SWAY_RANGE;
+            game.swayDirection = -game.swayDirection;
+        }
     }
     for (Alien& alien : game.aliens)
-        if (alien.alive) updateAlien(game, alien, dt);
-    for (Boss& boss : game.bosses) if (boss.alive) updateBoss(game, boss, dt);
-    if (dw >= 3 && anyPlayerAlive && !game.over) {
+        if (alien.alive) {
+            if (frozen) alien.flash = std::max(0.0f, alien.flash - dt);
+            else updateAlien(game, alien, dt);
+        }
+    for (Boss& boss : game.bosses)
+        if (boss.alive) {
+            if (frozen) boss.flash = std::max(0.0f, boss.flash - dt);
+            else updateBoss(game, boss, dt);
+        }
+    if (!frozen && dw >= 3 && anyPlayerAlive && !game.over) {
         game.diveTimer -= dt;
         if (game.diveTimer <= 0) {
             game.diveTimer = diveInterval(dw);
@@ -983,6 +1241,7 @@ void updateGame(Game& game, const Actions* actions, float dt) {
         for (Alien& alien : game.aliens) {
             if (!alien.alive || alien.y + ALIEN_HEIGHT[alien.type] < 0 || !overlap(bullet.x, bullet.y, 2, 4, alien.x, alien.y, ALIEN_WIDTH[alien.type], ALIEN_HEIGHT[alien.type])) continue;
             damageAlien(game, alien, damage, bullet.owner);
+            spawnHitSparks(game, bullet.x + 1, bullet.y);
             bullet.y = -100;   // spent; removed below
             break;
         }
@@ -995,7 +1254,16 @@ void updateGame(Game& game, const Actions* actions, float dt) {
                 spawnParticles(game, bullet.x + 1, bullet.y, 2, paletteColor('l'), 30);
             } else {
                 damageBoss(game, boss, damage, bullet.owner);
+                spawnHitSparks(game, bullet.x + 1, bullet.y);
             }
+            bullet.y = -100;   // spent; removed below
+        }
+        for (Fish& f : game.fish) {
+            if (bullet.y <= -50 || f.life <= 0 || !overlap(bullet.x, bullet.y, 2, 4, f.x, f.y, FISH_W, FISH_H)) continue;
+            f.life = 0;   // removed below
+            addScore(game, game.players[bullet.owner], FISH_SCORE);
+            spawnParticles(game, f.x + FISH_W / 2.0f, f.y + FISH_H / 2.0f, 8, paletteColor('O'), 50);
+            game.soundRequested[SOUND_ALIEN_DEATH] = true;
             bullet.y = -100;   // spent; removed below
         }
     }
@@ -1008,10 +1276,64 @@ void updateGame(Game& game, const Actions* actions, float dt) {
             if (alien.alive && alien.y + ALIEN_HEIGHT[alien.type] >= 0 && overlap(rocket.x, rocket.y, 4, 8, alien.x, alien.y, ALIEN_WIDTH[alien.type], ALIEN_HEIGHT[alien.type])) hit = true;
         for (const Boss& boss : game.bosses)
             if (boss.alive && boss.y + BOSS_H >= 0 && overlap(rocket.x, rocket.y, 4, 8, boss.x, boss.y, BOSS_W, BOSS_H)) hit = true;
+        for (const Fish& f : game.fish) if (f.life > 0 && overlap(rocket.x, rocket.y, 4, 8, f.x, f.y, FISH_W, FISH_H)) hit = true;
         if (hit) {
             explode(game, rocket.x + 2, std::max(rocket.y, 0.0f) + 4, rocket.owner);
             rocket.y = -1000;   // spent; removed below
         }
+    }
+
+    int living = 0;
+    for (const Alien& alien : game.aliens) living += alien.alive;
+    for (const Boss& boss : game.bosses) living += boss.alive;
+    for (size_t i = 0; i < game.shieldBubbles.size(); i++) {
+        ShieldBubble b = game.shieldBubbles[i];
+        b.age += dt;
+        bool targetAlive = (b.alien >= 0 && b.alien < (int)game.aliens.size() && game.aliens[b.alien].alive) ||
+                           (b.boss >= 0 && b.boss < (int)game.bosses.size() && game.bosses[b.boss].alive);
+        if (!targetAlive && living > 0) {   // a random living enemy
+            int pick = (int)(randomUnit(game) * living);
+            b.alien = b.boss = -1;
+            for (size_t k = 0; k < game.aliens.size() && b.alien < 0; k++) if (game.aliens[k].alive && pick-- == 0) b.alien = (int)k;
+            for (size_t k = 0; k < game.bosses.size() && b.alien < 0 && b.boss < 0; k++) if (game.bosses[k].alive && pick-- == 0) b.boss = (int)k;
+            targetAlive = b.alien >= 0 || b.boss >= 0;
+        }
+        if (b.age >= SHIELD_BUBBLE_SPREAD && targetAlive) {   // homes on the target's centre
+            float tx = b.alien >= 0 ? game.aliens[b.alien].x + ALIEN_WIDTH[game.aliens[b.alien].type] / 2.0f : game.bosses[b.boss].x + BOSS_W / 2.0f;
+            float ty = b.alien >= 0 ? game.aliens[b.alien].y + ALIEN_HEIGHT[game.aliens[b.alien].type] / 2.0f : game.bosses[b.boss].y + BOSS_H / 2.0f;
+            float dx = tx - b.x, dy = ty - b.y, length = sqrtf(dx * dx + dy * dy) + 0.001f;
+            b.vx = dx / length * SHIELD_BUBBLE_SPEED[b.size];
+            b.vy = dy / length * SHIELD_BUBBLE_SPEED[b.size];
+        }
+        b.x += b.vx * dt;
+        b.y += b.vy * dt;
+        float d = (float)SHIELD_BUBBLE_D[b.size], bx = b.x - d / 2, by = b.y - d / 2;
+        bool hit = false;
+        if (b.age >= SHIELD_BUBBLE_SPREAD) {   // spreading bubbles can't hit yet, so a split doesn't land on the same enemy at once
+            for (Alien& alien : game.aliens) {
+                if (hit || !alien.alive || !overlap(bx, by, d, d, alien.x, alien.y, ALIEN_WIDTH[alien.type], ALIEN_HEIGHT[alien.type])) continue;
+                damageAlien(game, alien, BUBBLE_DAMAGE, b.owner);
+                hit = true;
+            }
+            for (Boss& boss : game.bosses) {
+                if (hit || !boss.alive || !overlap(bx, by, d, d, boss.x, boss.y, BOSS_W, BOSS_H)) continue;
+                damageBoss(game, boss, BUBBLE_DAMAGE, b.owner);
+                hit = true;
+            }
+            for (Fish& f : game.fish) {
+                if (hit || f.life <= 0 || !overlap(bx, by, d, d, f.x, f.y, FISH_W, FISH_H)) continue;
+                f.life = 0;   // removed below
+                addScore(game, game.players[b.owner], FISH_SCORE);
+                hit = true;
+            }
+        }
+        if (hit) {   // pops, and splits into three smaller ones until size 1
+            spawnParticles(game, b.x, b.y, 3, paletteColor('i'), 30);
+            game.soundRequested[SOUND_BUBBLE] = true;
+            b.age = SHIELD_BUBBLE_LIFE;   // removed below
+            if (b.size > 1) spawnShieldBubbles(game, b.x, b.y, b.size - 1, b.owner);
+        }
+        game.shieldBubbles[i] = b;
     }
 
     for (Shot& shot : game.enemyShots) {
@@ -1046,28 +1368,45 @@ void updateGame(Game& game, const Actions* actions, float dt) {
             game.mists.push_back({lob.toX, lob.toY, 0});
             spawnParticles(game, lob.toX, lob.toY, 6, paletteColor('h'), 30);
             game.soundRequested[SOUND_SPLAT] = true;
+        } else if (lob.fish) {   // lands as a live fish
+            game.fish.push_back({lob.toX - FISH_W / 2.0f, lob.toY - FISH_H / 2.0f, FISH_LIFE, randomUnit(game) < 0.5f});
+            spawnParticles(game, lob.toX, lob.toY, 4, paletteColor('i'), 25);
+            game.soundRequested[SOUND_SPLAT] = true;
         } else {
             game.peels.push_back({lob.toX - PEEL_W / 2.0f, lob.toY - PEEL_H / 2.0f, PEEL_LIFE});
         }
     }
     for (Peel& peel : game.peels) peel.life -= dt;
     for (Mist& mist : game.mists) mist.age += dt;
+    for (Fish& f : game.fish) {   // a live fish swims at the nearest living ship
+        f.life -= dt;
+        float bestDx = 0, bestDy = 0, best = -1;
+        for (const Player& p : game.players) {
+            float dx = p.x + SHIP_W / 2.0f - (f.x + FISH_W / 2.0f), dy = p.y + SHIP_H / 2.0f - (f.y + FISH_H / 2.0f);
+            if (p.alive && (best < 0 || dx * dx + dy * dy < best)) { best = dx * dx + dy * dy; bestDx = dx; bestDy = dy; }
+        }
+        if (best < 0) continue;
+        float length = sqrtf(best) + 0.001f;
+        f.x += bestDx / length * FISH_SPEED * dt;
+        f.y += bestDy / length * FISH_SPEED * dt;
+        if (fabsf(bestDx) > 1) f.left = bestDx < 0;
+    }
     for (Pickup& pickup : game.pickups) pickup.y += PICKUP_FALL_SPEED * dt;
 
     for (Player& player : game.players) {
         if (!player.alive) continue;
         float hx = player.x + HITBOX_X, hy = player.y + HITBOX_Y;
         for (Thrown& t : game.thrown) {   // ice blocks freeze and lava drops scorch, even a blinking ship; neither kills
-            if (t.kind != THROWN_ICE_BLOCK && t.kind != THROWN_LAVA_DROP) continue;
+            if (t.kind != THROWN_ICE_BLOCK && t.kind != THROWN_LAVA_DROP && t.kind != THROWN_BIG_LAVA) continue;
             if (!overlap(t.x + 1, t.y + 1, THROWN_W[t.kind] - 2, THROWN_H[t.kind] - 2, hx, hy, HITBOX, HITBOX)) continue;
             if (t.kind == THROWN_ICE_BLOCK) {
                 player.frozenTimer = FREEZE_TIME;
                 player.slideTimer = 0;
-                spawnParticles(game, t.x + 4, t.y + 4, 8, paletteColor('i'), 40);
+                spawnParticles(game, t.x + THROWN_W[t.kind] / 2.0f, t.y + THROWN_H[t.kind] / 2.0f, 8, paletteColor('i'), 40);
                 game.soundRequested[SOUND_FREEZE] = true;
             } else {
                 player.scorchTimer = SCORCH_TIME;
-                spawnParticles(game, t.x + 2, t.y + 3, 6, paletteColor('O'), 30);
+                spawnParticles(game, t.x + THROWN_W[t.kind] / 2.0f, t.y + THROWN_H[t.kind] / 2.0f, 6, paletteColor('O'), 30);
                 game.soundRequested[SOUND_SIZZLE] = true;
             }
             t.y = SCREEN_H + 100;   // spent; removed below
@@ -1081,32 +1420,71 @@ void updateGame(Game& game, const Actions* actions, float dt) {
                 }
             }
             for (Thrown& t : game.thrown) {   // the deadly box is 1 px inside the sprite
-                if (t.kind == THROWN_ICE_BLOCK || t.kind == THROWN_LAVA_DROP) continue;
+                if (t.kind == THROWN_ICE_BLOCK || t.kind == THROWN_LAVA_DROP || t.kind == THROWN_BIG_LAVA) continue;
                 if (!hit && overlap(t.x + 1, t.y + 1, THROWN_W[t.kind] - 2, THROWN_H[t.kind] - 2, hx, hy, HITBOX, HITBOX)) {
                     hit = true;
                     t.y = SCREEN_H + 100;   // spent; removed below
+                }
+            }
+            for (Fish& f : game.fish) {   // the deadly box is 1 px inside the sprite
+                if (!hit && f.life > 0 && overlap(f.x + 1, f.y + 1, FISH_W - 2, FISH_H - 2, hx, hy, HITBOX, HITBOX)) {
+                    hit = true;
+                    f.life = 0;   // removed below
                 }
             }
             for (const Alien& alien : game.aliens)
                 if (alien.alive && overlap(alien.x, alien.y, ALIEN_WIDTH[alien.type], ALIEN_HEIGHT[alien.type], hx, hy, HITBOX, HITBOX)) hit = true;
             for (const Boss& boss : game.bosses) {
                 if (boss.alive && overlap(boss.x, boss.y, BOSS_W, BOSS_H, hx, hy, HITBOX, HITBOX)) hit = true;
-                int beamW = boss.type == BOSS_FIRELORD ? ERUPTION_W : BEAM_W;   // the mage's beam or the fire lord's eruption
-                if (boss.alive && boss.beamTimer > 0 && overlap(boss.ballX - beamW / 2.0f, 0, beamW, SCREEN_H, hx, hy, HITBOX, HITBOX)) hit = true;
+                if (boss.alive && boss.beamTimer > 0) {   // only the part of the beam or eruption that has grown kills
+                    bool lord = boss.type == BOSS_FIRELORD;
+                    float reach = beamReach((lord ? ERUPTION_TIME : BEAM_TIME) - boss.beamTimer);
+                    float top = lord ? SCREEN_H * (1 - reach) : boss.ballY, length = lord ? SCREEN_H - top : reach * (SCREEN_H - boss.ballY);
+                    int beamW = lord ? ERUPTION_W : BEAM_W;
+                    if (overlap(boss.ballX - beamW / 2.0f, top, beamW, length, hx, hy, HITBOX, HITBOX)) hit = true;
+                }
             }
-            if (hit) {
+            if (hit && player.shield) {   // the bubble shield takes the hit and bursts into three big bubbles
+                player.shield = false;
+                player.invincibleTimer = SHIELD_POP_INVINCIBLE;
+                spawnShieldBubbles(game, player.x + SHIP_W / 2.0f, player.y + SHIP_H / 2.0f, 3, (int)(&player - &game.players[0]));
+                spawnParticles(game, player.x + SHIP_W / 2.0f, player.y + SHIP_H / 2.0f, 10, paletteColor('i'), 50);
+                feedback(game, TRAUMA_STRONG, 0, 0);
+                game.soundRequested[SOUND_BUBBLE] = true;
+            } else if (hit) {
                 killPlayer(game, player);
                 continue;
             }
         }
         for (Pickup& pickup : game.pickups) {
-            if (!overlap(pickup.x, pickup.y, 8, 8, player.x, player.y, SHIP_W, SHIP_H)) continue;
-            if (pickup.type == PICKUP_ROCKET) player.rockets = std::min(player.rockets + 1, MAX_ROCKETS);
-            else if (player.weaponLevel < MAX_WEAPON_LEVEL) player.weaponLevel++;
-            else addScore(game, player, UPGRADE_MAX_POINTS);
-            spawnParticles(game, pickup.x + 4, pickup.y + 4, PICKUP_PARTICLES, paletteColor(pickup.type == PICKUP_ROCKET ? 'p' : 'y'), 30);
+            int size = pickup.type == PICKUP_BUFF ? BUFF_PICKUP_SIZE : 8;
+            if (!overlap(pickup.x, pickup.y, size, size, player.x, player.y, SHIP_W, SHIP_H)) continue;
+            if (pickup.type == PICKUP_ROCKET) {
+                player.rockets = std::min(player.rockets + 1, MAX_ROCKETS);
+            } else if (pickup.type == PICKUP_BUFF) {
+                int bit = 1 << (pickup.level - 1);
+                if (player.buffs & bit) {
+                    addScore(game, player, BUFF_HELD_POINTS);
+                } else {
+                    player.buffs |= bit;
+                    if (pickup.level == 1 || pickup.level == 3 || pickup.level == 5) player.strongAttack = pickup.level;
+                }
+            } else if (player.weaponLevel < MAX_WEAPON_LEVEL) {   // level n takes n pickups to reach n + 1
+                player.upgradeParts++;
+                player.upgradeLevelUp = player.upgradeParts >= player.weaponLevel;
+                player.upgradeTimer = UPGRADE_TEXT_TIME;
+                if (player.upgradeLevelUp) {
+                    player.weaponLevel++;
+                    player.upgradeParts = 0;
+                    spawnParticles(game, player.x + SHIP_W / 2.0f, player.y + SHIP_H / 2.0f, LEVEL_UP_PARTICLES, paletteColor('y'), 70);
+                    game.soundRequested[SOUND_EXTRA_LIFE] = true;
+                }
+            } else {
+                addScore(game, player, UPGRADE_MAX_POINTS);
+            }
+            spawnParticles(game, pickup.x + size / 2.0f, pickup.y + size / 2.0f, PICKUP_PARTICLES, paletteColor(pickup.type == PICKUP_ROCKET ? 'p' : 'y'), 30);
             pickup.y = SCREEN_H + 100;   // collected; removed below
-            game.soundRequested[SOUND_PICKUP] = true;
+            game.soundRequested[pickup.type == PICKUP_BUFF ? SOUND_EXTRA_LIFE : SOUND_PICKUP] = true;
         }
     }
 
@@ -1125,6 +1503,11 @@ void updateGame(Game& game, const Actions* actions, float dt) {
                           return t.y > SCREEN_H || t.y < -20 || t.x < -20 || t.x > SCREEN_W + 20; }), game.thrown.end());
     game.lobs.erase(std::remove_if(game.lobs.begin(), game.lobs.end(),
                                    [](const Lob& l) { return l.age >= LOB_TIME; }), game.lobs.end());
+    game.fish.erase(std::remove_if(game.fish.begin(), game.fish.end(),
+                                   [](const Fish& f) { return f.life <= 0; }), game.fish.end());
+    game.shieldBubbles.erase(std::remove_if(game.shieldBubbles.begin(), game.shieldBubbles.end(), [](const ShieldBubble& b) {
+                                 return b.age >= SHIELD_BUBBLE_LIFE || b.x < -20 || b.x > SCREEN_W + 20 || b.y < -20 || b.y > SCREEN_H + 20; }),
+                             game.shieldBubbles.end());
     game.peels.erase(std::remove_if(game.peels.begin(), game.peels.end(),
                                     [](const Peel& p) { return p.life <= 0; }), game.peels.end());
     game.mists.erase(std::remove_if(game.mists.begin(), game.mists.end(),
@@ -1146,6 +1529,7 @@ void updateGame(Game& game, const Actions* actions, float dt) {
     bool anyAlienAlive = std::any_of(game.bosses.begin(), game.bosses.end(), [](const Boss& b) { return b.alive; }) ||
                          std::any_of(game.aliens.begin(), game.aliens.end(), [](const Alien& a) { return a.alive; });
     if (!anyAlienAlive && game.nextWaveTimer == 0 && !game.levelClear) {
+        game.freezeTimer = 0;   // the freeze ends with the wave
         for (Player& player : game.players)
             if (player.lives > 0) addScore(game, player, WAVE_CLEAR_BONUS * game.wave);
         if (game.wave == LEVEL_LAST_WAVE) {   // the level boss is dead (level-1 rule 4)
@@ -1165,6 +1549,7 @@ void updateGame(Game& game, const Actions* actions, float dt) {
                 game.levelClear = false;
                 game.thrown.clear();   // the last level's hazards stay behind
                 game.lobs.clear();
+                game.fish.clear();
                 game.peels.clear();
                 game.mists.clear();
                 startWave(game, 1);
@@ -1558,11 +1943,19 @@ void drawGame(const Game& game) {
         if (peel.life <= PEEL_BLINK && fmodf(peel.life, 0.2f) < 0.1f) continue;
         drawSprite(PEEL, (int)peel.x, (int)peel.y);
     }
+    int swim = (int)(game.time * 8) % 2;
+    for (const Fish& f : game.fish) {   // blinks in its last second
+        if (f.life <= FISH_BLINK && fmodf(f.life, 0.2f) < 0.1f) continue;
+        drawSprite(f.left ? (swim ? LIVE_FISH_L_B : LIVE_FISH_L_A) : (swim ? LIVE_FISH_R_B : LIVE_FISH_R_A), (int)f.x, (int)f.y);
+    }
+    bool iceShown = game.freezeTimer > 0 && !(game.freezeTimer < FROST_THAW_BLINK && fmodf(game.freezeTimer, 0.2f) < 0.1f);   // blinks as it thaws
     for (const Alien& alien : game.aliens) {
         if (!alien.alive) continue;
         const Sprite& sprite = *ALIEN_SPRITES[game.level - 1][alien.type][frame];
         if (alien.flash > 0) drawSpriteSolid(sprite, (int)alien.x, (int)alien.y, paletteColor('w'));
         else drawSprite(sprite, (int)alien.x, (int)alien.y);
+        if (iceShown)   // frozen by the frost wave
+            drawSprite(ICE_CUBE, (int)(alien.x + ALIEN_WIDTH[alien.type] / 2.0f) - 9, (int)(alien.y + ALIEN_HEIGHT[alien.type] / 2.0f) - 8);
     }
     for (const Boss& boss : game.bosses) {
         if (!boss.alive) continue;
@@ -1583,15 +1976,38 @@ void drawGame(const Game& game) {
             case BOSS_ANGLER: sprite = frame ? &ANGLER_B : &ANGLER_A; break;
             case BOSS_FISHERMAN: sprite = frame ? &FISHERMAN_B : &FISHERMAN_A; break;
         }
-        if (boss.flash > 0) drawSpriteSolid(*sprite, (int)boss.x, (int)boss.y, paletteColor('w'));
+        int hitJitter = boss.flash > 0 ? ((int)(game.feelTime * 40) % 2 ? 1 : -1) : 0;   // a hit boss shudders sideways
+        if (boss.flash > 0) drawSpriteSolid(*sprite, (int)boss.x + hitJitter, (int)boss.y, paletteColor('w'));
         else drawSprite(*sprite, (int)boss.x, (int)boss.y);
+        if (iceShown) {   // frozen by the frost wave: an ice outline
+            int ix = (int)boss.x - 2, iy = (int)boss.y - 2;
+            fillRect(ix, iy, BOSS_W + 4, 1, paletteColor('i'));
+            fillRect(ix, iy + BOSS_H + 3, BOSS_W + 4, 1, paletteColor('i'));
+            fillRect(ix, iy, 1, BOSS_H + 4, paletteColor('i'));
+            fillRect(ix + BOSS_W + 3, iy, 1, BOSS_H + 4, paletteColor('i'));
+            fillRect((int)boss.x - 1, (int)boss.y - 1, 1, 1, paletteColor('w'));
+            fillRect((int)boss.x + BOSS_W, (int)boss.y + BOSS_H, 1, 1, paletteColor('w'));
+        }
     }
-    for (const Pickup& pickup : game.pickups)
-        drawSprite(pickup.type == PICKUP_ROCKET ? ROCKET_PICKUP : UPGRADE_PICKUP, (int)pickup.x, (int)pickup.y);
+    for (const Pickup& pickup : game.pickups) {
+        if (pickup.type == PICKUP_BUFF) {   // a blinking frame around the level's icon
+            int px = (int)pickup.x, py = (int)pickup.y;
+            fillRect(px, py, BUFF_PICKUP_SIZE, BUFF_PICKUP_SIZE, paletteColor((int)(game.time * 4) % 2 ? 'w' : 'y'));
+            fillRect(px + 1, py + 1, BUFF_PICKUP_SIZE - 2, BUFF_PICKUP_SIZE - 2, paletteColor('k'));
+            drawSprite(*BUFF_ICONS[pickup.level - 1], px + 3, py + 3);
+        } else {
+            drawSprite(pickup.type == PICKUP_ROCKET ? ROCKET_PICKUP : UPGRADE_PICKUP, (int)pickup.x, (int)pickup.y);
+        }
+    }
     for (const Shot& bullet : game.bullets) {
         const Player& owner = game.players[bullet.owner];
+        bool banana = owner.buffs & BUFF_JUNGLE, fiery = (owner.buffs & BUFF_VOLCANO) || owner.scorchTimer > 0;
         if (owner.inMist) {
             fillRect((int)bullet.x, (int)bullet.y, 2, 4, paletteColor('l'));   // heals gorillas
+        } else if (banana) {
+            drawSprite(fiery ? FIRE_BANANA : PLAYER_BANANA, (int)bullet.x, (int)bullet.y - 1);
+        } else if (owner.buffs & BUFF_VOLCANO) {
+            drawSprite(FIRE_BULLET, (int)bullet.x, (int)bullet.y);
         } else if (owner.scorchTimer > 0) {   // fire bolts: double damage
             fillRect((int)bullet.x, (int)bullet.y, 2, 4, paletteColor('O'));
             fillRect((int)bullet.x, (int)bullet.y, 2, 1, paletteColor('N'));
@@ -1600,21 +2016,73 @@ void drawGame(const Game& game) {
         }
     }
     for (const Rocket& rocket : game.rockets) drawSprite(ROCKET, (int)rocket.x, (int)rocket.y);
+    for (const Player& player : game.players) {   // the magic ball at the wand, then its beam
+        if (!player.alive) continue;
+        if (player.beamCharge > 0) {
+            int ballX = (int)player.beamX, ballY = (int)player.beamBottom;
+            for (int y = ballY - BALL_MAX_RADIUS - 2; y > 0; y -= 4) fillRect(ballX, y, 1, 2, paletteColor('c'));   // guide line up the column
+            int radius = 1 + (int)((1 - player.beamCharge / MAGIC_CHARGE_TIME) * (BALL_MAX_RADIUS - 1));
+            fillCircle(ballX, ballY, radius, paletteColor('c'));
+            if (radius >= 3) fillCircle(ballX, ballY, radius - 2, paletteColor('w'));
+        }
+        if (player.beamTimer > 0) {
+            float reach = beamReach(MAGIC_BEAM_TIME - player.beamTimer);
+            int bottom = (int)player.beamBottom, tip = (int)(player.beamBottom * (1 - reach));
+            fillRect((int)player.beamX - MAGIC_BEAM_W / 2, tip, MAGIC_BEAM_W, bottom - tip, paletteColor('c'));
+            fillRect((int)player.beamX - MAGIC_BEAM_CORE_W / 2, tip, MAGIC_BEAM_CORE_W, bottom - tip, paletteColor('w'));
+            if (reach < 1) fillRect((int)player.beamX - MAGIC_BEAM_W / 2, tip, MAGIC_BEAM_W, 2, paletteColor('w'));
+            int r = BALL_MAX_RADIUS + (int)(game.feelTime * 20) % 2;
+            fillCircle((int)player.beamX, bottom, r, paletteColor('c'));
+            fillCircle((int)player.beamX, bottom, r - 2, paletteColor('w'));
+        }
+    }
     for (size_t i = 0; i < game.players.size(); i++) {
         const Player& player = game.players[i];
         bool blinkOff = player.invincibleTimer > 0 && fmodf(player.invincibleTimer, 2 * BLINK_PERIOD) < BLINK_PERIOD;
-        const Sprite& ship = i == 0 ? (frame ? SHIP_B : SHIP_A) : (frame ? SHIP2_B : SHIP2_A);
+        const Sprite& ship = *SHIP_SKINS[game.level - 1][i == 0 ? 0 : 1][frame];
         bool shaking = player.slideTimer > 0 || player.stunTimer > 0 || player.hookedTimer > 0;
-        if (player.alive && !blinkOff) drawSprite(ship, (int)player.x + (shaking && (int)(game.feelTime * 30) % 2 ? 1 : 0), (int)player.y);
+        int shipShake = shaking && (int)(game.feelTime * 30) % 2 ? 1 : 0;
+        if (player.alive && !blinkOff) {
+            drawSprite(ship, (int)player.x + shipShake, (int)player.y);
+            const Sprite* wand = player.strongAttack == 1 ? &WAND : player.strongAttack == 3 ? &WAND_ICE : player.strongAttack == 5 ? &WAND_BUBBLE : NULL;
+            if (wand) drawSprite(*wand, (int)player.x + 13 + shipShake, (int)player.y + 2);   // holds the armed strong attack's wand
+            if (player.muzzleTimer > 0) {   // a white core over an orange flare at each gun
+                int noseX = (int)(player.x + SHIP_W / 2 - 1), guns[2] = {noseX, noseX};
+                if (player.weaponLevel == 2) { guns[0] -= (int)DOUBLE_OFFSET; guns[1] += (int)DOUBLE_OFFSET; }
+                for (int gunX : guns) {
+                    fillRect(gunX - 1, (int)player.y - 1, 4, 1, paletteColor('o'));
+                    fillRect(gunX, (int)player.y - 3, 2, 2, paletteColor('w'));
+                }
+            }
+        }
+        if (player.alive && player.shield) {   // a shimmering bubble ring
+            float centreX = player.x + SHIP_W / 2.0f, centreY = player.y + SHIP_H / 2.0f;
+            for (int k = 0; k < 48; k++) {
+                if ((k + (int)(game.feelTime * 8)) % 6 == 0) continue;
+                float angle = k * 6.2831853f / 48 + game.feelTime;
+                fillRect((int)(centreX + SHIELD_RADIUS * cosf(angle)), (int)(centreY + SHIELD_RADIUS * sinf(angle)), 1, 1, paletteColor('i'));
+            }
+        }
         if (player.alive && player.frozenTimer > 0) drawSprite(ICE_CUBE, (int)player.x - 1, (int)player.y - 1);
         if (player.alive && player.scorchTimer > SCORCH_TIME - HOT_TEXT_TIME)
             drawText((int)player.x + SHIP_W / 2 - textWidth("HOT!") / 2, (int)player.y - 8, "HOT!", paletteColor('O'));
+        if (player.alive && player.upgradeTimer > 0) {   // the pickup's progress, or POWER UP!, rises off the ship and blinks out
+            char progress[16];
+            if (player.upgradeLevelUp) snprintf(progress, sizeof progress, "POWER UP!");
+            else snprintf(progress, sizeof progress, "%d/%d", player.upgradeParts, player.weaponLevel);
+            int rise = (int)((UPGRADE_TEXT_TIME - player.upgradeTimer) * 16);
+            if (player.upgradeTimer > 0.25f || (int)(game.feelTime * 20) % 2)
+                drawText((int)player.x + SHIP_W / 2 - textWidth(progress) / 2, (int)player.y - 9 - rise, progress,
+                         paletteColor(player.upgradeLevelUp ? ((int)(game.feelTime * 16) % 2 ? 'w' : 'y') : 'o'));
+        }
         if (player.alive && (player.stunTimer > 0 || player.hookedTimer > 0))
             for (int star = 0; star < 3; star++) {   // dizzy stars circle above the ship
                 float a = game.feelTime * 8 + star * 2.09f;
                 fillRect((int)(player.x + 8 + 6 * cosf(a)), (int)(player.y - 3 + 2 * sinf(a)), 1, 1, paletteColor('Y'));
             }
     }
+    for (const ShieldBubble& b : game.shieldBubbles)
+        drawSprite(*SHIELD_BUBBLE_SPRITES[b.size], (int)(b.x - SHIELD_BUBBLE_D[b.size] / 2.0f), (int)(b.y - SHIELD_BUBBLE_D[b.size] / 2.0f));
     for (const Shot& shot : game.enemyShots) drawSprite(ENEMY_SHOT, (int)shot.x, (int)shot.y);
     for (const Thrown& t : game.thrown) {
         int shake = t.delay > 0 && (int)(game.time * 20) % 2 ? 1 : 0;   // a hanging icicle trembles
@@ -1624,9 +2092,9 @@ void drawGame(const Game& game) {
         if (lob.age < 0) continue;
         float t = lob.age / LOB_TIME;
         float x = lob.fromX + (lob.toX - lob.fromX) * t, y = lob.fromY + (lob.toY - lob.fromY) * t - LOB_ARC * 4 * t * (1 - t);
-        const Sprite& sprite = lob.poop ? POOP : PEEL;
+        const Sprite& sprite = lob.fish ? LIVE_FISH_R_A : lob.poop ? POOP : PEEL;
         drawSprite(sprite, (int)x - sprite.w / 2, (int)y - sprite.h / 2);
-        uint32_t mark = paletteColor(lob.poop ? 'M' : 'H');   // landing mark
+        uint32_t mark = paletteColor(lob.fish ? 'O' : lob.poop ? 'M' : 'H');   // landing mark
         fillRect((int)lob.toX - 3, (int)lob.toY, 1, 1, mark);
         fillRect((int)lob.toX + 3, (int)lob.toY, 1, 1, mark);
         fillRect((int)lob.toX, (int)lob.toY - 2, 1, 1, mark);
@@ -1655,9 +2123,12 @@ void drawGame(const Game& game) {
                     fillRect(bx - 6 + i * 4 + (int)(game.time * 12 + i) % 3, SCREEN_H - 4 - (int)(game.time * 9 + i * 2) % 3, 1, 1, paletteColor('N'));
             }
             if (boss.beamTimer > 0) {
-                fillRect(bx - ERUPTION_W / 2, 0, ERUPTION_W, SCREEN_H, paletteColor('m'));
-                fillRect(bx - ERUPTION_W / 2 + 1, 0, ERUPTION_W - 2, SCREEN_H, paletteColor('O'));
-                fillRect(bx - 3, 0, 6, SCREEN_H, paletteColor('N'));
+                float reach = beamReach(ERUPTION_TIME - boss.beamTimer);
+                int tip = (int)(SCREEN_H * (1 - reach));
+                fillRect(bx - ERUPTION_W / 2, tip, ERUPTION_W, SCREEN_H - tip, paletteColor('m'));
+                fillRect(bx - ERUPTION_W / 2 + 1, tip, ERUPTION_W - 2, SCREEN_H - tip, paletteColor('O'));
+                fillRect(bx - 3, tip, 6, SCREEN_H - tip, paletteColor('N'));
+                if (reach < 1) fillRect(bx - ERUPTION_W / 2, tip, ERUPTION_W, 2, paletteColor('N'));
             }
             continue;
         }
@@ -1668,12 +2139,26 @@ void drawGame(const Game& game) {
             if (radius >= 3) fillCircle(bx, by, radius - 2, paletteColor('w'));
         }
         if (boss.beamTimer > 0) {
-            fillRect(bx - BEAM_W / 2, 0, BEAM_W, SCREEN_H, paletteColor('m'));
-            fillRect(bx - BEAM_CORE_W / 2, 0, BEAM_CORE_W, SCREEN_H, paletteColor('w'));
+            float reach = beamReach(BEAM_TIME - boss.beamTimer);
+            int length = (int)(reach * (SCREEN_H - by));
+            fillRect(bx - BEAM_W / 2, by, BEAM_W, length, paletteColor('m'));
+            fillRect(bx - BEAM_CORE_W / 2, by, BEAM_CORE_W, length, paletteColor('w'));
+            if (reach < 1) fillRect(bx - BEAM_W / 2, by + length - 2, BEAM_W, 2, paletteColor('w'));
+            int r = BALL_MAX_RADIUS + (int)(game.feelTime * 20) % 2;
+            fillCircle(bx, by, r, paletteColor('m'));
+            fillCircle(bx, by, r - 2, paletteColor('w'));
+        }
+    }
+    if (game.frostAge >= 0) {   // the frost wave's ring sweeping out from the ship
+        float r = FROST_RING_SPEED * game.frostAge;
+        for (int k = 0; k <= (int)(6.3f * r); k++) {
+            float angle = k / r;
+            fillRect((int)(game.frostX + r * cosf(angle)), (int)(game.frostY + r * sinf(angle)), 1, 1, paletteColor('i'));
+            fillRect((int)(game.frostX + (r - 2) * cosf(angle)), (int)(game.frostY + (r - 2) * sinf(angle)), 1, 1, paletteColor('w'));
         }
     }
     for (const Explosion& explosion : game.explosions) drawExplosion(explosion);
-    for (const Particle& p : game.particles) fillRect((int)p.x, (int)p.y, 1, 1, p.color);
+    for (const Particle& p : game.particles) fillRect((int)p.x, (int)p.y, 1, p.h, p.color);
 
     // Screen flash: the play field halfway to white; reduce flashing turns it off.
     if (game.flashTimer > 0 && !game.reduceFlashing)
@@ -1711,6 +2196,31 @@ void drawGame(const Game& game) {
         drawText(right ? SCREEN_W - 2 - textWidth(text) : 2, 2, text, paletteColor('w'));
         for (int i = 0; i < player.lives - 1; i++) drawSprite(LIFE_ICON, right ? SCREEN_W - 9 - i * 9 : 2 + i * 9, 9);
         for (int i = 0; i < player.rockets; i++) drawSprite(ROCKET_ICON, right ? SCREEN_W - 5 - i * 5 : 2 + i * 5, SCREEN_H - 7);
+        int strongHeld = 0, passiveHeld = 0;
+        for (int level = 1; level <= LEVEL_COUNT; level++) {   // strong attacks just above the rockets (armed one underlined), passive buffs above them
+            if (!(player.buffs & (1 << (level - 1)))) continue;
+            bool strong = level == 1 || level == 3 || level == 5;
+            int slot = strong ? strongHeld++ : passiveHeld++;
+            int x = right ? SCREEN_W - 7 - slot * 7 : 2 + slot * 7;
+            drawSprite(*BUFF_ICONS[level - 1], x, SCREEN_H - (strong ? 14 : 21));
+            if (level == player.strongAttack) fillRect(x, SCREEN_H - 8, 5, 1, paletteColor('y'));
+        }
+        // Weapon gauge above the buffs: four rising bars for the level, then one pip per pickup the next level takes.
+        auto hudX = [&](int offset, int w) { return right ? SCREEN_W - 2 - offset - w : 2 + offset; };
+        int gaugeY = SCREEN_H - 28;
+        bool pulse = player.upgradeTimer > 0 && (int)(game.feelTime * 16) % 2;
+        for (int bar = 0; bar < MAX_WEAPON_LEVEL; bar++)
+            fillRect(hudX(bar * 3, 2), gaugeY + 3 - bar, 2, 2 + bar,
+                     paletteColor(bar >= player.weaponLevel ? 'd' : pulse && player.upgradeLevelUp ? 'w' : 'y'));
+        if (player.weaponLevel == MAX_WEAPON_LEVEL) {
+            drawText(hudX(14, textWidth("MAX")), gaugeY, "MAX", paletteColor(pulse ? 'w' : 'y'));
+        } else {
+            for (int pip = 0; pip < player.weaponLevel; pip++) {   // the newest part blinks white while its text is up
+                bool filled = pip < player.upgradeParts, newest = pip == player.upgradeParts - 1;
+                fillRect(hudX(14 + pip * 5, 4), gaugeY + 1, 4, 4, paletteColor(filled ? (newest && pulse ? 'w' : 'o') : 'd'));
+                if (!filled) fillRect(hudX(14 + pip * 5 + 1, 2), gaugeY + 2, 2, 2, paletteColor('k'));
+            }
+        }
     }
     int bossHp = 0, bossMaxHp = 0;
     bool anyBossAlive = false, anyLaughing = false;

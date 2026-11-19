@@ -1,6 +1,9 @@
 // nameGame: startup, the scenes (menus, play, pause), the main loop (fixed 60 Hz game steps), and copying the picture to the TV.
 #include <SDL.h>
 #include <algorithm>
+#ifdef NAMEGAME_MAC   // make mac: a native build for fast testing, see host/
+#include "../host/ps3_stubs.h"
+#else
 #include <debugnet.h>
 #include <net/net.h>
 #include <sys/thread.h>
@@ -8,6 +11,7 @@
 #include <lv2/process.h>
 #include <rsx/gcm_sys.h>
 #include <malloc.h>
+#endif
 #include <math.h>
 #include <stdio.h>
 #include <string>
@@ -19,7 +23,7 @@
 
 const float STEP = 1.0f / 60;   // s per game update
 const int MAX_STEPS_PER_FRAME = 4;
-const bool DEV_AIDS = !RELEASE;   // Triangle stress test, Select autopilot and L1 screenshot; off in make release
+const bool DEV_AIDS = !RELEASE;   // Triangle stress test, Select autopilot, L2+L3 test mode and L1 screenshot; off in make release
 
 enum Scene { SCENE_MAIN_MENU, SCENE_LEVEL_PICKER, SCENE_SETTINGS, SCENE_PLAYING, SCENE_PAUSED };
 const char* const SCENE_NAMES[] = {"main menu", "level picker", "settings", "playing", "paused"};
@@ -102,6 +106,10 @@ int main(int argc, char** argv) {
     // The window matches the PS3's video output; the picture is copied into it scaled (CLAUDE.md, GDD D-008).
     SDL_DisplayMode desktop;
     SDL_GetDesktopDisplayMode(0, &desktop);
+#ifdef NAMEGAME_MAC
+    desktop.w = 1280;   // a 4x window instead of the whole desktop
+    desktop.h = 720;
+#endif
     SDL_Window* window = SDL_CreateWindow("NAME game", 0, 0, desktop.w, desktop.h, 0);
     SDL_Renderer* renderer = window ? SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC) : NULL;
     SDL_Texture* picture = renderer ? SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
@@ -136,6 +144,9 @@ int main(int argc, char** argv) {
     bool runSingleLevel = false;   // a level picker run: play again replays just that level
     float pickerSpin = 0;   // rows the picker wheel still has to turn: + after Down, - after Up
     bool autopilot = false;
+    bool godMode = false;   // dev test mode (L2+L3): ships can't die
+    int loggedBuffs[MAX_PLAYERS] = {}, loggedStrong[MAX_PLAYERS] = {};   // what the log last said about each player's buffs
+    const char* const STRONG_NAMES[6] = {"rocket", "magic beam", "", "frost wave", "", "bubble shield"};   // by Player::strongAttack
     float bossStart = 0;   // game time the current boss appeared
     bool running = true;
     auto setScene = [&](Scene next) {
@@ -270,6 +281,12 @@ int main(int argc, char** argv) {
                     break;   // a second Start in the same frame can't act
                 }
                 if (DEV_AIDS && actions[p].stress) addStressLoad(game);
+                if (DEV_AIDS && actions[p].godMode) {
+                    godMode = !godMode;
+                    if (!godMode) for (Player& player : game.players) player.invincibleTimer = 0;
+                    else for (Player& player : game.players) player.buffs = BUFF_ALL;   // test mode on: every level buff
+                    debugNetPrintf(INFO, "test mode %s\n", godMode ? "on" : "off");
+                }
                 if (DEV_AIDS && actions[p].autopilot) { autopilot = !autopilot; debugNetPrintf(INFO, "autopilot %s\n", autopilot ? "on" : "off"); }
                 // Game over: after the input lock, X or Start begins a new run and Circle goes to the main menu.
                 if (game.over && game.time - game.overTime > GAME_OVER_INPUT_LOCK) {
@@ -298,6 +315,9 @@ int main(int argc, char** argv) {
             if (pilot.alive) pilot.invincibleTimer = 1;   // runs out 1 s after the autopilot is switched off
         }
 
+        if (godMode && scene == SCENE_PLAYING)   // dev test mode: every living ship stays invincible
+            for (Player& player : game.players) if (player.alive) player.invincibleTimer = 1;
+
         bool wasOver = game.over;
         int bossesBefore = 0;
         bool beamBefore[2] = {};
@@ -309,6 +329,7 @@ int main(int argc, char** argv) {
         int waveBefore = game.wave;
         int levelBefore = game.level;
         size_t mistsBefore = game.mists.size();
+        size_t fishBefore = game.fish.size();
         bool laughBefore[2] = {};
         for (size_t i = 0; i < game.bosses.size() && i < 2; i++) laughBefore[i] = game.bosses[i].laughTimer > 0;
         int livesBefore[MAX_PLAYERS] = {};
@@ -320,6 +341,13 @@ int main(int argc, char** argv) {
             scorchedBefore[p] = game.players[p].scorchTimer > 0;
             hookedBefore[p] = game.players[p].hookedTimer > 0;
         }
+        bool shieldBefore[MAX_PLAYERS] = {}, beamFiredBefore[MAX_PLAYERS] = {};
+        for (size_t p = 0; p < game.players.size(); p++) {
+            shieldBefore[p] = game.players[p].shield;
+            beamFiredBefore[p] = game.players[p].beamTimer > 0;
+        }
+        bool frozenWaveBefore = game.freezeTimer > 0;
+        int buffPickupsBefore = (int)std::count_if(game.pickups.begin(), game.pickups.end(), [](const Pickup& pk) { return pk.type == PICKUP_BUFF; });
         bool bootBefore = std::any_of(game.thrown.begin(), game.thrown.end(), [](const Thrown& t) { return t.kind == THROWN_BOOT; });
 
         stage = "update";
@@ -330,7 +358,7 @@ int main(int argc, char** argv) {
                 updateBackground(game, STEP);
             if (pickerSpin > 0) pickerSpin = SDL_max(0.0f, pickerSpin - STEP / PICKER_SPIN_TIME);
             if (pickerSpin < 0) pickerSpin = SDL_min(0.0f, pickerSpin + STEP / PICKER_SPIN_TIME);
-            for (Actions& a : actions) a.rocket = false;   // a press counts once, in the first step
+            for (Actions& a : actions) a.rocket = a.cycle = false;   // a press counts once, in the first step
             accumulator -= STEP;
             steps++;
         }
@@ -352,10 +380,30 @@ int main(int argc, char** argv) {
             if (player.scorchTimer > 0 && !scorchedBefore[p]) debugNetPrintf(INFO, "player %d scorched\n", (int)p + 1);
             if (player.hookedTimer > 0 && !hookedBefore[p]) debugNetPrintf(INFO, "player %d hooked\n", (int)p + 1);
         }
+        for (size_t p = 0; p < game.players.size(); p++) {
+            const Player& player = game.players[p];
+            if (player.buffs != loggedBuffs[p]) debugNetPrintf(INFO, "player %d buffs 0x%02x, strong attack %s\n", (int)p + 1, player.buffs, STRONG_NAMES[player.strongAttack]);
+            else if (player.strongAttack != loggedStrong[p]) debugNetPrintf(INFO, "player %d strong attack %s\n", (int)p + 1, STRONG_NAMES[player.strongAttack]);
+            loggedBuffs[p] = player.buffs;
+            loggedStrong[p] = player.strongAttack;
+            if (player.beamTimer > 0 && !beamFiredBefore[p]) debugNetPrintf(INFO, "player %d magic beam at x %.0f\n", (int)p + 1, player.beamX);
+            if (player.shield && !shieldBefore[p]) debugNetPrintf(INFO, "player %d shield up\n", (int)p + 1);
+            if (!player.shield && shieldBefore[p] && player.alive) debugNetPrintf(INFO, "player %d shield popped\n", (int)p + 1);
+        }
+        if (game.freezeTimer > 0 && !frozenWaveBefore) {
+            int aliensFrozen = (int)std::count_if(game.aliens.begin(), game.aliens.end(), [](const Alien& a) { return a.alive; });
+            int bossesFrozen = (int)std::count_if(game.bosses.begin(), game.bosses.end(), [](const Boss& b) { return b.alive; });
+            debugNetPrintf(INFO, "frost wave: %d aliens, %d bosses frozen\n", aliensFrozen, bossesFrozen);
+        }
+        if (std::count_if(game.pickups.begin(), game.pickups.end(), [](const Pickup& pk) { return pk.type == PICKUP_BUFF; }) > buffPickupsBefore) {
+            for (const Pickup& pk : game.pickups)
+                if (pk.type == PICKUP_BUFF) debugNetPrintf(INFO, "buff pickup dropped: level %d at wave %d\n", pk.level, game.wave);
+        }
         if (!bootBefore && std::any_of(game.thrown.begin(), game.thrown.end(), [](const Thrown& t) { return t.kind == THROWN_BOOT; }))
             debugNetPrintf(INFO, "boot thrown\n");
         if (game.mists.size() > mistsBefore)
             debugNetPrintf(INFO, "stink mist at %.0f,%.0f\n", game.mists.back().x, game.mists.back().y);
+        if (game.fish.size() > fishBefore) debugNetPrintf(INFO, "live fish landed, %d out\n", (int)game.fish.size());
         for (size_t i = 0; i < game.bosses.size() && i < 2; i++)
             if (game.bosses[i].laughTimer > 0 && !laughBefore[i]) debugNetPrintf(INFO, "gorilla healed to %d hp\n", game.bosses[i].hp);
         for (size_t p = 0; p < game.players.size(); p++)
@@ -394,6 +442,14 @@ int main(int argc, char** argv) {
                 game.soundRequested[s] = false;
             }
         }
+
+        // Rumble: a short buzz for a lost life or a popped shield, a long one for a boss kill, and the screen shake's strength between.
+        for (size_t p = 0; p < game.players.size(); p++)
+            if (game.players[p].lives < livesBefore[p] || (shieldBefore[p] && !game.players[p].shield && game.players[p].alive))
+                inputRumblePulse((int)p, 0.8f, 0.25f);
+        if (bossesAlive < bossesBefore)
+            for (size_t p = 0; p < game.players.size(); p++) inputRumblePulse((int)p, 1.0f, 1.5f);
+        inputRumbleUpdate(scene == SCENE_PLAYING ? game.trauma * settings.shake / 100.0f : 0, steps * STEP);
 
         game.highScore = highScore;
         game.shakeStrength = settings.shake / 100.0f;
@@ -476,6 +532,7 @@ int main(int argc, char** argv) {
     }
 
     debugNetPrintf(INFO, "nameGame exiting\n");
+    inputRumbleStop();
     audioClose();
     SDL_Quit();
     debugNetFinish();

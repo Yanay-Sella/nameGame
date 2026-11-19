@@ -11,12 +11,12 @@ Mockups: [formation wave](../../work-plan/jungle/mock-wave.png) · [twin monkeys
 2. Beating level 1 continues the same run into the jungle: score, lives, rockets and weapon level carry over. Play again restarts at the level the menu started (CLASSIC → level 1, JUNGLE → jungle).
 3. The jungle restarts the wave count. The banner reads `JUNGLE` for 2 s, then `WAVE 1`; the HUD top centre reads `JUNGLE n`.
 4. Killing the jungle's wave-20 bosses shows `JUNGLE CLEAR` for 3 s, then the [glacier](../glacier/design.md) starts with the same players (D-024). (Before D-024 this was the end screen.)
-5. Jungle wave n uses level 1's formulas at wave n + 5: rows, armour rows, sway, shot chance, shot speed, dive interval, divers from difficulty wave 3, two divers from difficulty wave 15.
+5. Jungle wave n uses the enemy-wave formulas at difficulty wave n + 5: rows, armour rows, HP bonus, sway, bob, shot chance, shot speed, dive interval and divers (enemy-waves rule 9).
 6. Enemies are insects with level 1's roles: lime leafhopper (1 HP, 100), brown beetle (2 HP, 200), black stag beetle (4 HP, 400), and the new heavy black rhinoceros beetle (12 HP, 1,000).
 7. Jungle formation waves get `wave / 8` heavy beetles (waves 8-14: 1, waves 16-19: 2; none on boss waves). A heavy flies in like an alien, then roams the box x 0…304, y 18…84 at 40 px/s sideways and 25 px/s vertically, never dives, and shoots at twice the formation's shot chance. It counts for the wave clear.
 8. Boss waves (n = wave / 5): 5 one monkey, 10 two monkeys, 15 one gorilla, 20 two gorillas. Entry, twins' halves, health bar, flash, rocket damage, pickups and clear bonus are as level 1's bosses.
 9. The monkey alternates a banana throw (3 bananas 0.15 s apart straight down, plus a peel lob that lands 1.25 s later on a random point of the ship zone) and a banana bunch (5 bananas in a fan).
-10. The gorilla rolls each attack: 30 % banana throw with a peel, 30 % poop throw, 20 % banana bunch, 20 % chest pound. A poop is lobbed at the nearest ship and splats into a stink mist; with 3 mists or poops already out it does a banana bunch instead. A chest pound (0.6 s) ends with 5 coconuts falling, one per fifth of the screen; pounding again while pounding gives a banana bunch.
+10. The gorilla rolls each attack: 30 % banana throw with a peel, 30 % poop throw, 20 % banana bunch, 20 % chest pound. A poop is lobbed at the nearest ship and splats into a stink mist; with 3 mists or poops already out it does a banana bunch instead. A chest pound (0.6 s) ends with 5 coconuts falling, one per fifth of the screen; pounding again while pounding gives a banana bunch. The gorilla is bulky with brown fur, light-brown shoulders and a dark face.
 11. A banana peel lies 5 s (blinking in the last second). A ship whose hitbox touches it slides 0.5 s at 140 px/s the way the stick was pushed (random left or right when centred), still able to shoot, then is stunned 1.0 s: no moving, shooting or rockets, with dizzy stars. The peel is squashed. Peels don't kill and work on a respawning ship.
 12. A stink mist grows to radius 20 px in 0.3 s, thins out in its last second and is gone after 6 s. While a ship's centre is inside any mist, that player's bullets heal gorillas (+1 HP each, up to max) instead of damaging them, and are drawn lime. The check happens when the bullet hits. A heal makes the gorilla laugh 0.6 s (`HA HA`, lime health bar). Rockets are unaffected.
 13. Magenta marks every deadly enemy projectile: shots, bananas and coconuts. Peels, poop and mist never use it.
@@ -28,7 +28,7 @@ Mockups: [formation wave](../../work-plan/jungle/mock-wave.png) · [twin monkeys
 | Palette | 15 new characters in `source/sprites.h` (greens, bark browns, insect colours, banana yellow, mist green); every background colour is darker than the grey stars |
 | Background | far layer 8 px/s (thin trunks, leaf clusters), near layer 18 px/s (two edge trunks, rope bridges, vines, leaf clumps), 14 dim fireflies |
 | Enemy roster | leafhopper, brown beetle, stag beetle, roaming rhinoceros beetle |
-| Ship skin | unchanged |
+| Ship skin | wooden hull with leaf wings (D-031) |
 | Bosses | monkey (150 HP) at 5, twin monkeys at 10, gorilla (300 HP) at 15, twin gorillas at 20 |
 
 ## Numbers

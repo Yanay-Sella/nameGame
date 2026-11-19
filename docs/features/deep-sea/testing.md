@@ -13,6 +13,9 @@
 - [x] `make ps3` builds without warnings (2026-11-18).
 - [ ] PS3 autopilot run from DEEP SEA at 60 fps, log lines `boss wave 15: 1 fisherman`, `player 1 hooked` or `boot thrown`, `level 5 clear at`.
 - [ ] One hand-played deep-sea run judges the current and the hook stun (user's verdict).
+- [x] A moving ship trails bubbles only in the deep sea. *(bubbleTrailOnlyWhileMovingInTheDeepSea)*
+- [x] The fisherman keeps at most 3 live fish out; they land, chase, kill and die as specified. *(fishermanKeepsAtMostThreeLiveFishOut, liveFishLandsAndChasesTheShip, liveFishKillsAndDies, shotsAndTimeEndLiveFish)*
+- [ ] PS3: the fisherman, live fish and bubble trail look right.
 
 ## History
 - 2026-11-18: criteria written.
