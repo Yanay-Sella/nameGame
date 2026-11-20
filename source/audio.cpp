@@ -128,6 +128,42 @@ void audioOpen(const char* folder) {
     sounds[SOUND_CAST] = synthesize({{0, 0.2f, 2500, 500, 0.2f, true}, {0, 0.2f, 1200, 400, 0.15f, false}});
     sounds[SOUND_HOOKED] = synthesize({{0, 0.08f, 800, 800, 0.3f, false}, {0.1f, 0.08f, 1000, 1000, 0.3f, false},
                                        {0.2f, 0.15f, 600, 1200, 0.3f, false}});
+    // NAME QUEST (spec §16): footsteps per surface, then the hero's and the world's sounds.
+    sounds[SOUND_Q_STEP_STONE] = synthesize({{0, 0.03f, 900, 700, 0.08f, true}});
+    sounds[SOUND_Q_STEP_METAL] = synthesize({{0, 0.03f, 2600, 2000, 0.07f, true}, {0, 0.02f, 1200, 1200, 0.04f, false}});
+    sounds[SOUND_Q_STEP_LEAVES] = synthesize({{0, 0.03f, 3000, 1800, 0.06f, true}});
+    sounds[SOUND_Q_STEP_SNOW] = synthesize({{0, 0.03f, 1800, 1200, 0.09f, true}});
+    sounds[SOUND_Q_STEP_ROCK] = synthesize({{0, 0.03f, 600, 400, 0.10f, true}});
+    sounds[SOUND_Q_STEP_SAND] = synthesize({{0, 0.03f, 700, 500, 0.08f, true}});
+    sounds[SOUND_Q_STEP_MARBLE] = synthesize({{0, 0.03f, 2200, 2000, 0.06f, true}, {0, 0.02f, 1600, 1600, 0.03f, false}});
+    sounds[SOUND_Q_STEP_PAPER] = synthesize({{0, 0.03f, 4000, 3000, 0.03f, true}});
+    sounds[SOUND_Q_JUMP] = synthesize({{0, 0.08f, 300, 600, 0.15f, false}});
+    sounds[SOUND_Q_LAND] = synthesize({{0, 0.06f, 500, 200, 0.15f, true}});
+    sounds[SOUND_Q_SWING] = synthesize({{0, 0.09f, 2500, 900, 0.2f, true}});
+    sounds[SOUND_Q_STAB] = synthesize({{0, 0.05f, 3500, 2000, 0.18f, true}});
+    sounds[SOUND_Q_ARROW] = synthesize({{0, 0.07f, 1800, 1200, 0.12f, false}});
+    sounds[SOUND_Q_SPELL] = synthesize({{0, 0.15f, 600, 1400, 0.15f, false}, {0, 0.15f, 3000, 5000, 0.08f, true}});
+    sounds[SOUND_Q_HIT] = synthesize({{0, 0.05f, 1200, 600, 0.3f, true}});
+    sounds[SOUND_Q_CRIT] = synthesize({{0, 0.05f, 1200, 600, 0.3f, true}, {0, 0.06f, 1500, 2200, 0.2f, false}});
+    sounds[SOUND_Q_HURT] = synthesize({{0, 0.15f, 400, 150, 0.35f, false}, {0, 0.1f, 1500, 500, 0.3f, true}});
+    sounds[SOUND_Q_DEATH] = synthesize({{0, 0.9f, 2500, 200, 0.45f, true}, {0, 0.9f, 500, 60, 0.3f, false}});
+    sounds[SOUND_Q_NAMES] = synthesize({{0, 0.05f, 880, 880, 0.2f, false}, {0.05f, 0.05f, 1175, 1175, 0.2f, false},
+                                        {0.1f, 0.05f, 1568, 1568, 0.2f, false}});
+    sounds[SOUND_Q_KINDLE] = synthesize({{0, 0.4f, 800, 2500, 0.3f, true}, {0.1f, 0.3f, 220, 440, 0.2f, false}});
+    sounds[SOUND_Q_LEVEL_UP] = synthesize({{0, 0.09f, 523, 523, 0.25f, false}, {0.09f, 0.09f, 659, 659, 0.25f, false},
+                                           {0.18f, 0.09f, 784, 784, 0.25f, false}, {0.27f, 0.09f, 1047, 1047, 0.25f, false},
+                                           {0.36f, 0.09f, 1319, 1319, 0.25f, false}});
+    sounds[SOUND_Q_PORTAL] = synthesize({{0, 0.3f, 200, 1200, 0.2f, false}, {0, 0.3f, 210, 1210, 0.15f, false}});
+    sounds[SOUND_Q_BLIP] = synthesize({{0, 0.03f, 1000, 1000, 0.15f, false}});
+    sounds[SOUND_Q_TALK] = synthesize({{0, 0.02f, 700, 700, 0.08f, false}});
+    sounds[SOUND_Q_DRINK] = synthesize({{0, 0.05f, 400, 600, 0.15f, false}, {0.1f, 0.05f, 400, 600, 0.15f, false},
+                                        {0.2f, 0.05f, 400, 600, 0.15f, false}});
+    sounds[SOUND_Q_DODGE] = synthesize({{0, 0.12f, 1500, 3000, 0.15f, true}});
+    sounds[SOUND_Q_SPLASH] = synthesize({{0, 0.3f, 1500, 300, 0.4f, true}});
+    sounds[SOUND_Q_ZAP] = synthesize({{0, 0.15f, 6000, 4000, 0.3f, true}, {0, 0.15f, 120, 120, 0.2f, false}});
+    sounds[SOUND_Q_ROAR] = synthesize({{0, 0.6f, 300, 120, 0.5f, true}, {0, 0.6f, 110, 70, 0.3f, false}});
+    sounds[SOUND_Q_GATE] = synthesize({{0, 0.5f, 200, 100, 0.4f, true}});
+    sounds[SOUND_Q_CHEST] = synthesize({{0, 0.06f, 660, 660, 0.25f, false}, {0.06f, 0.06f, 990, 990, 0.25f, false}});
     debugNetPrintf(INFO, "audio: %d Hz, format 0x%x, %d channels, mizrahit %s, dubstep %s\n", freq, format, channels,
                    songs[MUSIC_MIZRAHIT] ? "loaded" : "missing", songs[MUSIC_DUBSTEP] ? "loaded" : "missing");
 }

@@ -29,6 +29,7 @@ Full setup history, debugging toolkit and new-project checklist: `docs/ps3-new-p
   but silent, with keyboard pads (keys in `host/input_keyboard.cpp`) and logs on stdout. `BUTTONS='cross|3|right:1|r1:3|l1|1|quit'` scripts it
   like `make pad` (`|n|` waits, `name:s` holds, `l2+l3` chords, `quit` exits); an `l1` leaves `shots/shot.png`. It opens a 1280x720 window.
   It does NOT use the PS3's SDL port, audio or controller, so confirm anything final on the PS3. PS3-only calls in `main.cpp` are stubbed by `host/ps3_stubs.h` (`NAMEGAME_MAC`).
+  `NAMEGAME_QUEST='slot=3 class=0 world=8 area=0' make mac-run BUTTONS=...` starts NAME QUEST in play (spec §20).
 - `make log` — print the game's UDP log lines (port 18195). Run it before launching the game.
   `make ps3` deletes `build/`, so don't redirect the log into `build/`.
   A stale `make log` (python on UDP 18195) makes the next one fail with "Address already in use": `lsof -nP -iUDP:18195`, then kill that PID.

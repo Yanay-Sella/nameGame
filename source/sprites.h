@@ -71,6 +71,16 @@ inline uint32_t paletteColor(char c) {
         case '7': return 0xFF1D6A5E;   // dark teal
         case '8': return 0xFFE0E8C8;   // pale belly, teeth
         case '9': return 0xFFE6FF6A;   // lure glow
+        case '@': return 0xFFF0C8A0;   // NAME QUEST: skin
+        case '$': return 0xFFB07850;   // skin shade
+        case '&': return 0xFF4A3020;   // hair, leather
+        case '*': return 0xFF3A2E2A;   // Namula stone
+        case '%': return 0xFF5E4A3E;   // Namula stone light
+        case '=': return 0xFF1C1416;   // Namula night, Claude's room
+        case '?': return 0xFF8A8478;   // citadel grey
+        case '!': return 0xFF4E4A46;   // citadel dark
+        case 'z': return 0xFFC8A040;   // citadel gold
+        case 'Q': return 0xFFD97757;   // Claude's cloak
         default: return 0;             // '.' and anything else: transparent
     }
 }
@@ -1672,6 +1682,8 @@ inline int fontGlyph(char c) {
         case 'Y': return 055222; case 'Z': return 071247;
         case '.': return 000002; case ':': return 002020; case '-': return 000700; case '!': return 022202;
         case '/': return 011244; case '+': return 002720; case '%': return 051245; case '>': return 042124;
+        case ',': return 000024; case '?': return 071202; case '\'': return 022000; case '<': return 012421;
+        case '(': return 012221; case ')': return 042224; case '*': return 005250;
         default: return 0;
     }
 }

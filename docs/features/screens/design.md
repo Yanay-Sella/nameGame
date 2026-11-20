@@ -5,7 +5,7 @@
 The game opens on a main menu with room for more game modes, and a settings screen holds the music switch. It serves pillar 3 (arcade): only the menus the game needs.
 
 ## Rules
-1. Boot shows the main menu: title `NAME GAME`, `V1.0` in grey at the bottom right, the items CLASSIC, LEVEL PICKER and SETTINGS and the saved best as `HI 0012345` under the panel, with the starfield scrolling behind it. No music.
+1. Boot shows the main menu: title `NAME GAME`, `V1.0` in grey at the bottom right, the items CLASSIC, LEVEL PICKER, NAME QUEST and SETTINGS and the saved best as `HI 0012345` under the panel, with the starfield scrolling behind it. No music.
 2. CLASSIC starts a run at level 1 that goes through every level in order; the deep sea's clear is the win. LEVEL PICKER opens the level wheel. Both start with 1 player (player 2 still drops in with Start). Play again replays the same mode and level. The `HI` line sits at y 150.
 3. Settings has the items MUSIC: MIZRAHIT / DUBSTEP / OFF, SHAKE: 0–100 % in steps of 25, FLASHING: NORMAL / REDUCED and BACK. X or D-pad right changes the item (music steps MIZRAHIT → DUBSTEP → OFF and wraps, shake steps up and wraps; left steps either one back), and each change is saved to settings.txt and survives a reboot.
 4. Circle or BACK leaves settings and returns to whichever menu opened it.

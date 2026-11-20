@@ -14,10 +14,12 @@
 #endif
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string>
 #include "audio.h"
 #include "game.h"
 #include "input.h"
+#include "quest.h"
 #include "screen.h"
 #include "settings.h"
 
@@ -25,10 +27,10 @@ const float STEP = 1.0f / 60;   // s per game update
 const int MAX_STEPS_PER_FRAME = 4;
 const bool DEV_AIDS = !RELEASE;   // Triangle stress test, Select autopilot, L2+L3 test mode and L1 screenshot; off in make release
 
-enum Scene { SCENE_MAIN_MENU, SCENE_LEVEL_PICKER, SCENE_SETTINGS, SCENE_PLAYING, SCENE_PAUSED };
-const char* const SCENE_NAMES[] = {"main menu", "level picker", "settings", "playing", "paused"};
-const char* const MAIN_ITEMS[] = {"CLASSIC", "LEVEL PICKER", "SETTINGS"};   // classic plays every level in order
-const int PICKER_ITEM = 1, SETTINGS_ITEM = 2;
+enum Scene { SCENE_MAIN_MENU, SCENE_LEVEL_PICKER, SCENE_SETTINGS, SCENE_PLAYING, SCENE_PAUSED, SCENE_QUEST };
+const char* const SCENE_NAMES[] = {"main menu", "level picker", "settings", "playing", "paused", "quest"};
+const char* const MAIN_ITEMS[] = {"CLASSIC", "LEVEL PICKER", "NAME QUEST", "SETTINGS"};   // classic plays every level in order
+const int PICKER_ITEM = 1, QUEST_ITEM = 2, SETTINGS_ITEM = 3;
 const char* const PICKER_NAMES[LEVEL_COUNT] = {"SPACE", "JUNGLE", "GLACIER", "VOLCANO", "DEEP SEA"};
 const float PICKER_SPIN_TIME = 0.12f;   // s for the picker wheel to turn one row
 const char* const BOSS_NAMES[] = {"classic", "mage", "monkey", "gorilla", "yeti", "golem", "imp", "fire lord", "angler",
@@ -138,6 +140,9 @@ int main(int argc, char** argv) {
 
     Game game;
     startGame(game, 1, (uint32_t)SDL_GetPerformanceCounter());   // gives the menu its stars; a second player joins with Start (co-op)
+    Quest quest;
+    bool questPaused = false;   // the pause menu (and settings from it) sits over NAME QUEST, not the shooter
+    Actions questCarry = {};    // NAME QUEST presses read in a frame that ran no game step, kept for the next frame
     Scene scene = SCENE_MAIN_MENU, settingsBack = SCENE_MAIN_MENU;
     int selected = 0;
     int runLevel = 1;   // the level the menu started; play again restarts there
@@ -153,6 +158,16 @@ int main(int argc, char** argv) {
         scene = next;
         debugNetPrintf(INFO, "scene: %s\n", SCENE_NAMES[next]);
     };
+    auto openQuest = [&]() {
+        audioStopMusic();   // NAME QUEST has no music (D-049)
+        questOpen(quest, exeFolder.c_str());
+        quest.devAids = DEV_AIDS;
+        setScene(SCENE_QUEST);
+    };
+    if (DEV_AIDS && getenv("NAMEGAME_QUEST")) {   // Mac test scripts start straight into NAME QUEST play (spec §20)
+        openQuest();
+        questStartDev(quest, getenv("NAMEGAME_QUEST"));
+    }
 
     const double counterHz = (double)SDL_GetPerformanceFrequency();
     Uint64 lastCounter = SDL_GetPerformanceCounter();
@@ -173,6 +188,13 @@ int main(int argc, char** argv) {
         }
         Actions actions[MAX_PLAYERS];
         for (int p = 0; p < MAX_PLAYERS; p++) actions[p] = inputRead(p);
+        if (scene == SCENE_QUEST) {
+            Actions& a = actions[0];
+            a.jump |= questCarry.jump; a.item |= questCarry.item; a.back |= questCarry.back; a.up |= questCarry.up;
+            a.down |= questCarry.down; a.left |= questCarry.left; a.right |= questCarry.right;
+            a.godMode |= questCarry.godMode; a.autopilot |= questCarry.autopilot;
+        }
+        questCarry = {};
         // Every controller drives the menus.
         Actions menu = {};
         for (const Actions& a : actions) {
@@ -183,12 +205,14 @@ int main(int argc, char** argv) {
         int lostController = -1;
         for (int p = (int)game.players.size() - 1; p >= 0; p--)
             if (!actions[p].connected) lostController = p;
-        int itemCount = scene == SCENE_SETTINGS ? 4 : scene == SCENE_LEVEL_PICKER ? LEVEL_COUNT : 3;
-        if (scene != SCENE_PLAYING) {
+        if (questPaused) lostController = actions[0].connected ? -1 : 0;   // NAME QUEST is single player
+        int itemCount = scene == SCENE_SETTINGS ? 4 : scene == SCENE_LEVEL_PICKER ? LEVEL_COUNT : scene == SCENE_MAIN_MENU ? 4 : 3;
+        if (scene != SCENE_PLAYING && scene != SCENE_QUEST) {
             if (menu.up) selected = (selected + itemCount - 1) % itemCount;
             if (menu.down) selected = (selected + 1) % itemCount;
         }
 
+        Scene frameScene = scene;   // a press that changes the scene this frame never also reaches NAME QUEST
         switch (scene) {
         case SCENE_MAIN_MENU:
             if (menu.confirm && selected == 0) {
@@ -202,6 +226,8 @@ int main(int argc, char** argv) {
                 selected = runSingleLevel ? runLevel - 1 : 0;   // back on the last picked level
                 pickerSpin = 0;
                 setScene(SCENE_LEVEL_PICKER);
+            } else if (menu.confirm && selected == QUEST_ITEM) {
+                openQuest();
             } else if (menu.confirm && selected == SETTINGS_ITEM) {
                 settingsBack = SCENE_MAIN_MENU;
                 selected = 0;
@@ -233,7 +259,7 @@ int main(int argc, char** argv) {
             } else if (selected < 3 && (menu.confirm || menu.left || menu.right)) {
                 if (selected == 0) {
                     settings.music = (Music)((settings.music + (menu.left ? MUSIC_CHOICES - 1 : 1)) % MUSIC_CHOICES);   // Mizrahit → Dubstep → Off → Mizrahit
-                    if (settingsBack == SCENE_PAUSED) audioStartMusic(settings.music);   // the main menu stays silent
+                    if (settingsBack == SCENE_PAUSED && !questPaused) audioStartMusic(settings.music);   // the main menu and NAME QUEST stay silent
                 } else if (selected == 1) {
                     settings.shake = (settings.shake + (menu.left ? -25 : 25) + 125) % 125;   // 0, 25 ... 100, wrapping
                 } else {
@@ -246,15 +272,31 @@ int main(int argc, char** argv) {
             break;
         case SCENE_PAUSED:
             if (menu.pause || menu.back || (menu.confirm && selected == 0)) {
-                if (lostController < 0) setScene(SCENE_PLAYING);
+                if (lostController < 0) {
+                    setScene(questPaused ? SCENE_QUEST : SCENE_PLAYING);
+                    questPaused = false;
+                }
             } else if (menu.confirm && selected == 1) {
                 settingsBack = SCENE_PAUSED;
                 selected = 0;
                 setScene(SCENE_SETTINGS);
             } else if (menu.confirm && selected == 2) {
+                if (questPaused) questSave(quest);   // RETURN TO MENU autosaves the slot (spec §17)
+                questPaused = false;
                 audioStopMusic();
                 selected = 0;
                 setScene(SCENE_MAIN_MENU);
+            }
+            break;
+        case SCENE_QUEST:
+            if (quest.wantsMainMenu) {
+                quest.wantsMainMenu = false;
+                selected = QUEST_ITEM;
+                setScene(SCENE_MAIN_MENU);
+            } else if ((actions[0].pause || !actions[0].connected) && questCanPause(quest)) {
+                questPaused = true;
+                selected = 0;
+                setScene(SCENE_PAUSED);
             }
             break;
         case SCENE_PLAYING:
@@ -354,15 +396,19 @@ int main(int argc, char** argv) {
         int steps = 0;
         while (accumulator >= STEP && steps < MAX_STEPS_PER_FRAME) {
             if (scene == SCENE_PLAYING) updateGame(game, actions, STEP);
+            else if (scene == SCENE_QUEST && frameScene == SCENE_QUEST) questUpdate(quest, actions[0], STEP);
             else if (scene == SCENE_MAIN_MENU || scene == SCENE_LEVEL_PICKER || (scene == SCENE_SETTINGS && settingsBack == SCENE_MAIN_MENU))
                 updateBackground(game, STEP);
             if (pickerSpin > 0) pickerSpin = SDL_max(0.0f, pickerSpin - STEP / PICKER_SPIN_TIME);
             if (pickerSpin < 0) pickerSpin = SDL_min(0.0f, pickerSpin + STEP / PICKER_SPIN_TIME);
             for (Actions& a : actions) a.rocket = a.cycle = false;   // a press counts once, in the first step
+            Actions& a0 = actions[0];
+            a0.jump = a0.item = a0.back = a0.up = a0.down = a0.left = a0.right = a0.confirm = a0.pause = a0.godMode = a0.autopilot = false;
             accumulator -= STEP;
             steps++;
         }
         if (steps == MAX_STEPS_PER_FRAME) accumulator = 0;   // fell far behind: drop the backlog rather than spiral
+        if (steps == 0 && scene == SCENE_QUEST && frameScene == SCENE_QUEST) questCarry = actions[0];
         if (game.level != levelBefore) debugNetPrintf(INFO, "level %d starts at %.1f s\n", game.level, game.time);
         if (game.wave != waveBefore) {
             for (size_t p = 0; p < game.players.size(); p++)
@@ -442,6 +488,16 @@ int main(int argc, char** argv) {
                 game.soundRequested[s] = false;
             }
         }
+        if (scene == SCENE_QUEST) {
+            for (int s = 0; s < SOUND_COUNT; s++) {
+                if (quest.soundRequested[s]) audioPlay((Sound)s);
+                quest.soundRequested[s] = false;
+            }
+        }
+        for (const std::string& line : quest.logLines) debugNetPrintf(INFO, "%s\n", line.c_str());
+        quest.logLines.clear();
+        quest.shakeStrength = settings.shake / 100.0f;
+        quest.reduceFlashing = settings.reduceFlashing;
 
         // Rumble: a short buzz for a lost life or a popped shield, a long one for a boss kill, and the screen shake's strength between.
         for (size_t p = 0; p < game.players.size(); p++)
@@ -482,15 +538,19 @@ int main(int argc, char** argv) {
             }
             drawText((SCREEN_W - textWidth("X PLAY  O BACK")) / 2, panelY + panelH - 9, "X PLAY  O BACK", paletteColor('s'));
         } else if (scene == SCENE_SETTINGS) {
-            if (settingsBack == SCENE_PAUSED) drawGame(game);
+            if (settingsBack == SCENE_PAUSED && questPaused) questDraw(quest);
+            else if (settingsBack == SCENE_PAUSED) drawGame(game);
             else drawBackground(game);
             char shake[24];
             snprintf(shake, sizeof shake, "SHAKE: %d%%", settings.shake);
             const char* settingsItems[] = {MUSIC_LABELS[settings.music], shake,
                                            settings.reduceFlashing ? "FLASHING: REDUCED" : "FLASHING: NORMAL", "BACK"};
             drawMenu("SETTINGS", settingsItems, 4, selected, "X CHANGE  O BACK");
+        } else if (scene == SCENE_QUEST) {
+            questDraw(quest);
         } else {
-            drawGame(game);
+            if (questPaused) questDraw(quest);
+            else drawGame(game);
             if (scene == SCENE_PAUSED) {
                 char hint[32] = "X SELECT  O RESUME";
                 if (lostController >= 0) snprintf(hint, sizeof hint, "CONNECT CONTROLLER %d", lostController + 1);
@@ -522,8 +582,12 @@ int main(int argc, char** argv) {
         worstWorkMs = SDL_max(worstWorkMs, workMs);
         statsTimer += (float)((SDL_GetPerformanceCounter() - frameStart) / counterHz);
         if (statsTimer >= 5) {
-            debugNetPrintf(INFO, "fps %.1f, worst work %.1f ms, wave %d, score %d, weapon %d, heap %d KB\n", framesSinceStats / statsTimer,
-                           worstWorkMs, game.wave, game.players[0].score, game.players[0].weaponLevel, (int)(mallinfo().uordblks / 1024));
+            if (scene == SCENE_QUEST || questPaused)
+                debugNetPrintf(INFO, "fps %.1f, worst work %.1f ms, quest %d.%d, heap %d KB\n", framesSinceStats / statsTimer, worstWorkMs,
+                               quest.area.world, quest.area.index, (int)(mallinfo().uordblks / 1024));
+            else
+                debugNetPrintf(INFO, "fps %.1f, worst work %.1f ms, wave %d, score %d, weapon %d, heap %d KB\n", framesSinceStats / statsTimer,
+                               worstWorkMs, game.wave, game.players[0].score, game.players[0].weaponLevel, (int)(mallinfo().uordblks / 1024));
             framesSinceStats = 0;
             statsTimer = 0;
             worstWorkMs = 0;

@@ -10,6 +10,8 @@ extern uint32_t screenPixels[SCREEN_W * SCREEN_H];   // ARGB, row by row
 void fillRect(int x, int y, int w, int h, uint32_t color);
 void fillCircle(int cx, int cy, int radius, uint32_t color);
 void drawSprite(const Sprite& sprite, int x, int y);
+// Like drawSprite, mirrored when flip, with every swapFrom pixel drawn as swapTo (swapFrom 0: no swap).
+void drawSpriteEx(const Sprite& sprite, int x, int y, bool flip, char swapFrom = 0, uint32_t swapTo = 0);
 void drawSpriteSolid(const Sprite& sprite, int x, int y, uint32_t color);   // silhouette, for hit flashes
 void drawText(int x, int y, const char* text, uint32_t color, int scale = 1);
 int textWidth(const char* text, int scale = 1);

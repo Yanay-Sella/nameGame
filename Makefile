@@ -51,11 +51,11 @@ release:
 	cp README.md "dist/NAME-game-$(VERSION)-README.md"
 	ls -l dist
 
-# Build and run the game-rule tests on the Mac (game.cpp and screen.cpp have no SDL or PS3 code).
+# Build and run the game-rule and NAME QUEST tests on the Mac (game.cpp, quest*.cpp and screen.cpp have no SDL or PS3 code).
 test:
 	mkdir -p build/tests
-	c++ -std=c++14 -Wall -Wextra -Isource tests/game_tests.cpp source/game.cpp source/formations.cpp source/screen.cpp source/settings.cpp -o build/tests/game_tests
-	build/tests/game_tests
+	c++ -std=c++14 -Wall -Wextra -Isource tests/game_tests.cpp source/game.cpp source/formations.cpp source/screen.cpp source/settings.cpp -o build/tests/game_tests && build/tests/game_tests
+	c++ -std=c++14 -O2 -Wall -Wextra -Isource tests/quest_tests.cpp $(wildcard source/quest*.cpp) source/screen.cpp -o build/tests/quest_tests && build/tests/quest_tests
 
 # Native Mac build for fast testing (SDL2 from Homebrew, silent, keyboard pads): game logic and drawing are the real code,
 # but not the PS3's SDL port, audio or controller, so confirm anything final on the PS3.
@@ -64,7 +64,8 @@ mac:
 	mkdir -p build/mac
 	c++ -std=c++14 -O2 -Wall -Wextra -Wno-unused-parameter -DNAMEGAME_MAC -DRELEASE=0 -DGAME_VERSION=\"$(VERSION)\" \
 		-DLOG_HOST=\"127.0.0.1\" -DLOG_PORT=$(LOG_PORT) $$(sdl2-config --cflags) -Isource \
-		source/main.cpp source/game.cpp source/formations.cpp source/screen.cpp source/settings.cpp host/input_keyboard.cpp host/audio_silent.cpp \
+		source/main.cpp source/game.cpp source/formations.cpp source/screen.cpp source/settings.cpp $(wildcard source/quest*.cpp) \
+		host/input_keyboard.cpp host/audio_silent.cpp \
 		$$(sdl2-config --libs) -o $(MAC_BIN)
 
 # Run the Mac build; BUTTONS='cross|1|l1|1|quit' plays a script like make pad (plus hold 'right:2', chord 'l2+l3', 'quit'),

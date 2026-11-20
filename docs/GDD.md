@@ -1,9 +1,9 @@
 # NAME game — Game Design Document
 
-**Version:** 0.25 · **Updated:** 2026-11-18 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
+**Version:** 0.29 · **Updated:** 2026-11-20 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
 
 ## Summary
-You pilot a small ship at the bottom of the screen against waves of pixel-art aliens. Hold R1 to spray bullets, and save the scarce R2 rocket for the moment a wave gets out of hand. Waves get harder, and every 5th wave is a boss. The run goes through five levels of 20 waves each, every one harder than the last: level 1 (space), the jungle, the glacier, the volcano and the deep sea. It ends when you beat the deep sea's wave-20 bosses or lose your last life, and you chase the saved high score. Big bosses drop level buffs that stack until you die. Classic plays the five levels as one run; the level picker plays any single level on its own.
+You pilot a small ship at the bottom of the screen against waves of pixel-art aliens. Hold R1 to spray bullets, and save the scarce R2 rocket for the moment a wave gets out of hand. Waves get harder, and every 5th wave is a boss. The run goes through five levels of 20 waves each, every one harder than the last: level 1 (space), the jungle, the glacier, the volcano and the deep sea. It ends when you beat the deep sea's wave-20 bosses or lose your last life, and you chase the saved high score. Big bosses drop level buffs that stack until you die. Classic plays the five levels as one run; the level picker plays any single level on its own. NAME QUEST, the third item on the main menu, is a separate RPG platformer set in the same worlds, with four classes, a hub village, checkpoints and three save slots.
 
 | | |
 |---|---|
@@ -18,7 +18,7 @@ You pilot a small ship at the bottom of the screen against waves of pixel-art al
 ## Pillars
 1. **Readable at a glance.** Chunky pixels at 320×180, enemy shots in a colour nothing else uses; a background or effect that hides a bullet is cut.
 2. **The rocket is the panic button.** Bullets handle the routine and the rocket saves you, so rockets stay scarce and every one is decisive; no rocket spam.
-3. **Arcade, not a campaign.** 3 lives, a score and a high score; no story, no menus beyond what the screens below need.
+3. **Arcade, not a campaign (Classic and the level picker).** 3 lives, a score and a high score; no story, no menus beyond what the screens below need.
 4. **60 fps on a real PS3.** A feature or effect that drops frames on the console is simplified or cut.
 
 ## Core loop
@@ -51,6 +51,7 @@ dodge + shoot (R1) → kill aliens → score and pickups → stronger gun / more
 | Level buffs | implemented | MVP | Big bosses drop a level buff (wand beam, bananas, frost wave, fire bullets, bubble shield); Square picks the strong attack; death loses all | [design](features/level-buffs/design.md) |
 | Volcano | implemented | MVP | Level 4: fire monsters, an imp and a fire lord; lava drops slow you but double your bullets; eruptions | [design](features/volcano/design.md) |
 | Deep sea | implemented | MVP | Level 5: scary fish, a current, a bubble-spitting anglerfish and a fisherman fish that hooks you (or throws a boot) | [design](features/deep-sea/design.md) |
+| NAME QUEST | in progress | MVP | RPG platformer mode: 4 classes, 6 worlds of 20 areas, Namula hub, souls-like death | [design](features/name-quest/design.md) |
 
 ## Milestones
 1. **M1, greybox on the PS3:** boxes for ship, bullets, rocket and enemies; low-res scaling, music playback and button mapping proven · done when: [prototypes/ship-feel/BRIEF.md](../prototypes/ship-feel/BRIEF.md) has a RESULT line.
@@ -64,11 +65,13 @@ The task-by-task plan for each milestone is in the [work plan](work-plan/nameGam
 ```
 MAIN MENU ─ CLASSIC ─→ level 1 ─→ JUNGLE ─→ GLACIER ─→ VOLCANO ─→ DEEP SEA ─ DEEP SEA CLEAR (3 s) ─→ end screen (win)
           ├ LEVEL PICKER ─→ wheel of SPACE / JUNGLE / GLACIER / VOLCANO / DEEP SEA ─→ that level only ─ <LEVEL> CLEAR ─→ end screen (win)
+          ├ NAME QUEST ─→ SLOTS ─ empty slot → CLASS SELECT → INTRO → PLAY in Namula; used slot → PLAY at the last checkpoint
+          │               PLAY ⇄ (Start) PAUSED ─ RETURN TO MENU (saves the slot) ─→ MAIN MENU; SLOTS: Circle → MAIN MENU
           └ SETTINGS
 Between levels: "<LEVEL> CLEAR" for 3 s, then the next level's name banner and WAVE 1, with the same players.
 Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN MENU; game over / <LEVEL> CLEAR end screen: X/Start = play again (same mode and level), Circle = MAIN MENU
 ```
-- **Main menu:** title "NAME GAME", the items Classic, Level picker and Settings and the saved high score. Silent. Classic starts at level 1 and goes through every level.
+- **Main menu:** title "NAME GAME", the items Classic, Level picker, NAME QUEST and Settings and the saved high score. Silent. Classic starts at level 1 and goes through every level.
 - **Level picker:** a wheel with the picked level big and yellow in the middle and two levels above and below it smaller; up/down spins it (wrapping), the background previews the picked level, X plays just that level, Circle goes back.
 - **Settings:** music Mizrahit / Dubstep / Off, screen shake 0–100 % and reduced flashing, saved to settings.txt. Circle or Back returns to the menu that opened it.
 - **Game:** the HUD shows score, wave, lives and rockets. Music loops if enabled.
@@ -125,6 +128,23 @@ Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN ME
 | D-032 | 2026-11-18 | Beams grow from their ball in 0.1 s, spark, and end in shards; the eruption grows too; beams, the frost wave and the shield pop shake the screen; the player's beam hits when it reaches the top | beams appearing at once; kick-only shake; hit-stop on the shield pop | user's request: beams felt flat and trauma 0.3 rounded to no visible shake | [level buffs](features/level-buffs/design.md), [bosses](features/bosses/design.md), [volcano](features/volcano/design.md), [game feel](features/game-feel/design.md) |
 | D-033 | 2026-11-18 | Upgrades drop at 1 % and level n takes n parts, shown by a HUD gauge and a pop-up; formation waves pick a random shape and entry; difficulty waves run 1-20 in level 1 and step back 15 at each new level (to 21-40 in the deep sea), adding HP, sway, divers and a bob past wave 15 | keep 3 % drops; one fixed formation; per-level offsets 5, 8, 11, 14 | user's request: rarer, earned upgrades; varied waves; a classic run that eases off at each new world then climbs higher | [weapon upgrades](features/weapon-upgrades/design.md), [enemy waves](features/enemy-waves/design.md) |
 | D-034 | 2026-11-19 | Formation waves also pick from 29 traced shapes (lines, X, heart, <>, circles, zigzag, letters, words...) drawn by spacing the wave's aliens along strokes; a shape that doesn't fit the alien count is redrawn | only the 6 grid shapes; fixed bitmaps with their own alien counts | user's request for many more shapes; keeping 16-40 aliens per wave leaves the difficulty untouched | [enemy waves](features/enemy-waves/design.md) |
+| D-035 | 2026-11-20 | NAME QUEST is a separate RPG platformer on the main menu with its own code and saves; the shooter's pillar 3 ("arcade, not a campaign") applies to Classic and the level picker only | a story mode inside the shooter; a separate homebrew app | user's choice | [NAME QUEST](features/name-quest/design.md) |
+| D-036 | 2026-11-20 | 6 worlds in a fixed order: the 5 shooter themes, then The Nameless Citadel; 20 areas each; a secret world unlocked by a quest | free world order; fewer, larger worlds | user's choice | [NAME QUEST](features/name-quest/design.md) |
+| D-037 | 2026-11-20 | 3 save slots with autosave (rest, level up, purchase, quest step, boss kill, quit); no manual save | one slot; manual saves at checkpoints | user's choice | [NAME QUEST](features/name-quest/design.md) |
+| D-038 | 2026-11-20 | Death drops all carried names where you died; touching them recovers them; dying again first loses them | keep names on death; lose them for good | user's choice | [NAME QUEST](features/name-quest/design.md) |
+| D-039 | 2026-11-20 | Healing only from bought potions; resting at a checkpoint heals fully and respawns enemies; big bosses stay dead, mini-bosses respawn | regenerating HP; enemies that stay dead | user's choice | [NAME QUEST](features/name-quest/design.md) |
+| D-040 | 2026-11-20 | Max level 40, no stat points; jobs at levels 5, 15, 30 through the class mentor | stat points to spend; a higher level cap | user's choice | [NAME QUEST](features/name-quest/design.md) |
+| D-041 | 2026-11-20 | The strong attack costs MP | a cooldown only | user's choice | [NAME QUEST](features/name-quest/design.md) |
+| D-042 | 2026-11-20 | Controls: X jump, R1 attack (hold to repeat), R2 strong attack, Circle dodge, Square drink potion, Triangle switch potion, Up talk / portal / climb, Start pause | attack on Square or X; jump on a shoulder button | user's choice | [NAME QUEST](features/name-quest/design.md) |
+| D-043 | 2026-11-20 | Areas are 2 screens: 80x23 tiles wide or 40x45 tiles tall (8 px tiles); exits at the edges and through portals | single-screen rooms; long scrolling levels | user's choice | [NAME QUEST](features/name-quest/design.md) |
+| D-044 | 2026-11-20 | Areas are hand-made ASCII tile maps, checked by a physics-based reachability test | generated areas; an in-game level editor | user's choice | [NAME QUEST](features/name-quest/design.md) |
+| D-045 | 2026-11-20 | Single player only | drop-in co-op like the shooter | user's choice | [NAME QUEST](features/name-quest/design.md) |
+| D-046 | 2026-11-20 | Pits and deadly liquids kill instantly | pits cost HP and put you back at the edge | user's choice | [NAME QUEST](features/name-quest/design.md) |
+| D-047 | 2026-11-20 | A normal enemy hit takes 20 % of the reference hero's max HP; enemy stats derive from a reference hero per world | hand-tuned stats per enemy | user's choice | [NAME QUEST](features/name-quest/design.md) |
+| D-048 | 2026-11-20 | The final boss is Claude, never hinted before the citadel's last room; after the credits Claude waits in Namula and offers New Game+ | the Name-Eater as the last boss; no New Game+ | user's choice | [NAME QUEST](features/name-quest/design.md) |
+| D-049 | 2026-11-20 | No music in NAME QUEST for now: synthesized ambience per world and sound effects | the shooter's songs; a song per world | user's choice | [NAME QUEST](features/name-quest/design.md) |
+| D-050 | 2026-11-20 | Each world's mini-boss holds the key to the gate in front of the world's second half | no gates; keys found in chests | user's choice | [NAME QUEST](features/name-quest/design.md) |
+| D-051 | 2026-11-20 | Worlds 1–5 reuse the shooter's enemy and boss sprites where the theme matches (the RPG is set in the same worlds) | all-new sprites | user's choice | [NAME QUEST](features/name-quest/design.md) |
 
 ## Open questions
 - **Assumptions to confirm:** sprites as text grids in code (D-006); every number marked `[ASSUMPTION]` in the feature notes.
@@ -161,3 +181,4 @@ Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN ME
 **0.26 (2026-11-18):** beam build-up, shards and strong-attack shake (D-032).
 **0.27 (2026-11-18):** upgrade parts and gauge, random wave patterns, classic difficulty ramp (D-033).
 **0.28 (2026-11-19):** 29 traced formation shapes (D-034).
+**0.29 (2026-11-20):** NAME QUEST designed (D-035 to D-051); phase 1 engine.

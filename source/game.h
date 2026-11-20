@@ -17,6 +17,9 @@ struct Actions {
     bool screenshot;              // L1 pressed: dev screenshot (main.cpp)
     bool godMode;                 // L2+L3 pressed: dev test mode, no ship can die (main.cpp)
     bool cycle;                  // Square pressed: arm the next held strong attack (level buffs)
+    bool jump;                    // X pressed (NAME QUEST: jump and confirm; Start is not a confirm there)
+    bool jumpHeld;                // X held: a full-height jump
+    bool item;                    // Triangle pressed (NAME QUEST: select the next item)
     bool connected;               // this player's controller is open
 };
 
@@ -25,7 +28,13 @@ enum Sound {
     SOUND_SHOOT, SOUND_ALIEN_HIT, SOUND_ALIEN_DEATH, SOUND_ROCKET_LAUNCH, SOUND_EXPLOSION, SOUND_PICKUP,
     SOUND_PLAYER_DEATH, SOUND_ROCKET_EMPTY, SOUND_WAVE_START, SOUND_EXTRA_LIFE,
     SOUND_BANANA_THROW, SOUND_SCREECH, SOUND_SLIP, SOUND_STUN, SOUND_SPLAT, SOUND_LAUGH, SOUND_POUND,
-    SOUND_SNEEZE, SOUND_FREEZE, SOUND_CRACK, SOUND_SIZZLE, SOUND_BUBBLE, SOUND_CAST, SOUND_HOOKED, SOUND_COUNT
+    SOUND_SNEEZE, SOUND_FREEZE, SOUND_CRACK, SOUND_SIZZLE, SOUND_BUBBLE, SOUND_CAST, SOUND_HOOKED,
+    // NAME QUEST (spec §16)
+    SOUND_Q_STEP_STONE, SOUND_Q_STEP_METAL, SOUND_Q_STEP_LEAVES, SOUND_Q_STEP_SNOW, SOUND_Q_STEP_ROCK, SOUND_Q_STEP_SAND,
+    SOUND_Q_STEP_MARBLE, SOUND_Q_STEP_PAPER, SOUND_Q_JUMP, SOUND_Q_LAND, SOUND_Q_SWING, SOUND_Q_STAB, SOUND_Q_ARROW,
+    SOUND_Q_SPELL, SOUND_Q_HIT, SOUND_Q_CRIT, SOUND_Q_HURT, SOUND_Q_DEATH, SOUND_Q_NAMES, SOUND_Q_KINDLE, SOUND_Q_LEVEL_UP,
+    SOUND_Q_PORTAL, SOUND_Q_BLIP, SOUND_Q_TALK, SOUND_Q_DRINK, SOUND_Q_DODGE, SOUND_Q_SPLASH, SOUND_Q_ZAP, SOUND_Q_ROAR,
+    SOUND_Q_GATE, SOUND_Q_CHEST, SOUND_COUNT
 };
 
 // Level buffs: bit (level - 1) of Player::buffs (docs/features/level-buffs).

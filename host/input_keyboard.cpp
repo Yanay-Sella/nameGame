@@ -1,5 +1,5 @@
 // Mac build: two virtual PS3 pads driven by the keyboard, plus a button script in NAMEGAME_PAD (same syntax as make pad).
-// Player 1: arrows, Z cross, X circle, C square, V triangle, Enter start, Backspace select, Space R1 (fire), Right Shift R2 (rocket),
+// Player 1: arrows, Z cross (jump), X circle (dodge), C square (potion), V triangle (item), Enter start, Backspace select, Space R1 (fire), Right Shift R2 (rocket),
 //           P L1 (screenshot), 1 L2, 2 L3 (1 + 2 together: test mode).
 // Player 2: WASD, K cross (joins the run), L square, H R1 (fire), J R2 (rocket).
 #include "../source/input.h"
@@ -111,6 +111,9 @@ Actions inputRead(int player) {
     a.screenshot = pressed[player][BTN_L1];
     a.godMode = (pressed[player][BTN_L2] || pressed[player][BTN_L3]) && down(BTN_L2) && down(BTN_L3);
     a.cycle = pressed[player][BTN_SQUARE];
+    a.jump = pressed[player][BTN_CROSS];
+    a.jumpHeld = down(BTN_CROSS);
+    a.item = pressed[player][BTN_TRIANGLE];
     a.up = pressed[player][BTN_UP];
     a.down = pressed[player][BTN_DOWN];
     a.left = pressed[player][BTN_LEFT];

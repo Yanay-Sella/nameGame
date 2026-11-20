@@ -33,6 +33,21 @@ void drawSprite(const Sprite& sprite, int x, int y) {
     }
 }
 
+void drawSpriteEx(const Sprite& sprite, int x, int y, bool flip, char swapFrom, uint32_t swapTo) {
+    for (int row = 0; row < sprite.h; row++) {
+        int py = y + row;
+        if (py < 0 || py >= SCREEN_H) continue;
+        for (int col = 0; col < sprite.w; col++) {
+            int px = x + col;
+            char c = sprite.pixels[row * sprite.w + (flip ? sprite.w - 1 - col : col)];
+            uint32_t color = swapFrom && c == swapFrom ? swapTo : paletteColor(c);
+            if (!color || px < 0 || px >= SCREEN_W) continue;
+            uint32_t& pixel = screenPixels[py * SCREEN_W + px];
+            pixel = c == '~' ? 0xFF000000 | (((pixel >> 1) & 0x7F7F7F) + ((pixel >> 2) & 0x3F3F3F) + ((color >> 2) & 0x3F3F3F)) : color;
+        }
+    }
+}
+
 void drawSpriteSolid(const Sprite& sprite, int x, int y, uint32_t color) {
     for (int row = 0; row < sprite.h; row++)
         for (int col = 0; col < sprite.w; col++)

@@ -60,6 +60,9 @@ Actions inputRead(int player) {
     a.godMode = (pressed[player][BTN_L2] || pressed[player][BTN_L3])
         && SDL_JoystickGetButton(joystick, BTN_L2) && SDL_JoystickGetButton(joystick, BTN_L3);
     a.cycle = pressed[player][BTN_SQUARE];
+    a.jump = pressed[player][BTN_CROSS];
+    a.jumpHeld = SDL_JoystickGetButton(joystick, BTN_CROSS);
+    a.item = pressed[player][BTN_TRIANGLE];
     a.up = pressed[player][BTN_UP];
     a.down = pressed[player][BTN_DOWN];
     a.left = pressed[player][BTN_LEFT];
