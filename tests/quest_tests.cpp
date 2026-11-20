@@ -8,7 +8,9 @@
 #include <string>
 #include <vector>
 #include "quest.h"
+#include "quest_art.h"
 #include "quest_sprites.h"
+#include <algorithm>
 
 static int failures = 0;
 
@@ -21,21 +23,143 @@ static int failures = 0;
     } while (0)
 
 const float DT = 1.0f / 60;
-const char* const LEGEND = ".#-|^~icgkzf<>vuSCMNPTKABDEFQWRYXO";
+const char* const LEGEND = ".#-|^~icgkzf<>vuSCMNPTKABDEFQWRYXLO";
 const char* const OBJECTS_TO_REACH = "CMNTKQW";
 const int REACH_WORLDS[] = {WORLD_NAMULA, WORLD_TEST};   // phases 4-9 add their worlds
 
 static const Sprite* const ALL_QUEST_SPRITES[] = {
-    &HERO_KNIGHT_IDLE_A, &HERO_KNIGHT_IDLE_B, &HERO_KNIGHT_WALK_A, &HERO_KNIGHT_WALK_B, &HERO_KNIGHT_JUMP, &HERO_KNIGHT_ATTACK,
-    &HERO_KNIGHT_CLIMB, &HERO_KNIGHT_ROLL, &HERO_ARCHER_IDLE_A, &HERO_ARCHER_IDLE_B, &HERO_ARCHER_WALK_A, &HERO_ARCHER_WALK_B,
-    &HERO_ARCHER_JUMP, &HERO_ARCHER_ATTACK, &HERO_ARCHER_CLIMB, &HERO_ARCHER_ROLL, &HERO_MAGICIAN_IDLE_A, &HERO_MAGICIAN_IDLE_B,
-    &HERO_MAGICIAN_WALK_A, &HERO_MAGICIAN_WALK_B, &HERO_MAGICIAN_JUMP, &HERO_MAGICIAN_ATTACK, &HERO_MAGICIAN_CLIMB,
-    &HERO_MAGICIAN_ROLL, &HERO_THIEF_IDLE_A, &HERO_THIEF_IDLE_B, &HERO_THIEF_WALK_A, &HERO_THIEF_WALK_B, &HERO_THIEF_JUMP,
-    &HERO_THIEF_ATTACK, &HERO_THIEF_CLIMB, &HERO_THIEF_ROLL, &CHECKPOINT_UNLIT, &CHECKPOINT_LIT_A, &CHECKPOINT_LIT_B,
-    &CHECKPOINT_LIT_C, &HEARTH_A, &HEARTH_B, &HEARTH_C, &PORTAL_A, &PORTAL_B, &ARCH_CLOSED, &CHEST_CLOSED, &CHEST_OPEN};
+    &HERO_KNIGHT_IDLE_1, &HERO_KNIGHT_IDLE_2, &HERO_KNIGHT_WALK_1, &HERO_KNIGHT_WALK_2, &HERO_KNIGHT_WALK_3,
+    &HERO_KNIGHT_WALK_4, &HERO_KNIGHT_JUMP, &HERO_KNIGHT_FALL, &HERO_KNIGHT_ATTACK_1, &HERO_KNIGHT_ATTACK_2,
+    &HERO_KNIGHT_ATTACK_3, &HERO_KNIGHT_CLIMB_1, &HERO_KNIGHT_CLIMB_2, &HERO_KNIGHT_ROLL_1, &HERO_KNIGHT_ROLL_2,
+    &HERO_KNIGHT_HURT, &HERO_ARCHER_IDLE_1, &HERO_ARCHER_IDLE_2, &HERO_ARCHER_WALK_1, &HERO_ARCHER_WALK_2,
+    &HERO_ARCHER_WALK_3, &HERO_ARCHER_WALK_4, &HERO_ARCHER_JUMP, &HERO_ARCHER_FALL, &HERO_ARCHER_ATTACK_1,
+    &HERO_ARCHER_ATTACK_2, &HERO_ARCHER_ATTACK_3, &HERO_ARCHER_CLIMB_1, &HERO_ARCHER_CLIMB_2, &HERO_ARCHER_ROLL_1,
+    &HERO_ARCHER_ROLL_2, &HERO_ARCHER_HURT, &HERO_MAGICIAN_IDLE_1, &HERO_MAGICIAN_IDLE_2, &HERO_MAGICIAN_WALK_1,
+    &HERO_MAGICIAN_WALK_2, &HERO_MAGICIAN_WALK_3, &HERO_MAGICIAN_WALK_4, &HERO_MAGICIAN_JUMP, &HERO_MAGICIAN_FALL,
+    &HERO_MAGICIAN_ATTACK_1, &HERO_MAGICIAN_ATTACK_2, &HERO_MAGICIAN_ATTACK_3, &HERO_MAGICIAN_CLIMB_1,
+    &HERO_MAGICIAN_CLIMB_2, &HERO_MAGICIAN_ROLL_1, &HERO_MAGICIAN_ROLL_2, &HERO_MAGICIAN_HURT, &HERO_THIEF_IDLE_1,
+    &HERO_THIEF_IDLE_2, &HERO_THIEF_WALK_1, &HERO_THIEF_WALK_2, &HERO_THIEF_WALK_3, &HERO_THIEF_WALK_4,
+    &HERO_THIEF_JUMP, &HERO_THIEF_FALL, &HERO_THIEF_ATTACK_1, &HERO_THIEF_ATTACK_2, &HERO_THIEF_ATTACK_3,
+    &HERO_THIEF_CLIMB_1, &HERO_THIEF_CLIMB_2, &HERO_THIEF_ROLL_1, &HERO_THIEF_ROLL_2, &HERO_THIEF_HURT,
+    &CHECKPOINT_UNLIT, &CHECKPOINT_LIT_A, &CHECKPOINT_LIT_B, &CHECKPOINT_LIT_C, &HEARTH_A, &HEARTH_B, &HEARTH_C,
+    &PORTAL_A, &PORTAL_B, &ARCH_CLOSED, &CHEST_CLOSED, &CHEST_OPEN};
+
+// Every palette sprite of a world's art, for the size and character checks.
+static std::vector<const Sprite*> artSprites(const WorldArt& art) {
+    std::vector<const Sprite*> all;
+    for (const auto& variants : art.ground)
+        for (const Sprite* s : variants) if (s) all.push_back(s);
+    const Sprite* single[] = {art.fringe[0], art.fringe[1], art.fringe[2], art.drapeLeft, art.drapeRight, art.platformLeft,
+                              art.platformMid, art.platformRight, art.bracket, art.rope, art.post, art.ladder[0], art.ladder[1],
+                              art.liquid[0], art.liquid[1], art.liquid[2]};
+    all.insert(all.end(), single, single + sizeof single / sizeof single[0]);
+    for (int i = 0; i < art.propCount; i++)
+        for (int f = 0; f < art.props[i].frameCount; f++) all.push_back(art.props[i].frames[f]);
+    for (int i = 0; i < art.landmarkCount; i++)
+        for (int f = 0; f < art.landmarks[i].frameCount; f++) all.push_back(art.landmarks[i].frames[f]);
+    return all;
+}
 
 static void questSpritesHaveTheirSize() {
     for (const Sprite* s : ALL_QUEST_SPRITES) CHECK((int)strlen(s->pixels) == s->w * s->h);
+    for (int w = 0; w < WORLD_COUNT; w++)
+        if (worldArt(w))
+            for (const Sprite* s : artSprites(*worldArt(w))) CHECK(s && (int)strlen(s->pixels) == s->w * s->h);
+}
+
+static void palSpritesUseOnlyPaletteChars() {
+    for (int w = 0; w < WORLD_COUNT; w++)
+        if (worldArt(w))
+            for (const Sprite* s : artSprites(*worldArt(w)))
+                for (const char* c = s->pixels; *c; c++) CHECK(strchr("0123456789abcdef.", *c) != NULL);
+}
+
+static void everyGroundShapeHasArt() {
+    const WorldArt& art = *worldArt(WORLD_NAMULA);
+    for (int shape = 0; shape < TILE_SHAPE_COUNT; shape++) CHECK(art.ground[shape][0] != nullptr);
+    CHECK(art.propCount >= 12 && art.landmarkCount >= 6);
+}
+
+static void propsNeverBlockSpots() {
+    for (int i = 0; i < worldDef(WORLD_NAMULA).count; i++) {
+        AreaState area;
+        loadArea(area, WORLD_NAMULA, i, 0, 0);
+        std::vector<PlacedProp> props;
+        placeProps(area, props);
+        CHECK(!props.empty());
+        for (const PlacedProp& p : props) {
+            CHECK(!propTileExcluded(area, p.tx, p.ty));
+            for (int dy = -1; dy <= 1; dy++)
+                for (int dx = -1; dx <= 1; dx++) CHECK(!strchr("SCMNPTKQWXLO", tileAt(area, p.tx + dx, p.ty + dy)));
+        }
+    }
+}
+
+static void propPlacementIsStable() {
+    AreaState area;
+    loadArea(area, WORLD_NAMULA, 0, 0, 0);
+    std::vector<PlacedProp> a, b;
+    placeProps(area, a);
+    placeProps(area, b);
+    CHECK(a.size() == b.size());
+    for (size_t i = 0; i < a.size() && i < b.size(); i++) CHECK(a[i].kind == b[i].kind && a[i].x == b[i].x && a[i].y == b[i].y);
+}
+
+static float luminance(uint32_t c) {
+    return (0.2126f * ((c >> 16) & 0xFF) + 0.7152f * ((c >> 8) & 0xFF) + 0.0722f * (c & 0xFF)) / 255;
+}
+
+// Spec §22: L0-L1 at most 30 % luminance, L2 40 %, L3 50 % and at most 25 % of the view; never m or y.
+static void layersObeyTheValueRules() {
+    prepareWorldArt(WORLD_NAMULA);
+    const float caps[4] = {0.30f, 0.30f, 0.40f, 0.50f};
+    for (int l = 0; l < 4; l++) {
+        const uint32_t* pixels = layerPixels(l);
+        CHECK(pixels != nullptr);
+        if (!pixels) continue;
+        float brightest = 0;
+        int opaque = 0;
+        for (int i = 0; i < LAYER_W * LAYER_H; i++) {
+            if (!pixels[i]) continue;
+            brightest = std::max(brightest, luminance(pixels[i]));
+            CHECK(pixels[i] != paletteColor('m') && pixels[i] != paletteColor('y'));
+            opaque += i / LAYER_W < QUEST_H;
+        }
+        if (brightest > caps[l]) printf("  layer %d is %.0f %% bright (cap %.0f %%)\n", l, brightest * 100, caps[l] * 100);
+        CHECK(brightest <= caps[l]);
+        if (l == 3) CHECK(opaque <= LAYER_W * QUEST_H / 4);
+    }
+}
+
+static void outlineSurroundsTheSprite() {
+    static uint32_t pixels[64 * 64];
+    screenSetTarget(pixels, 64, 64);
+    std::fill(pixels, pixels + 64 * 64, 0u);
+    const Sprite plus = {3, 3, ".w.www.w."};
+    drawSpriteOutlined(plus, 10, 10, false, 0xFF000001);
+    CHECK(pixels[11 * 64 + 11] == paletteColor('w'));
+    CHECK(pixels[9 * 64 + 11] == 0xFF000001 && pixels[13 * 64 + 11] == 0xFF000001);   // above and below the plus
+    CHECK(pixels[11 * 64 + 9] == 0xFF000001 && pixels[11 * 64 + 13] == 0xFF000001);
+    CHECK(pixels[10 * 64 + 10] == 0xFF000001);   // the corner cell beside two arms
+    CHECK(pixels[8 * 64 + 8] == 0);
+    screenSetTarget(screenPixels, SCREEN_W, SCREEN_H);
+}
+
+static void areaLandmarksExist() {
+    for (int w = 0; w < WORLD_COUNT; w++) {
+        const WorldArt* art = worldArt(w);
+        for (int i = 0; i < worldDef(w).count; i++) {
+            const AreaDef& def = worldDef(w).areas[i];
+            int n = 0;
+            for (const char* t = def.tiles; *t; t++) {
+                if (*t != 'L') continue;
+                CHECK(n < 4 && art && def.landmarks[n] >= 1 && def.landmarks[n] <= art->landmarkCount);
+                n++;
+            }
+            for (int k = n; k < 4; k++) CHECK(def.landmarks[k] == 0);
+            if (w == WORLD_NAMULA) CHECK(n >= 1);
+        }
+    }
 }
 
 static bool isWide(const AreaDef& def) { return def.cols == WIDE_COLS && def.rows == WIDE_ROWS; }
@@ -172,7 +296,7 @@ static int simulate(const Reach& reach, int from, Script script) {
         float t = i * DT;
         Actions a = {};
         bool walk = script == WALK_LEFT || script == WALK_RIGHT, climb = script == CLIMB_UP || script == CLIMB_DOWN;
-        bool inputDone = walk ? fabsf(h.x - x0) >= 8 : climb ? fabsf(h.y - y0) >= 8 : true;
+        bool inputDone = walk ? fabsf(h.x - x0) >= 8 * DP : climb ? fabsf(h.y - y0) >= 8 * DP : true;
         if (script == WALK_LEFT || script == OFF_LEFT || script == JUMP_LEFT || script == TAP_LEFT) a.moveX = -1;
         if (script == WALK_RIGHT || script == OFF_RIGHT || script == JUMP_RIGHT || script == TAP_RIGHT) a.moveX = 1;
         if (walk && inputDone) a.moveX = 0;
@@ -191,7 +315,7 @@ static int simulate(const Reach& reach, int from, Script script) {
         if (!h.onGround && !h.climbing) airborne = true;
         bool held = h.onGround || h.climbing;
         if (held && airborne) return spotOf(area, h);
-        if (held && (walk || climb) && fabsf(h.x - x0) + fabsf(h.y - y0) >= 8 && fabsf(h.vx) < 1 && fabsf(h.vy) < 1) return spotOf(area, h);
+        if (held && (walk || climb) && fabsf(h.x - x0) + fabsf(h.y - y0) >= 8 * DP && fabsf(h.vx) < 1 * DP && fabsf(h.vy) < 1 * DP) return spotOf(area, h);
     }
     return h.onGround || h.climbing ? spotOf(area, h) : -1;
 }
@@ -213,7 +337,7 @@ static const std::vector<int>& neighbours(Reach& reach, int from) {
     for (int t = 0; t < def.cols * def.rows && h.onGround; t++) {
         if (def.tiles[t] != 'P') continue;
         float px = (t % def.cols) * TILE + TILE / 2.0f, bottom = (float)((t / def.cols + 1) * TILE);
-        bool touching = h.x < px + 8 && h.x + HERO_W > px - 8 && h.y < bottom && h.y + HERO_H > bottom - 24;
+        bool touching = h.x < px + 8 * DP && h.x + HERO_W > px - 8 * DP && h.y < bottom && h.y + HERO_H > bottom - 24 * DP;
         if (touching && def.portals[seen].area >= 0)
             spots.push_back(spotKey(def.portals[seen].area, def.portals[seen].tileX, def.portals[seen].tileY));
         seen++;
@@ -305,7 +429,7 @@ static void makeArea(TestArea& t, const std::map<int, std::string>& rows) {
         t.tiles += found != rows.end() ? found->second : std::string(WIDE_COLS, r >= 20 ? '#' : '.');
     }
     AreaLink none = {-1, 0, 0};
-    t.def = {"TEST", WIDE_COLS, WIDE_ROWS, t.tiles.c_str(), none, none, none, none, {none, none, none, none}, {-1, -1, -1, -1}, {-1, -1}, 0, 0, 0, 0, -1};
+    t.def = {"TEST", WIDE_COLS, WIDE_ROWS, t.tiles.c_str(), none, none, none, none, {none, none, none, none}, {-1, -1, -1, -1}, {-1, -1}, 0, 0, 0, 0, -1, {}};
     t.state.world = WORLD_TEST;
     t.state.index = 0;
     t.state.def = &t.def;
@@ -336,7 +460,7 @@ static void jumpPeakIsFourAndAHalfTiles() {
     step(h, t, a);
     a.jump = false;
     for (int i = 0; i < 120; i++) { step(h, t, a); top = fminf(top, h.y); }
-    CHECK(fabsf(startY - top - 36) <= 1);
+    CHECK(fabsf(startY - top - 36 * DP) <= 1 * DP);
     CHECK(h.onGround);
 
     h = standing(t, 10);
@@ -345,8 +469,8 @@ static void jumpPeakIsFourAndAHalfTiles() {
     tap.jump = tap.jumpHeld = true;
     step(h, t, tap);
     for (int i = 0; i < 120; i++) { step(h, t, Actions()); top = fminf(top, h.y); }
-    CHECK(startY - top <= 12);
-    CHECK(startY - top > 2);
+    CHECK(startY - top <= 12 * DP);
+    CHECK(startY - top > 2 * DP);
 }
 
 static void coyoteAndBufferWork() {
@@ -363,23 +487,23 @@ static void coyoteAndBufferWork() {
         Actions jump = walk;
         jump.jump = jump.jumpHeld = true;
         step(h, t, jump);
-        if (late < 0.08f) CHECK(h.vy < -150);   // inside coyote time: still a full jump
+        if (late < 0.08f) CHECK(h.vy < -150 * DP);   // inside coyote time: still a full jump
         else CHECK(h.vy > 0);                   // too late: keeps falling
     }
     // Buffer: X pressed 0.05 s before landing still jumps on landing.
     Hero h = standing(t, 40);
-    h.y -= 30;
+    h.y -= 30 * DP;
     h.onGround = false;
     Actions none = {};
     float landY = (float)(20 * TILE) - HERO_H;
-    while (h.y + h.vy * 0.05f < landY - 1) step(h, t, none);
+    while (h.y + h.vy * 0.05f < landY - 1 * DP) step(h, t, none);
     Actions press = {};
     press.jump = press.jumpHeld = true;
     step(h, t, press);
     Actions hold = {};
     hold.jumpHeld = true;
     bool jumped = false;
-    for (int i = 0; i < 10; i++) { step(h, t, hold); jumped |= h.vy < -150; }
+    for (int i = 0; i < 10; i++) { step(h, t, hold); jumped |= h.vy < -150 * DP; }
     CHECK(jumped);
 }
 
@@ -422,7 +546,7 @@ static void ladderClimbAndJumpOff() {
     CHECK(h.climbing);
     float y = h.y;
     step(h, t, up, CLASS_KNIGHT, 30);
-    CHECK(fabsf(y - h.y - 25) < 1.5f);   // 50 px/s
+    CHECK(fabsf(y - h.y - 25 * DP) < 1.5f * DP);   // 50 dp/s
     step(h, t, up, CLASS_KNIGHT, 120);   // over the top: stands on the ladder's top
     CHECK(!h.climbing && h.onGround && fabsf(h.y + HERO_H - 12 * TILE) < 0.01f);
     // Down from the top climbs back down; X with the stick sideways jumps off.
@@ -434,7 +558,7 @@ static void ladderClimbAndJumpOff() {
     off.moveX = -1;
     off.jump = off.jumpHeld = true;
     step(h, t, off);
-    CHECK(!h.climbing && h.vy < -150 && h.vx < 0);
+    CHECK(!h.climbing && h.vy < -150 * DP && h.vx < 0);
 }
 
 static void iceSlides() {
@@ -445,9 +569,9 @@ static void iceSlides() {
     Actions run = {};
     run.moveX = 1;
     step(h, t, run, CLASS_KNIGHT, 120);
-    CHECK(fabsf(h.vx - 66) < 0.5f);
+    CHECK(fabsf(h.vx - 66 * DP) < 0.5f * DP);
     int steps = 0;
-    while (h.vx > 0.5f && steps < 600) { step(h, t, Actions()); steps++; }
+    while (h.vx > 0.5f * DP && steps < 600) { step(h, t, Actions()); steps++; }
     CHECK(steps * DT >= 0.4f);
 
     TestArea floor;
@@ -455,7 +579,7 @@ static void iceSlides() {
     h = standing(floor, 10);
     step(h, floor, run, CLASS_KNIGHT, 120);
     steps = 0;
-    while (h.vx > 0.5f && steps < 600) { step(h, floor, Actions()); steps++; }
+    while (h.vx > 0.5f * DP && steps < 600) { step(h, floor, Actions()); steps++; }
     CHECK(steps * DT < 0.1f);
 }
 
@@ -471,11 +595,11 @@ static void thiefDoubleJumpsOthersDont() {
         hold.jumpHeld = true;
         step(h, t, hold, (HeroClass)c, 15);
         step(h, t, jump, (HeroClass)c);
-        bool doubled = h.vy < -150;
+        bool doubled = h.vy < -150 * DP;
         CHECK(doubled == (c == CLASS_THIEF));
         step(h, t, hold, (HeroClass)c, 10);
         step(h, t, jump, (HeroClass)c);
-        CHECK(h.vy > -150);   // only once per airtime
+        CHECK(h.vy > -150 * DP);   // only once per airtime
     }
 }
 
@@ -533,6 +657,13 @@ static void deleteRemovesTheSlot() {
 
 int main() {
     questSpritesHaveTheirSize();
+    palSpritesUseOnlyPaletteChars();
+    everyGroundShapeHasArt();
+    propsNeverBlockSpots();
+    propPlacementIsStable();
+    layersObeyTheValueRules();
+    outlineSurroundsTheSprite();
+    areaLandmarksExist();
     areaSizesAndObjectsAreValid();
     linksArriveOnStandableTiles();
     edgeLinkedAreasAreMapNeighbours();

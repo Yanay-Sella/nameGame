@@ -4,7 +4,11 @@ Read first: [`../name-quest-plan.md`](../name-quest-plan.md), the **world author
 [`phase-4-world-1.md`](phase-4-world-1.md), then spec §8 (worlds 2–3 rosters and traits), §9 (worlds 2–3), §10 (their
 chests), §12 (worlds 2–3 rows), §13 (their rows), §14 (Garrick's world 2 spot, Ilsa/Lio lines). Phases 1–4 done.
 Work world 2 fully (steps 1–3), run `make test`, then world 3 (steps 4–6). If the session gets long, write
-`progress.md` after world 2 (master plan rule 8).
+`progress.md` after world 2 (master plan rule 9).
+
+**Art first (spec §22, recipe step 0 in phase 4):** for each world in this phase, build its `WorldArt` from its §13 art
+brief and get the user's OK on its style frame before authoring its areas. Redraw its roster and bosses per §22
+(side-view, outlined, 4-frame movement + tell + attack; bosses 40–64 px); sprite sizes named below are minimums.
 
 ## What the player gets
 Two more worlds of 20 areas, each with its own hazards, five enemies, a mini-boss and a boss: the Monkey King and the
@@ -59,7 +63,7 @@ Ilsa's and Lio's lines after worlds 2 and 3 (author). Garrick's world 2 lines: w
 leave `// phase 7` there.
 
 ## Step 9: docs
-design.md: worlds 2–3; testing.md: PS3 checks below plus a user playtest checklist per world. GDD change log `0.33`.
+design.md: worlds 2–3; testing.md: PS3 checks below plus a user playtest checklist per world. GDD change log: the next version.
 
 ## Step 10: Mac self-check and PS3 check
 - `make quest-maps` and read all 80 images. Play each boss on the Mac at its world's reference level and gear.

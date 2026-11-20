@@ -1,7 +1,7 @@
 # Phase 2: combat (classes, jobs, enemies, damage, death and names)
 
 Read first: [`../name-quest-plan.md`](../name-quest-plan.md), then spec §5 (attack and dodge rows), §6, §7, §8, §9
-(the hazard damage only), §15 (HUD HP/MP/names), §18, §21 (hero frames, projectile colours). Phase 1 must be done.
+(the hazard damage only), §15 (HUD HP/MP/names), §18, §21 (hero frames, projectile colours). Phases 1 and 1b must be done (characters follow spec §22: outlined, the 16x20 hero frames).
 
 ## What the player gets
 - Every class attacks with R1 (hold to repeat), R2 casts the tier's strong skill (MP), Circle dodges (roll / blink),
@@ -67,7 +67,8 @@ std::vector<Particle> particles; std::vector<uint64_t> killed[WORLD_COUNT];` (pe
 the inner vector to the world's area count on open), `float hitStop;`.
 - Rosters: TEST GROUNDS uses world 1's roster but world 1's stats. World 1–6 rosters per spec §8 (all 6 now: the table
   is small, and later phases only author maps). New sprites listed there are authored in the world's phase; until then
-  use the shooter sprite of the same slot or a 12x12 placeholder box sprite `PLACEHOLDER_ENEMY` in `n`/`s`.
+  use the shooter sprite of the same slot or a 12x12 placeholder box sprite `PLACEHOLDER_ENEMY` in `n`/`s`, drawn with
+  `drawSpriteOutlined` like every character.
 - `loadArea` (caller side, in quest.cpp) spawns an `Enemy` for each `A B D E F` whose killed bit is clear: stats from
   `enemyAttack/Health/Names` with the kind's spec §7 numbers.
 - One `updateEnemy(Quest&, Enemy&, float dt)` with a `switch (behaviour)`; the numbers and states of spec §8 exactly.
@@ -135,13 +136,13 @@ Script each class against TEST GROUNDS area 3 with `job=0` and `job=3`, take `l1
 ```
 NAMEGAME_QUEST='slot=3 class=0 world=8 area=3 level=10 job=3' make mac-run BUTTONS='1|r1:2|r2|1|l1|1|circle|1|quit'
 ```
-Check: the skill's shape is visible and readable at 320x180, numbers float, the HUD's MP drops. Walk into an elite
+Check: the skill's shape is visible and readable at 640x360, numbers float, the HUD's MP drops. Walk into an elite
 without blocking and die on purpose; confirm the echo and recovery in stdout.
 
 ## Step 9: docs
 - `docs/features/name-quest/design.md`: add the combat rules (numbered, short, pointing to spec §6–§8 for numbers);
   implementation.md: the new files; testing.md: this phase's PS3 checks.
-- GDD change log `0.30 (date): NAME QUEST combat`. Run `check_docs.py`.
+- GDD change log: the next version, `NAME QUEST combat`. Run `check_docs.py`.
 
 ## Step 10: PS3 check
 First add the dev rule of spec §20 "Select held 2 s → TEST GROUNDS area 0" to the dev aids in `quest.cpp` (a held-time

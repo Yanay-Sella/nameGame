@@ -2,7 +2,11 @@
 
 Read first: [`../name-quest-plan.md`](../name-quest-plan.md), then spec §4 (layout rules), §8 (world 1 roster), §9
 (world 1), §12 (rules, world 1 row), §13 (world 1 row, ramp), §14 (Ilsa and Lio after a Great Name), §15 (boss bar),
-§10 (world 1 chests). Phases 1–3 done.
+§10 (world 1 chests), §22 (art). Phases 1, 1b, 2 and 3 done.
+**Art first (spec §22, recipe step 0 in phase 4):** for each world in this phase, build its `WorldArt` from its §13 art
+brief and get the user's OK on its style frame before authoring its areas. Redraw its roster and bosses per §22
+(side-view, outlined, 4-frame movement + tell + attack; bosses 40–64 px); sprite sizes named below are minimums.
+
 
 This phase also writes the **world authoring recipe** below; phases 5, 6, 8 and 9 follow it for their worlds.
 
@@ -13,6 +17,11 @@ Killing it lights world 2's entry (world 2's areas come in phase 5; until then t
 checkpoint in an empty one-area placeholder room: author `WORLD2_AREAS` with one wide area holding a `C`, removed in phase 5).
 
 ## World authoring recipe (phases 4, 5, 6, 8, 9)
+0. **Art and style frame first (spec §22).** Build the world's `WorldArt` (`source/quest_art_world<N>.cpp`): palette,
+   4 painted layers and their animated details, the 12 ground shapes x 3 variants, fringes, drapes, platforms with
+   supports, ladder, liquid, ≥ 10 props, ≥ 6 landmarks, lights — all from the world's §13 art brief. Make area 0 a
+   dressed style frame with the hero and two enemies, screenshot it on the Mac, send it to the user and wait for OK
+   (phase 1b step 9 method). Redraw the world's roster and bosses per §22 before placing them.
 1. **Plan the graph before any tiles.** At the top of `source/quest_world<N>.cpp`, a comment block: an ASCII sketch of
    the world map grid (area indices in their cells), then one line per area: index, name, wide/tall, band, purpose
    (`teaches panels`, `dead end: VIAL SHARD`, `loop back to 4`, ...). Check it against spec §4 layout rules 1–10 and
@@ -68,7 +77,7 @@ void updateBosses(Quest& q, float dt);                    // phases, gaps, the p
 ## Step 2: map renderer tool (`Makefile`, `tests/quest_tests.cpp`)
 `make quest-maps`: builds `quest_tests` and runs it with `--maps`, which, instead of testing, renders every area of
 every world: for each area, it sets up a `Quest` in PLAY there (no enemies moving, hero hidden), draws with the camera
-at each 320x180 screen of the area (2 per area), saves `build/maps/w<N>_a<NN>_<k>.bmp` with `screenSaveBmp`, then the
+at each 640x360 screen of the area (2 per area), saves `build/maps/w<N>_a<NN>_<k>.bmp` with `screenSaveBmp`, then the
 Makefile converts them with `sips -s format png` into `shots/maps/` (gitignored with `shots/`). Enemy spawns are drawn
 at their spots. This is your eyes on the level design.
 
@@ -76,7 +85,8 @@ at their spots. This is your eyes on the level design.
 - Electric panels `z` (spec §9): a world clock `q.time` drives the cycle (all panels in sync per area; band 2 uses the
   shorter off time); flicker frames before on; damage when on (§7 trap 15 %); SOUND_Q_ZAP when they turn on and are on screen.
 - Vents `v` already lift (phase 1); draw their rising streaks.
-- Sprites: HOPPER DRONE (12x10, 2 frames), SENTINEL (16x16, 2 frames + a wind-up frame), world 1 tiles (plate floor
+- Sprites (minimum sizes; §22 frames and outlines): all five world 1 enemies redrawn side-view (CRAWLER, FLOATER,
+  GUNNER from the shooter's aliens), HOPPER DRONE (12x10), SENTINEL (16x16 + a wind-up frame), world 1 tiles (plate floor
   with rivets, girders), the world 1 background (stars, a far planet, girders; spec §13), the space pit (black with stars).
 - The shooter's aliens face the camera; that's fine for this world (they're aliens).
 
@@ -112,7 +122,7 @@ Ilsa's first line after world 1's Great Name (author, §14), Lio's world 1 and 2
 ## Step 9: docs
 design.md: world 1 and the boss rules; implementation.md; testing.md (PS3 checks below + a user playtest checklist:
 "a first-time run of world 1 takes at least 2 hours", "each boss took more than one try", "never stuck"). GDD change
-log `0.32`. `check_docs.py`.
+log: the next version. `check_docs.py`.
 
 ## Step 10: PS3 check and the user's playtest
 1. Locked command: load slot 1, travel from the hearth to world 1's entry (Up at the hearth, TRAVEL, the second row), walk

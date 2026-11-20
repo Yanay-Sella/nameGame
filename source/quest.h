@@ -5,7 +5,9 @@
 #include <string>
 #include <vector>
 
-const int TILE = 8, WIDE_COLS = 80, WIDE_ROWS = 23, TALL_COLS = 40, TALL_ROWS = 45;
+// Design pixels (dp, the 320x180 design's units) → real pixels at 640x360 (spec "Resolution", D-053).
+const float DP = 2;
+const int TILE = (int)(8 * DP), WIDE_COLS = 80, WIDE_ROWS = 23, TALL_COLS = 40, TALL_ROWS = 45;
 const int WORLD_NAMULA = 0, WORLD_SECRET = 7, WORLD_TEST = 8, WORLD_COUNT = 9, SAVED_WORLDS = 8;   // 1-6 the worlds
 const int SLOT_COUNT = 3, MAX_LEVEL = 40;
 enum HeroClass { CLASS_KNIGHT, CLASS_ARCHER, CLASS_MAGICIAN, CLASS_THIEF, CLASS_COUNT };
@@ -29,6 +31,7 @@ struct AreaDef {
     int band;                // 0 calm, 1 medium, 2 intense (§13 ramp)
     int flags;               // AREA_MINIBOSS, AREA_BOSS, AREA_DARK (world 5), AREA_RISING_LAVA (world 4)
     int shortcut;            // the world's shortcut index for this area's lever, -1 none
+    int landmarks[4];        // the world's landmark ids by 'L' order, 1-based; 0 unused (§22; last, so older initialisers stay valid)
 };
 
 // How a world looks and sounds; tile drawing and the map read it (spec §13).
@@ -97,6 +100,8 @@ struct Quest {
 void questOpen(Quest& q, const char* folder);             // reads the slot summaries, shows the slot screen
 void questUpdate(Quest& q, const Actions& a, float dt);
 void questDraw(const Quest& q);
+extern double (*questClock)();                            // dev timing in s, set by main.cpp; nullptr: drawPlay doesn't measure
+extern float questDrawMs[3];                              // worst ms of layers, tiles + props, lights + vignette; main.cpp resets it
 bool questCanPause(const Quest& q);                       // true in PLAY (and, later, its menus)
 bool questSave(Quest& q);                                 // writes the current slot (spec §17); false on failure
 void questStartDev(Quest& q, const char* spec);           // NAMEGAME_QUEST (spec §20)
@@ -111,7 +116,7 @@ bool saveRead(const char* folder, int slot, SaveData& save);    // false when mi
 bool saveDelete(const char* folder, int slot);
 
 // Shared by quest.cpp, quest_draw.cpp and the tests.
-const float HERO_W = 8, HERO_H = 14;
+const float HERO_W = 8 * DP, HERO_H = 14 * DP;
 extern const char* const CLASS_NAMES[CLASS_COUNT];        // KNIGHT, ARCHER, MAGICIAN, THIEF
 extern const char* const INTRO_PAGES[4];                  // spec §1, lines split by '\n'
 const float INTRO_CHARS_PER_S = 50;

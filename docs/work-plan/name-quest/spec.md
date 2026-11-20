@@ -2,12 +2,20 @@
 
 Every rule and number here is decided (see the decisions table in [`../name-quest-plan.md`](../name-quest-plan.md)).
 "Author" marks content the implementer creates inside the stated rules. All on-screen text is UPPERCASE (the
-3x5 font has no lowercase). Distances are in px of the 320x180 picture, times in s, speeds in px/s.
+3x5 font has no lowercase). Times are in s.
+
+**Resolution (D-053): NAME QUEST draws at 640x360**, twice the shooter's 320x180 each way (x2 on a 720p TV, x3 at
+1080p), so it has four times the pixels for detail. Every distance, size, speed and acceleration in this spec is in
+**design pixels (dp)**, the units of the original 320x180 design: the code multiplies them by `DP = 2`
+(`const float JUMP_SPEED = 225 * DP;`). So a tile is 8 dp = 16 px, the hitbox 8 x 14 dp = 16 x 28 px, a 16 x 20 dp
+sprite is authored as a 32 x 40 text grid, and the tile maps (80 x 23, 40 x 45 tiles) don't change. Art is authored
+at the full 640x360 resolution: the extra pixels are for detail, never for blocky 2x copies of 1x art. Text uses the
+3x5 font at scale 2 (1 font pixel = 1 dp); UI layouts in §15 are in dp. "px" below means dp unless it says "real px".
 
 Sections: §1 story · §2 controls · §3 screens and flow · §4 areas and tiles · §5 movement · §6 classes and jobs ·
 §7 combat · §8 enemies · §9 hazards · §10 economy · §11 checkpoints, Namula, map · §12 bosses · §13 worlds ·
 §14 NPCs, quests, dialogue · §15 HUD and UI · §16 audio · §17 save file · §18 logs · §19 ending and New Game+ ·
-§20 dev aids · §21 palette and sprites
+§20 dev aids · §21 palette and sprites · §22 art direction
 
 ---
 
@@ -112,6 +120,7 @@ SLOTS: Circle → MAIN MENU
 | `R` | rock spawner (world 4) | §9 |
 | `Y` | icicle (world 3) | §9 |
 | `X` | boss anchor | boss arenas only: points a boss uses (the Star Mage's teleport spots, the Monkey King's trees), in order of appearance |
+| `L` | landmark | a big decorative set piece (§22): the area's `landmarks[]` in order of appearance |
 | `O` | moving platform start (world 6, secret) | 24 x 4 px one-way platform, moves +48 px right and back, 1.5 s each way, eased (smoothstep) |
 
 An object's position is its tile's bottom-centre: objects stand on the tile below them.
@@ -131,8 +140,9 @@ struct AreaDef {
     int band;                // 0 calm, 1 medium, 2 intense (§13 ramp)
     int flags;               // AREA_MINIBOSS, AREA_BOSS, AREA_DARK (world 5), AREA_RISING_LAVA (world 4)
     int shortcut;            // the world's shortcut index for this area's lever, -1 none
+    int landmarks[4];        // the world's landmark ids by 'L' order, 1-based; 0 unused (§22; last, so older initialisers stay valid)
 };
-struct WorldDef { const char* name; const AreaDef* areas; int count; /* + tileset, palette, roster ids (§13) */ };
+struct WorldDef { const char* name; const AreaDef* areas; int count; /* + style, WorldPalette, art sets (§13, §22) */ };
 ```
 
 ### Edges
@@ -165,7 +175,7 @@ struct WorldDef { const char* name; const AreaDef* areas; int count; /* + tilese
 
 ## §5 Hero movement (feel)
 
-Hitbox 8 x 14; sprite 12 x 16 drawn at (x - 2, y - 2), facing right, flipped for left.
+Hitbox 8 x 14; sprite 16 x 20 drawn at (x - 4, y - 6), facing right, flipped for left (§22).
 
 | Name | Value | Notes |
 |---|---|---|
@@ -289,7 +299,7 @@ multiplies enemy HP, attack and names by `1 + 0.5 * n` (n at most 3).
 Contact damage applies to every enemy except while it is dead or a dropped icicle. Enemies never leave their area
 and never fall into pits (they turn). An area keeps its killed spawns until the hero rests, travels or dies.
 
-### Rosters (sprite reuse D-051; new sprites are authored, sizes given)
+### Rosters (D-051: the named shooter sprite is the design each NAME QUEST enemy is redrawn from, §22; "new" ones are designed from scratch)
 | World | A (fodder) | B (fodder) | D (soldier) | E (soldier) | F (elite) |
 |---|---|---|---|---|---|
 | 1 Drifting Station | CRAWLER, WALKER, `GREEN_ALIEN_A/B` | FLOATER, FLYER, `BLUE_ALIEN_A/B` | GUNNER, SHOOTER, `RED_ALIEN_A/B` | HOPPER DRONE, JUMPER, new 12x10 | SENTINEL, ARMORED, new 16x16 |
@@ -300,7 +310,8 @@ and never fall into pits (they turn). An area keeps its killed spawns until the 
 | 6 Nameless Citadel | NAME WRAITH, FLYER whose hit also steals 10 % of carried names (killing it within 10 s drops them back), new 12x12 | GARGOYLE, DROPPER, new 12x12 | STATUE ARCHER, SHOOTER (arrow), new 12x16 | SHADE HOUND, CHARGER, new 16x10 | CITADEL KNIGHT, ARMORED, new 16x18 |
 | 7 Unwritten | world 3's A, world 4's D, world 5's E, world 6's B, world 6's F, all with world 7 stats, drawn in greys (§21 recolour) | | | | |
 
-Shooter sprites are 12x10 front-facing; draw them unflipped. An enemy's hitbox is its sprite size minus 2 px each side.
+Sizes given for new enemies are minimums; §22 sets 12–20 px side-view sprites with 4 movement frames, a tell and an
+attack frame. An enemy's hitbox is its sprite size minus 2 px each side.
 Spawn counts per area by band (wide or tall alike): calm 3–5 (A, B only), medium 5–7 (A, B, D, E; at most 1 F),
 intense 7–10 (all; at most 3 F).
 
@@ -371,7 +382,7 @@ stays closed until there is room. Opening: Up at the chest, 0.3 s lid animation,
 ## §11 Checkpoints, Namula, gates, shortcuts, the map
 
 ### Checkpoints (D-039)
-- A stone brazier (12 x 16): unlit grey; lit with a 3-frame flame. Touching an unlit one lights it: banner
+- A stone brazier (16 x 20): unlit grey; lit with a 3-frame flame. Touching an unlit one lights it: banner
   `NAME KINDLED` (scale 2, `o`, 1.5 s), SOUND_Q_KINDLE, autosave.
 - Up at a lit checkpoint → menu titled with the checkpoint's name (`<WORLD> ENTRY`, `<WORLD> DEPTHS`; Namula:
   `HEARTH OF NAMES`): REST, TRAVEL, LEAVE.
@@ -404,7 +415,7 @@ Hitting a lever `K` with any attack opens every `k` in its area: SOUND_Q_GATE, s
 `shortcut`). Levers sit on the far side, so the door is a one-way way back to a checkpoint.
 
 ### Surveyors and the map (the only map)
-- A surveyor (12 x 16, telescope; author 12 names, 2 per world, e.g. SURVEYOR ANDO) stands on its tile. Up within
+- A surveyor (16 x 20, telescope and a satchel of maps; author 12 names, 2 per world, e.g. SURVEYOR ANDO) stands on its tile. Up within
   20 px: one line of dialogue (author it; flavour about getting lost), then the world map opens. The game stays frozen
   while it is open; Circle or X closes it. There is no other way to see the map.
 - Map screen: full-screen `k` with a 1 px `n` border, the world name on top (scale 1, white). Cells are 12 x 8 px;
@@ -432,7 +443,7 @@ Hitting a lever `K` with any attack opens every `k` in its area: SOUND_Q_GATE, s
 - Mini-boss death: names, the gate opens (§11). Mini-bosses come back after a rest; their arena then fights again.
 - HP from §7; names from §7; contact damage while the boss's body touches the hero.
 
-### The bosses (sprite; gap; phase 1 attacks; phase 2 changes)
+### The bosses (the design it is redrawn from at 40–64 px, §22; gap; phase 1 attacks; phase 2 changes)
 | World | Mini-boss | Boss |
 |---|---|---|
 | 1 | **THE OVERSEER** (`BOSS_A/B`, 32x20; gap 1.8). Hovers 50 px above the floor sweeping the arena at 40. BURST: 3 aimed shots 0.15 s apart (tell 0.5). FAN: 5 shots down (tell 0.5). SLAM: its shadow marks the floor 0.8 s, it drops at 300 px/s, sits 1.5 s (open), rises. P2: speed x1.3; adds SUMMON 2 FLOATERS (at most 4 alive). | **THE STAR MAGE** (`MAGE_A/B`; gap 1.6). Teleports between 4 authored platform points (fade out 0.3, in 0.3). BEAM: a ball grows 1.2 s at the wand's star, then a 24 px beam down its column for 0.8 s (big). STAR FAN: 7 shots spread 120° (tell 0.5). SUMMON: 2 crawlers (at most 4). P2: BEAM fires two columns (the second 64 px from the first, both marked); the floor's middle 6 tiles electrify for 1.5 s every 8 s (flicker 0.6 s before). |
@@ -446,13 +457,13 @@ Hitting a lever `K` with any attack opens every `k` in its area: SOUND_Q_GATE, s
 
 ### §12a Claude (the final boss; never shown before)
 - Area 19, "THE LAST ROOM": a wide arena, dark `=` walls, 3 one-way platforms at authored heights. Entering: the
-  screen is dark for 1.5 s, text `...`, then Claude fades in (new sprite 20x28: a calm robed figure in a clay-orange
+  screen is dark for 1.5 s, text `...`, then Claude fades in (new sprite 24 x 32: a calm robed figure in a clay-orange
   cloak `Q`, pale face, warm light; **do not draw the Anthropic or Claude logo**; author idle A/B, cast, hurt).
   Dialogue before the fight (§14). Boss bar name `CLAUDE`. HP 300 hits. Gap 1.6.
 - Attacks:
   - TOKEN RAIN: 0.8 s of `m` markers on the ceiling, then 12 falling glyphs (random letters drawn with the font,
     magenta, 70 px/s) in columns with two 24 px safe gaps.
-  - SUBAGENTS: summons 3 small copies (new 10x14), 8 hits each (soldier stats), each fires one aimed shot every 2 s;
+  - SUBAGENTS: summons 3 small copies (new 12 x 16), 8 hits each (soldier stats), each fires one aimed shot every 2 s;
     at most 3.
   - REFACTOR (phase 2+): the 3 platforms show their new heights as `m` outlines for 1 s, then swap.
   - CONTEXT WINDOW (phase 2+): two walls slide in from the arena edges over 1 s and leave a 96 px window that drifts
@@ -473,21 +484,33 @@ and the title (§19).
 
 ## §13 Worlds
 
-Each world below: name (banner, scale 2), map colour, ground tiles, background, ambience, step sound, special rules.
-Backgrounds are 2 parallax layers drawn behind the tiles (far x0.25, near x0.5 of the camera), plus 1 ambient detail.
-Author them like the shooter's level backgrounds (cheap fills, nothing brighter than `s` behind the action, no
-magenta, no pale yellow). Area names, tile maps, surveyor names: author.
+Each world below: name (banner, scale 2), map colour, ambience, step sound, special rules, and its art brief. Every
+world's look is built with the art system of §22 (16-colour world palette, 4 background layers, autotiled ground with
+thick caps, thick platforms, scattered props, landmarks, lights, animated details). Area names, tile maps, surveyor
+names, palettes and all art: author, inside §22's rules.
 
-| # | Name | Map colour | Ground (top / fill) | Background | Ambience | Steps | Special |
+| # | Name | Map colour | Ambience | Steps | Special |
+|---|---|---|---|---|---|
+| 0 | NAMULA | `%` | hearth crackle | stone | safe; no enemies |
+| 1 | THE DRIFTING STATION | `u` | low hum + random clicks | metal | gravity normal; pits open to space |
+| 2 | THE GREENDEEP | `F` | insects, distant birds | leaves | vines `\|` |
+| 3 | THE WHITE SILENCE | `I` | wind | snow crunch | ice floors |
+| 4 | THE EMBER MAW | `C` | lava rumble | rock | lava pits, heat shimmer on lava |
+| 5 | THE SUNKEN HALLS | `6` | water, bubbles | wet sand | underwater physics; the hero trails bubbles like the shooter's ships |
+| 6 | THE NAMELESS CITADEL | `z` | high wind, a far bell every 9 s | marble | the void under every pit |
+| 7 | THE UNWRITTEN | `b` | near-silence, a soft scratch every 5 s | paper | unwritten blocks |
+
+### Art briefs (layers far → near; ground; props; landmarks; animated details; lights)
+| # | Background layers (§22: L0 sky, L1 far, L2 mid, L3 near) | Ground cap / fill | Platforms (6 px) | Props (scattered) | Landmarks (hand-placed, ≥ 6 kinds) | Animated details | Lights |
 |---|---|---|---|---|---|---|---|
-| 0 | NAMULA | `%` | `%` / `*` | night sky `=`, far cliffs `*`, the sea `2`, the hearth's glow on near walls | hearth crackle | stone | safe; no enemies |
-| 1 | THE DRIFTING STATION | `u` | `b` plate / `d` | starfield (reuse the shooter's star colours), far planet, girders `n` | low hum + random clicks | metal | gravity normal; pits open to space |
-| 2 | THE GREENDEEP | `F` | `F` / `t` | jungle layers `J` `j` `f`, fireflies `L` | insects, distant birds | leaves | vines `\|` |
-| 3 | THE WHITE SILENCE | `I` | `i` snow top / `A` | cave walls `a` `A`, crystals `e`, falling snow | wind | snow crunch | ice floors |
-| 4 | THE EMBER MAW | `C` | `K` / `V` | rock `v` `V`, glowing cracks `D`, embers `C` | lava rumble | rock | lava pits, heat shimmer on lava |
-| 5 | THE SUNKEN HALLS | `6` | `4` / `3` | water `1` `2`, light rays `5`, rising bubbles | water, bubbles | wet sand | underwater physics; ships trail bubbles like the shooter |
-| 6 | THE NAMELESS CITADEL | `z` | `?` / `!` | clouds `b` `s` far below, grey-gold towers `!` `z` | high wind, a far bell every 9 s | marble | the void under every pit |
-| 7 | THE UNWRITTEN | `b` | `w` outline / `k` | blank, faint ruled lines `n` every 16 px | near-silence, a soft scratch every 5 s | paper | unwritten blocks |
+| 0 | L0 night sky with a dithered dusk band and stars; L1 far sea cliffs and a lighthouse silhouette; L2 rooftops, chimneys with smoke, hanging lanterns; L3 wooden fences, laundry lines, tree trunks | worn cobbles with moss in the cracks / packed earth with buried stones | wooden planks with rope lashings and pegs | grass tufts, small flowers, pebbles, crates, buckets, wooden stools, a cat | the hearth's stone ring, the well, market stalls with awnings, a signpost, a statue of a nameless hero, boats on the shore | smoke curls, lantern flicker, waves on the shore, fireflies, a cat's tail | the hearth (big warm glow), lanterns, windows |
+| 1 | L0 deep space with 3 star layers and a nebula band; L1 a dim sun and a ringed planet; L2 station spars, solar panels, a far docked ship; L3 pipes, cable bundles, broken windows to space | riveted steel plating with yellow-black hazard edges / dark hull panels with vents and bolts | grated catwalk with rails | cables, bolts, broken screens, crates, warning signs, oxygen tanks, a loose helmet | airlock doors, a reactor core, a cracked observation window, a wrecked shuttle, server racks, a crew mural | blinking console lights, drifting debris, sparking cables, a rotating radar dish | console glow, emergency red lamps, the reactor |
+| 2 | L0 green-gold canopy light with dithered beams; L1 giant tree silhouettes and a temple top in mist; L2 hanging vines, broad leaves, temple pillars; L3 near fronds and roots | moss and grass overhanging the edge with roots / dark soil with stones and buried bones | branch platforms with leaves and knots | ferns, mushrooms (3 kinds), flowers, fallen leaves, roots, snail shells | fallen statue head, temple stairs, a waterfall, a giant flower, a rope bridge, an idol with glowing eyes | swaying ferns, falling leaves, fireflies, butterflies, dripping water | glowing mushrooms, fireflies, sun shafts |
+| 3 | L0 dim blue cave glow; L1 far ice cliffs and a frozen waterfall; L2 crystal clusters, icicles (decorative: blue-white, never the hazard's shape), frozen trees; L3 near ice pillars | snow cap with drifts overhanging / blue rock with frost veins and trapped bubbles | ice slabs with frost rims | snow mounds, small crystals, frozen grass, bones in ice, a frozen lantern | an ice cathedral arch, a frozen mammoth in the wall, a frozen waterfall, a crystal geode, an explorer's camp | falling snow (3 depths), glinting crystals, breath-like mist, slow light shimmer in ice | crystals (cold glow), the camp's lantern |
+| 4 | L0 red-black smoke sky with ash; L1 far volcano cones with lava rivers; L2 basalt columns, a half-melted forge city; L3 near chains, anvils, broken pillars | cracked basalt with glowing seams / dark rock with ember veins | iron grates on chains, glowing hot in the middle | charred stumps, obsidian shards, small skulls, slag, broken tools | a giant forge with bellows, a lava fall, a melted statue, the mine entrance with rails, an obsidian throne | rising embers, lava bubbles, heat shimmer rows, smoke, sparks from the forge | lava (strong orange glow from below), forges, braziers |
+| 5 | L0 deep blue with light rays from above; L1 far sunken towers and a whale skeleton; L2 kelp forests, coral, broken arches; L3 near kelp strands and chains | sand with shells and starfish / sunken stone bricks with barnacles | coral shelves and old beams with algae | shells, starfish, coral (4 kinds), sea grass, pearls, anchors, bottles | a sunken ship's bow, a flooded chapel with stained glass, a giant clam, a statue covered in coral, a whale skull | swaying kelp and sea grass, rising bubbles, drifting plankton, small fish schools in L2 | glowing jellyfish (L2), lantern fish, light rays |
+| 6 | L0 high sky gradient above a cloud sea; L1 far towers and floating ruins; L2 grey-gold colonnades, empty banners; L3 near statues and broken balustrades | pale marble with gold inlay and cracks / grey stone blocks with carvings | marble ledges with gold trims and small chains | fallen banners, gold coins, broken vases, candle stubs, feathers | the empty throne, a hall of nameless statues, a great bell, a stained-glass window with an erased face, a broken sky bridge | drifting clouds, fluttering banners, candle flames, falling dust | candles, gold glints, the stained glass |
+| 7 | L0 off-white paper with faint ruled lines; L1 half-drawn sketches of earlier worlds' landmarks in pencil grey; L2 crossed-out words and ink blots; L3 margin doodles | ink outline with a hatched edge / blank paper with faint hatching | pencil-sketched planks | ink drops, smudges, eraser crumbs, paper scraps | a giant quill, an open book, the outline of Namula's hearth, a half-drawn door | lines drawing themselves in, ink drips, pages turning far away | none (light comes from the hero: the area is brightest near them) |
 
 ### The difficulty ramp inside a world (the PDF's "calm at first, intense at the end")
 Bands by main-path position: the first third calm (band 0), the middle third medium (band 1), the last third intense
@@ -696,13 +719,104 @@ New palette characters (append to `paletteColor`; never reuse `m`, `y` outside t
 '?' 0xFF8A8478 citadel grey '!' 0xFF4E4A46 citadel dark  'z' 0xFFC8A040 citadel gold
 'Q' 0xFFD97757 Claude's cloak
 ```
-- Hero: 12 x 16 sprites per class: IDLE_A, IDLE_B, WALK_A, WALK_B, JUMP, ATTACK, CLIMB, ROLL (28 sprites). The
-  class's trim uses `h` only; it is recoloured by job tier when drawn: tier 0 `h`, 1 `b`, 2 `Y`, 3 `N`.
+- Hero: 16 x 20 sprites per class, the 16 frames of §22 (64 sprites). The class's trim uses `h` only; it is recoloured by job tier when drawn: tier 0 `h`, 1 `b`, 2 `Y`, 3 `N`.
   Knight: grey plate `b`/`d`, red cape `r`. Archer: green hood `g`/`G`, bow `h`. Magician: blue robe `u`/`U`, hat.
   Thief: dark `x`/`X` with a purple scarf `p`.
-- NPCs 12 x 16 with 2 idle frames each (author); the hearth checkpoint is 16 x 20 (bigger brazier).
+- NPCs 16 x 20 with 2–4 idle frames each (§22); the hearth checkpoint is 24 x 28 (bigger brazier with a stone ring).
 - Projectiles: hero arrows, bolts, stars in `y` (the player's colour, like the shooter); enemy shots and every deadly
   enemy projectile in `m` (pillar 1). Deadly projectiles drawn with a themed sprite (banana, coconut, icicle, rock,
   fireball, boot, snowball, ice shard) get a 1 px `m` outline so they still read as danger.
 - Recolouring at draw time: `drawSpriteEx(sprite, x, y, flip, fromChar, toColor)` (one swap) and the grey recolour for
   world 7 / the First Name maps every colour to its luminance on the grey ramp `k n d s b w`.
+
+## §22 Art direction (rich pixel art at 640x360)
+
+The goal: every screen looks hand-made and full of small things (leaves, stones, cables, shells), with depth behind
+the action, while the action stays readable (pillar 1) and the frame stays under budget (pillar 4). Reference for
+what this density can hold: Owlboy, Blasphemous, Dead Cells' layered backgrounds, Celeste's environments at twice
+their pixel density. Since the
+game draws into a CPU pixel buffer (D-008), any blending is done in software and costs only CPU time.
+
+### Colour
+- Each world has a **16-colour world palette** (`WorldPalette { uint32_t c[16]; }`): four hue-shifted ramps of four
+  (dark → light; shadows cooler, lights warmer): ground, foliage/accent, background, light. Tiles, platforms, props,
+  landmarks and background art use it: their sprite characters are `0`–`9`, `a`–`f` (`.` transparent), drawn with
+  `drawSpritePal(sprite, x, y, flip, const WorldPalette&)`. Characters, enemies, NPCs, projectiles and the UI keep the
+  global palette.
+- Dithering (ordered 4x4 Bayer) for gradients, glows and fog, never noise.
+- Reserved: no world palette contains magenta or the hero projectiles' pale yellow (`m`, `y`).
+
+### Readability (checked on every style frame)
+- Value layers: L0–L1 at most 30 % luminance, L2 at most 40 %, L3 at most 50 % and lower saturation than the
+  playfield; the playfield's caps and props may be brighter; characters are brightest with a 1 px dark outline.
+  World 7 inverts this (light paper, dark ink): there everything in the playfield is outlined in ink black.
+- Nothing in a background moves faster than 20 px/s or looks like a projectile (no 2–6 px bright blobs moving).
+- Props never resemble hazards: no spike shapes within 3 tiles of real spikes; decorative icicles in a different
+  colour and shape from the hazard icicle; nothing magenta.
+
+### Background: 4 parallax layers per world
+| Layer | Scroll (x of camera) | Content |
+|---|---|---|
+| L0 sky | 0 horizontally, 0.05 vertically | gradient bands dithered, stars/clouds/rays, the world's far light |
+| L1 far | 0.15 | silhouettes (mountains, towers, giant trees), 2–3 values |
+| L2 mid | 0.35 | detailed scenery with small lights and some animation |
+| L3 near | 0.6 | big dark shapes (trunks, pillars, pipes) framing the view; sparse so they never cover more than 25 % of the screen |
+- Layers are **pre-rendered once** when entering a world into buffers 1280 x 480 real px (wrapping horizontally; vertically the
+  0.05–0.6 factors move within the 240), by authored drawing code that composes palette sprites, shapes and dither
+  with a fixed seed per world. Each frame copies L0 whole and L1–L3 as precomputed opaque runs per row (no per-pixel
+  transparency test). Budget: all 4 layers ≤ 3 ms on the PS3 (4x the pixels of 320x180: copy whole runs with `memcpy`, never per pixel).
+- Animated details on top of the layers: 3–5 kinds per world (§13), at most 60 small particles, each in its layer's
+  parallax.
+
+### Ground, walls and platforms
+- **Autotiling:** a solid tile's look comes from its 4 neighbours (16 cases: top, top-left/right corners, sides,
+  bottom, inner fill, single-width columns, isolated block) with **3 variants** of the top and fill tiles chosen by a
+  hash of (tx, ty). Authored per world as 16x16 real-px palette sprites.
+- **Thick caps:** top tiles carry a 3–4 px cap (grass, moss, snow, plating, sand, marble, ink). The cap **overhangs**:
+  a fringe of 1–3 px above the top line (grass blades, snow lip) and a drape of 2–4 px down the sides at edges (roots,
+  hanging moss, icicle-shaped frost in the safe colour, cables). Visual only; collision stays on the 8 px grid.
+- **Thick platforms:** one-way platforms are drawn 6 px tall (collision on their top line, as before) with end caps,
+  wood grain/rivets/frost, and supports: brackets into a wall within 2 tiles, ropes or chains up to a ceiling within
+  6 tiles, or posts down to the ground within 3 tiles.
+- Ladders, vines, liquids, gates, doors, hazards each get a detailed world-specific look; liquids have an animated
+  3-frame surface line, a dithered depth gradient and (lava) a glow.
+
+### Props and landmarks (dressing)
+- **Scattered props:** after loading an area, a deterministic pass (hash of world, area, tx, ty) places small
+  non-colliding props from the world's set (≥ 10 kinds, 4–16 px): on top surfaces (35 % of free top tiles; Namula 45 %),
+  hanging from ceilings (25 %), on walls (10 %). Never on or next to arrival tiles, checkpoints, NPCs, chests, levers,
+  portals, gates or hazards. Some props animate (2–4 frames: swaying grass, dripping water, flickering candles).
+  Props draw behind characters; grass fringe props draw in front of the hero's feet (2 px only).
+- **Landmarks:** big hand-placed set pieces (24–80 px) with the object letter `L`; the area's `int landmarks[4]` picks
+  which (by order of appearance, like `npcs[]`; ids are 1-based, 0 = none). Every area has at least one; every dead end has one used nowhere else
+  in that world (the getting-lost rule of the recipe). Landmarks may emit light.
+
+### Light
+- A software glow: each light (lava tiles' surface, lanterns, crystals, consoles, the hearth, fire jets, the hero's
+  Magician bolts) adds a tint to the pixels within its radius (8–48 px), falling off with (1 - d/r)², quantised to 4
+  steps with the Bayer pattern. At most 16 lights on screen, nearest first. Budget ≤ 2.5 ms.
+- A subtle precomputed vignette (corners one step darker by dither) on the playfield, not on the HUD; none in world 7.
+
+### Characters (sizes in dp; authored at 2x in real px with full detail)
+- **Hero:** 16 x 20 sprites (hitbox still 8 x 14, drawn at x - 4, y - 6): IDLE 1–2, WALK 1–4, JUMP, FALL, ATTACK 1–3,
+  CLIMB 1–2, ROLL 1–2, HURT (16 per class). Cape, weapon and hair have 1–2 px of secondary motion between frames.
+  Each job tier changes the trim colour (§21) and adds one visible detail (pauldron, quiver, staff gem, mask).
+- **Enemies:** redrawn for NAME QUEST as side-view sprites based on the shooter's designs (same colours and shapes, so
+  players recognise them), 12–20 px, 4-frame movement + a tell frame + an attack frame. New enemies the same way.
+- **Bosses:** redrawn at 40–64 px with 4–6 frames (idle, tell, attack, hurt, phase-2 look), based on the shooter's
+  boss designs where §12 names one.
+- **NPCs:** 16 x 20, 2–4 idle frames (blink, breathe, a gesture).
+- Every character gets a 1 px outline in its darkest colour (`drawSpriteOutlined`), so it reads on any background.
+- Hit flashes stay white silhouettes; particles take the hit thing's colours.
+
+### Style frames (the user approves each world's look before its areas are made)
+Before authoring a world's areas, the implementer builds a **style frame**: area 0 of that world fully dressed (all 4
+layers, the tileset, a platform, props, a landmark, a light, the hero and two enemies), takes `make mac-run` screenshots
+(`l1`), sends them to the user (SendUserFile, full 640x360 or scaled to 1280) and waits for an OK or changes. Notes go in the
+world's testing.md.
+
+### Authoring big sprites
+At 2x, sprites are large text grids (a 32 x 40 hero frame is 40 lines). Put them in `.cpp` files per world
+(`quest_sprites_<world>.cpp`, declared `extern` in a header) so a change rebuilds one file. Python generators that
+write the text grids are allowed (keep them in `docs/work-plan/name-quest/art-tools/`, run with `python3 -I`, like
+`docs/xmb-art/make_xmb_art.py`); the generated text is committed and is the source of truth for the build.

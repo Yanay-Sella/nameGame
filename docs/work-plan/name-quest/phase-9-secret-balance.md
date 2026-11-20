@@ -5,6 +5,10 @@ Read first: [`../name-quest-plan.md`](../name-quest-plan.md), the **world author
 §19, §21 (grey recolour); and every `docs/features/name-quest/testing.md` playtest note the user gave in phases 4–8.
 Phases 1–8 done. This is the only phase allowed to change numbers (master plan rule 2).
 
+**Art first (spec §22, recipe step 0 in phase 4):** for each world in this phase, build its `WorldArt` from its §13 art
+brief and get the user's OK on its style frame before authoring its areas. Redraw its roster and bosses per §22
+(side-view, outlined, 4-frame movement + tell + attack; bosses 40–64 px); sprite sizes named below are minimums.
+
 ## What the player gets
 After Pell's quest, the Unwritten: 10 grey areas where the floor only exists near you, the hardest enemies, and the
 First Name, the hero who failed before you, fighting with the other three classes' skills. The class's secret weapon
@@ -22,7 +26,7 @@ and a `*` on the save slot reward it. The whole game is tuned to the 15-hour tar
 
 ## Step 2: The First Name (`source/quest_bosses.cpp`)
 Spec §12b. It cycles through the three classes the player isn't (the order fixed by class index), drawing that class's
-hero sprites in grey at 1x like the hero, with a 1 px white outline so it reads as a boss. Its skills are the
+16x20 hero sprites in grey like the hero, with a 1 px white outline (world 7's ink rule inverted for it) so it reads as a boss. Its skills are the
 heroes' tier-3 skills mirrored as enemy attacks with magenta projectiles and the boss's `atk` / `bigAtk`. Death: lines
 (author 2 pages: it remembers its name, and thanks you), KEY_SECRET_DONE, the tier-7 weapon (`weapon = 7`), autosave.
 
@@ -47,14 +51,14 @@ numbers within ±20 %, `PRICE_SCALE`, boss gaps within ±25 %)
 | Playtime estimate | (main path areas x 90 s + side areas x 60 s + clears needed x 15 min + 3 boss tries x TTK) summed ≥ 15 h for worlds 1–6 |
 Apply the user's playtest notes first (they win over the tool where they disagree: a boss the user found unfair gets a
 longer telegraph, not less HP). Record every change: the spec's numbers, the code, and one GDD decision
-`D-052 | <date> | NAME QUEST balance pass: <the changes in one line> | ... | the targets above and the playtest notes`.
+`D-054 | <date> | NAME QUEST balance pass: <the changes in one line> | ... | the targets above and the playtest notes`.
 Add `balanceTargetsHold` to the tests (asserts the table above from the same computation) so later edits can't drift.
 
 ## Step 5: final docs
 - `docs/features/name-quest/design.md`: fold the final rules and numbers in (status `implemented`), keep the spec link as
   "the original plan". The final boss is described only as "a surprise final boss" there and in the README.
 - `docs/features/name-quest/testing.md`: every PS3 criterion with proof (log lines, dates) or left open with a note.
-- `docs/GDD.md`: feature row status `implemented`, the M5 milestone line `M5, NAME QUEST (done <date>)`, change log `0.37`.
+- `docs/GDD.md`: feature row status `implemented`, the M5 milestone line `M5, NAME QUEST (done <date>)`, change log: the next version.
 - `README.md`: a NAME QUEST section for players: what it is, the controls table (spec §2), "your progress saves at
   checkpoints and when you quit to the menu", three save slots. No spoilers.
 - Bump `VERSION` in the `Makefile` to `1.1`.

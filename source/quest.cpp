@@ -10,19 +10,19 @@
 const char* const CLASS_NAMES[CLASS_COUNT] = {"KNIGHT", "ARCHER", "MAGICIAN", "THIEF"};
 
 // Movement (spec §5), in one block so world 5's underwater numbers can scale it later.
-const float GRAVITY = 700, JUMP_SPEED = 225, JUMP_CUT = 80, MAX_FALL = 260;
-const float GROUND_ACCEL = 900, AIR_ACCEL = 500, ICE_ACCEL = 120;
-const float COYOTE_TIME = 0.08f, JUMP_BUFFER = 0.10f, DOUBLE_JUMP_SPEED = 200, CLIMB_SPEED = 50;
+const float GRAVITY = 700 * DP, JUMP_SPEED = 225 * DP, JUMP_CUT = 80 * DP, MAX_FALL = 260 * DP;
+const float GROUND_ACCEL = 900 * DP, AIR_ACCEL = 500 * DP, ICE_ACCEL = 120 * DP;
+const float COYOTE_TIME = 0.08f, JUMP_BUFFER = 0.10f, DOUBLE_JUMP_SPEED = 200 * DP, CLIMB_SPEED = 50 * DP;
 const float DROP_TIME = 0.2f;                       // s one-way tops are ignored after down + X
-const float CURRENT_PUSH = 50;                      // px/s added to x inside < and >
-const float VENT_LIFT = 900, VENT_MAX_RISE = 160;   // net px/s² upward inside a vent's column, up to this rise speed
+const float CURRENT_PUSH = 50 * DP;                 // px/s added to x inside < and >
+const float VENT_LIFT = 900 * DP, VENT_MAX_RISE = 160 * DP;   // net px/s² upward inside a vent's column, up to this rise speed
 const int VENT_REACH = 6;                           // tiles above a vent that still lift
-const float WALK_SPEED[CLASS_COUNT] = {66, 72, 68, 80};
+const float WALK_SPEED[CLASS_COUNT] = {66 * DP, 72 * DP, 68 * DP, 80 * DP};
 // Flow
-const float DEATH_TIME = 2.5f, STEP_TIME = 0.28f, LAND_SOUND_SPEED = 120;
+const float DEATH_TIME = 2.5f, STEP_TIME = 0.28f, LAND_SOUND_SPEED = 120 * DP;
 const float BANNER_TIME = 2;
 const float TRAUMA_DECAY = 1.5f, TRAUMA_DEATH = 0.6f;
-const float CAMERA_LEAD = 32, CAMERA_EASE_X = 5, CAMERA_EASE_Y = 6;
+const float CAMERA_LEAD = 32 * DP, CAMERA_EASE_X = 5, CAMERA_EASE_Y = 6;
 
 const char* const INTRO_PAGES[4] = {
     "LONG AGO, EVERY THING HAD A NAME,\nAND EVERY NAME KEPT ITS THING ALIVE.",
@@ -243,12 +243,12 @@ static bool standable(const AreaState& area, int tx, int ty) {
 // Moves the camera toward the hero (snap: at once); wide areas are bottom-aligned, tall ones follow in y.
 static void updateCamera(Quest& q, float dt, bool snap) {
     const AreaDef& def = *q.area.def;
-    float targetX = q.hero.x + HERO_W / 2 - SCREEN_W / 2 + (q.hero.facingLeft ? -CAMERA_LEAD : CAMERA_LEAD);
-    float targetY = def.rows == TALL_ROWS ? q.hero.y + HERO_H / 2 - SCREEN_H / 2 : (float)(def.rows * TILE - SCREEN_H);
+    float targetX = q.hero.x + HERO_W / 2 - QUEST_W / 2 + (q.hero.facingLeft ? -CAMERA_LEAD : CAMERA_LEAD);
+    float targetY = def.rows == TALL_ROWS ? q.hero.y + HERO_H / 2 - QUEST_H / 2 : (float)(def.rows * TILE - QUEST_H);
     q.camX = snap ? targetX : q.camX + (targetX - q.camX) * fminf(1, CAMERA_EASE_X * dt);
     q.camY = snap || def.rows != TALL_ROWS ? targetY : q.camY + (targetY - q.camY) * fminf(1, CAMERA_EASE_Y * dt);
-    q.camX = fmaxf(0, fminf(q.camX, (float)(def.cols * TILE - SCREEN_W)));
-    q.camY = fmaxf(0, fminf(q.camY, (float)(def.rows * TILE - SCREEN_H)));
+    q.camX = fmaxf(0, fminf(q.camX, (float)(def.cols * TILE - QUEST_W)));
+    q.camY = fmaxf(0, fminf(q.camY, (float)(def.rows * TILE - QUEST_H)));
 }
 
 // Loads an area and stands the hero on tile (tx, ty), or on its first standable tile from the left when tx < 0.
@@ -466,7 +466,7 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
         for (int t = 0; t < def.cols * def.rows; t++) {
             if (def.tiles[t] != 'P') continue;
             float px = (t % def.cols) * TILE + TILE / 2.0f, bottom = (float)((t / def.cols + 1) * TILE);
-            if (h.x < px + 8 && h.x + HERO_W > px - 8 && h.y < bottom && h.y + HERO_H > bottom - 24) portal = seen;
+            if (h.x < px + 8 * DP && h.x + HERO_W > px - 8 * DP && h.y < bottom && h.y + HERO_H > bottom - 24 * DP) portal = seen;
             seen++;
         }
         Actions move = a;
@@ -484,7 +484,7 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
         moveHero(h, move, q.area, (HeroClass)q.save.heroClass, dt);
         if (h.jumped) q.soundRequested[SOUND_Q_JUMP] = true;
         if (!wasOnGround && h.onGround && fallSpeed > LAND_SOUND_SPEED) q.soundRequested[SOUND_Q_LAND] = true;
-        if (h.onGround && fabsf(h.vx) > 10 && move.moveX != 0) {
+        if (h.onGround && fabsf(h.vx) > 10 * DP && move.moveX != 0) {
             h.stepTimer -= dt;
             if (h.stepTimer <= 0) {
                 q.soundRequested[worldDef(q.area.world).style.step] = true;

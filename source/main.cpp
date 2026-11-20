@@ -116,7 +116,9 @@ int main(int argc, char** argv) {
     SDL_Renderer* renderer = window ? SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC) : NULL;
     SDL_Texture* picture = renderer ? SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
                                                         SCREEN_W, SCREEN_H) : NULL;
-    if (!picture) {
+    SDL_Texture* questPicture = renderer ? SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
+                                                             QUEST_W, QUEST_H) : NULL;   // NAME QUEST's 640x360 (D-053)
+    if (!picture || !questPicture) {
         debugNetPrintf(ERROR, "window/renderer/texture failed: %s\n", SDL_GetError());
         return 1;
     }
@@ -124,7 +126,14 @@ int main(int argc, char** argv) {
     SDL_GetRendererOutputSize(renderer, &outputW, &outputH);
     int scale = SDL_min(outputW / SCREEN_W, outputH / SCREEN_H);
     SDL_Rect pictureRect = {(outputW - SCREEN_W * scale) / 2, (outputH - SCREEN_H * scale) / 2, SCREEN_W * scale, SCREEN_H * scale};
-    debugNetPrintf(INFO, "output %dx%d, picture x%d at %d,%d\n", outputW, outputH, scale, pictureRect.x, pictureRect.y);
+    int questScale = SDL_min(outputW / QUEST_W, outputH / QUEST_H);
+    SDL_Rect questRect = {(outputW - QUEST_W * questScale) / 2, (outputH - QUEST_H * questScale) / 2, QUEST_W * questScale, QUEST_H * questScale};
+    debugNetPrintf(INFO, "output %dx%d, picture x%d at %d,%d, quest x%d\n", outputW, outputH, scale, pictureRect.x, pictureRect.y, questScale);
+#ifdef NAMEGAME_MAC
+    questClock = [] { return SDL_GetPerformanceCounter() / (double)SDL_GetPerformanceFrequency(); };
+#else
+    questClock = [] { return sysGetSystemTime() / 1e6; };   // µs; SDL's counter on the PS3 ticks only every 1 ms
+#endif
 
     stage = "audio";
     std::string exePath = argc > 0 ? argv[0] : "/dev_hdd0/game/NMGM00001/USRDIR/EBOOT.BIN";
@@ -511,6 +520,11 @@ int main(int argc, char** argv) {
         game.shakeStrength = settings.shake / 100.0f;
         game.reduceFlashing = settings.reduceFlashing;
         stage = "draw";
+        // NAME QUEST and the menus over it draw into the 640x360 picture, everything else into the 320x180 one.
+        bool questFrame = scene == SCENE_QUEST || questPaused;
+        bool targetChanged = (screenTarget == questPixels) != questFrame;
+        if (questFrame) screenSetTarget(questPixels, QUEST_W, QUEST_H);
+        else screenSetTarget(screenPixels, SCREEN_W, SCREEN_H);
         if (scene == SCENE_MAIN_MENU) {
             drawBackground(game);
             drawMenu("NAME GAME", MAIN_ITEMS, SETTINGS_ITEM + 1, selected, "X SELECT");
@@ -566,13 +580,17 @@ int main(int argc, char** argv) {
 
         stage = "present";
         bool visible = false;   // an all-black picture counts towards the watchdog's black-screen exit
-        for (int i = 0; i < SCREEN_W * SCREEN_H && !visible; i++) visible = (screenPixels[i] & 0xFFFFFF) != 0;
-        SDL_UpdateTexture(picture, NULL, screenPixels, SCREEN_W * sizeof(uint32_t));
-        if (frame < 2) {   // borders are never drawn over, so clearing both screen buffers once is enough
+        for (int i = 0; i < screenW * screenH && !visible; i++) visible = (screenTarget[i] & 0xFFFFFF) != 0;
+        SDL_Texture* shown = questFrame ? questPicture : picture;
+        SDL_UpdateTexture(shown, NULL, screenTarget, screenW * sizeof(uint32_t));
+        static int bordersToClear = 2;   // both screen buffers, at the start and whenever the picture size changes
+        if (targetChanged) bordersToClear = 2;
+        if (bordersToClear > 0) {
             SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
             SDL_RenderClear(renderer);
+            bordersToClear--;
         }
-        SDL_RenderCopy(renderer, picture, NULL, &pictureRect);
+        SDL_RenderCopy(renderer, shown, NULL, questFrame ? &questRect : &pictureRect);
         float workMs = (float)((SDL_GetPerformanceCounter() - frameStart) * 1000.0 / counterHz);
         SDL_RenderPresent(renderer);
         if (visible) visibleFrames++;
@@ -583,11 +601,13 @@ int main(int argc, char** argv) {
         statsTimer += (float)((SDL_GetPerformanceCounter() - frameStart) / counterHz);
         if (statsTimer >= 5) {
             if (scene == SCENE_QUEST || questPaused)
-                debugNetPrintf(INFO, "fps %.1f, worst work %.1f ms, quest %d.%d, heap %d KB\n", framesSinceStats / statsTimer, worstWorkMs,
-                               quest.area.world, quest.area.index, (int)(mallinfo().uordblks / 1024));
+                debugNetPrintf(INFO, "fps %.1f, worst work %.1f ms, quest %d.%d, heap %d KB, draw bg %.1f tiles %.1f light %.1f ms\n",
+                               framesSinceStats / statsTimer, worstWorkMs, quest.area.world, quest.area.index,
+                               (int)(mallinfo().uordblks / 1024), questDrawMs[0], questDrawMs[1], questDrawMs[2]);
             else
                 debugNetPrintf(INFO, "fps %.1f, worst work %.1f ms, wave %d, score %d, weapon %d, heap %d KB\n", framesSinceStats / statsTimer,
                                worstWorkMs, game.wave, game.players[0].score, game.players[0].weaponLevel, (int)(mallinfo().uordblks / 1024));
+            questDrawMs[0] = questDrawMs[1] = questDrawMs[2] = 0;
             framesSinceStats = 0;
             statsTimer = 0;
             worstWorkMs = 0;

@@ -4,6 +4,10 @@ Read first: [`../name-quest-plan.md`](../name-quest-plan.md), the **world author
 [`phase-4-world-1.md`](phase-4-world-1.md), then spec §1, §8 (world 6 roster and traits), §9 (world 6), §10 (world 6
 chests), §12 (world 6 rows, §12a), §13 (world 6), §14 (story beats), §19. Phases 1–7 done.
 
+**Art first (spec §22, recipe step 0 in phase 4):** for each world in this phase, build its `WorldArt` from its §13 art
+brief and get the user's OK on its style frame before authoring its areas. Redraw its roster and bosses per §22
+(side-view, outlined, 4-frame movement + tell + attack; bosses 40–64 px); sprite sizes named below are minimums.
+
 **Keep the secret.** Players must not see or hear anything about Claude before world 6 area 19: no sprite, line or
 name on screen anywhere else (the credits and the post-credits Shore come after it). Area 19's banner is
 `THE LAST ROOM`. Logs may say `quest: boss CLAUDE start` (players don't see logs).
@@ -30,7 +34,7 @@ fire on the Shore offering New Game+.
   Dialogue before (a DIALOGUE mode page triggered on arena entry, the fight starts when it closes) and at death. Its
   phase-2 steals are recovered as an echo-like pickup at its death spot. Its death opens the throne door (a `k`-style
   door in area 18 opened by code, saved by its `bosses` bit 8) to area 19.
-- Claude (spec §12a, every number and line). New sprites: CLAUDE idle A/B, cast, hurt, kneel (20x28), SUBAGENT (10x14).
+- Claude (spec §12a, every number and line). New sprites: CLAUDE idle A/B, cast, hurt, kneel (24x32, outlined), SUBAGENT (12x16).
   TOKEN RAIN glyphs: random A–Z drawn with `drawText` in `m`, each a projectile with a 4x5 hitbox. REFACTOR finds the
   arena's three one-way platform runs at fight start (scan for `-` runs) and swaps their rows in the live `AreaState`
   (restored on reset). CONTEXT WINDOW walls are two solid rectangles handled like trap damage plus a push.
@@ -61,7 +65,7 @@ world 6 area 19 and the credits).
 
 ## Step 6: docs
 design.md: world 6, the finale, NG+ — in the design doc, describe area 19 only as "the final boss (see spec §12a)" so the
-surprise isn't spoiled by the README later. GDD change log `0.36`.
+surprise isn't spoiled by the README later. GDD change log: the next version.
 
 ## Step 7: Mac self-check and PS3 check
 - `make quest-maps`; play the three bosses on the Mac at the reference (`level=35 gear=5 job=3`).

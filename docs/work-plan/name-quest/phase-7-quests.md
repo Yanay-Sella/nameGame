@@ -43,7 +43,7 @@ lights world 6's entry. Until phase 8, world 6 is a one-area placeholder room wi
 `source/quest_story.cpp` and fails if it contains `phase 7`).
 
 ## Step 5: docs
-design.md: the quests as numbered rules (stage tables); testing.md; GDD change log `0.35`.
+design.md: the quests as numbered rules (stage tables); testing.md; GDD change log: the next version.
 
 ## Step 6: Mac self-check and PS3 check
 - Mac: dev starts with the quest stages and key items set (`NAMEGAME_QUEST='slot=3 class=3 world=0 area=2 level=35 keys=<hex> quest1=4'`,

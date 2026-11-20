@@ -1,7 +1,7 @@
 # Phase 3: RPG systems (checkpoints, Namula, levelling, shops, items, jobs, chests, gates, map, ambience)
 
 Read first: [`../name-quest-plan.md`](../name-quest-plan.md), then spec §2 (Up, Square, Triangle), §6 "Jobs", §10, §11,
-§14 (dialogue box, NPC table, the JOB quest, Ilsa's lines), §15, §16 (ambience), §17 "Autosave", §18. Phases 1–2 done.
+§14 (dialogue box, NPC table, the JOB quest, Ilsa's lines), §15, §16 (ambience), §17 "Autosave", §18, §22 (characters, lights). Phases 1, 1b and 2 done.
 
 ## What the player gets
 - Braziers light on touch; Up opens REST / TRAVEL / LEAVE; rest heals and respawns enemies; travel goes between lit
@@ -43,7 +43,7 @@ void talkTo(Quest& q, int id);                                        // fills t
   (JOB stages 0 → 1 → 2 per spec §14; tier 3 says `COME BACK AT LEVEL 30.` until phase 7), other mentors' flavour line,
   Lio, Pell, Sela (`...`), the Gatekeeper (`<n> OF 5 GREAT NAMES.` only), Tobin (stage 0 line only). Quest effects and
   the remaining stages come in phase 7; leave a one-line `// phase 7` at each spot that will grow.
-- Sprites (12 x 16, 2 idle frames each, author in the spec §1 tone): Ilsa (green-grey hooded keeper with a lantern),
+- Sprites (16 x 20, 2–4 idle frames each, outlined, lanterns and the hearth as lights; author in the spec §1 tone): Ilsa (green-grey hooded keeper with a lantern),
   Marra, Brann (apron, hammer), Lio (lute), Pell (huge rolled maps), Sela (shawl, by the well), Sir Odo, Wren, Ysolde,
   Kit, Tobin (a small boy, 12 x 12), the Gatekeeper (a 16 x 24 stone statue), the surveyor (telescope).
   Draw NPCs facing the hero.
@@ -112,8 +112,7 @@ const ChestContent& chestContent(int world, int chestId);        // spec §10 ch
 driving `questUpdate` with scripted `Actions` on TEST GROUNDS and Namula.
 
 ## Step 10: docs
-design.md rules for this phase's systems; implementation.md files; testing.md this phase's PS3 checks. GDD change log
-`0.31`. `check_docs.py` clean.
+design.md rules for this phase's systems; implementation.md files; testing.md this phase's PS3 checks. GDD change log: the next version. `check_docs.py` clean.
 
 ## Step 11: Mac self-check
 - `NAMEGAME_QUEST='slot=3 class=1 world=0 area=0 names=2000'`: talk to Ilsa four times, level up twice, buy two potions

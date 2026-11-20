@@ -5,6 +5,10 @@ Read first: [`../name-quest-plan.md`](../name-quest-plan.md), the **world author
 (worlds 4–5), §10 (their chests), §12 (worlds 4–5 rows), §13 (their rows, "Areas that are special"), §14 (Calder's spot).
 Phases 1–5 done. World 4 fully first, `make test`, then world 5.
 
+**Art first (spec §22, recipe step 0 in phase 4):** for each world in this phase, build its `WorldArt` from its §13 art
+brief and get the user's OK on its style frame before authoring its areas. Redraw its roster and bosses per §22
+(side-view, outlined, 4-frame movement + tell + attack; bosses 40–64 px); sprite sizes named below are minimums.
+
 ## What the player gets
 The Ember Maw: lava, fire jets, falling rocks and two climbs ahead of rising lava; the Imp and the Fire Lord.
 The Sunken Halls: the whole world underwater (floaty jumps, slower falls), currents, a black trench, pitch-dark areas
@@ -58,7 +62,7 @@ Ilsa's and Lio's lines after worlds 4 and 5; Calder's lines (stage 1 needs THE S
 page; `// phase 7` for the effect); Garrick's pickaxe line is phase 7.
 
 ## Step 7: docs
-design.md: worlds 4–5; testing.md: checks below; GDD change log `0.34`.
+design.md: worlds 4–5; testing.md: checks below; GDD change log: the next version.
 
 ## Step 8: Mac self-check and PS3 check
 - `make quest-maps` for both worlds; play both rising-lava areas and both bosses on the Mac at the reference level.

@@ -11,8 +11,9 @@ VERSION  := 1.0
 RELEASE  ?= 0
 
 APP_FOLDER := /dev_hdd0/game/NMGM00001/USRDIR
-# A shot is a 54-byte BMP header + 320*180*3 pixel bytes (no trailing comment: make would keep the spaces in the value).
+# A shot is a 54-byte BMP header + 320*180*3 pixel bytes, or 640*360*3 for NAME QUEST (no trailing comments: make keeps the spaces).
 SHOT_SIZE  := 172854
+QUEST_SHOT_SIZE := 691254
 
 .PHONY: ps3 image deploy install release log clean music test launch quit pad shot mac mac-run
 
@@ -73,7 +74,7 @@ mac:
 mac-run: mac
 	rm -f build/mac/shot.bmp
 	NAMEGAME_PAD='$(BUTTONS)' $(MAC_BIN)
-	@if [ -f build/mac/shot.bmp ]; then mkdir -p shots && sips -s format png --resampleWidth 960 build/mac/shot.bmp --out shots/shot.png >/dev/null && echo "shots/shot.png"; fi
+	@if [ -f build/mac/shot.bmp ]; then mkdir -p shots && sips -s format png --resampleWidth 1280 build/mac/shot.bmp --out shots/shot.png >/dev/null && echo "shots/shot.png"; fi
 
 # Print the game's UDP log output (Ctrl+C to stop).
 log:
@@ -114,8 +115,9 @@ shot:
 	curl -sS --fail -m 10 -o /dev/null 'http://$(PS3_IP)/pad.ps3?l1'
 	@for i in 1 2 3 4 5 6 7 8 9 10; do \
 		sleep 1; \
-		if curl -s -m 10 -o shots/shot.bmp ftp://$(PS3_IP)$(APP_FOLDER)/shot.bmp && [ "$$(stat -f %z shots/shot.bmp)" = "$(SHOT_SIZE)" ]; then \
-			sips -s format png --resampleWidth 960 shots/shot.bmp --out shots/shot.png >/dev/null && echo "shots/shot.png" && exit 0; \
+		if curl -s -m 10 -o shots/shot.bmp ftp://$(PS3_IP)$(APP_FOLDER)/shot.bmp && \
+			{ [ "$$(stat -f %z shots/shot.bmp)" = "$(SHOT_SIZE)" ] || [ "$$(stat -f %z shots/shot.bmp)" = "$(QUEST_SHOT_SIZE)" ]; }; then \
+			sips -s format png --resampleWidth 1280 shots/shot.bmp --out shots/shot.png >/dev/null && echo "shots/shot.png" && exit 0; \
 		fi; \
 	done; echo "No screenshot arrived: is a dev build of the game running? Check make log."; exit 1
 
