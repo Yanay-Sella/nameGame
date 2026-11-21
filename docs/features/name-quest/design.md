@@ -28,6 +28,19 @@ Rules and numbers: see the work-plan spec [`spec.md`](../../work-plan/name-quest
 17. Dying (HP 0, a pit or a liquid) drops every carried name as a pale-yellow wisp where the hero last stood on safe ground; an older wisp is lost. Touching the wisp gives the names back (`+n NAMES`). After death every enemy is back and HP and MP are full.
 18. The armored elite guards its front (hits from the front do a quarter) except while it winds up or recovers, or from above; a stunned charger takes 50 % more.
 
+## Rules (phase 3: RPG systems; numbers in spec §10, §11, §14-§16)
+19. Up on the ground uses the first thing touched: an NPC (within 14 dp, same floor), a chest, a lit checkpoint, a surveyor, a portal; a ladder is climbed only when none is touched. The world stops while a dialogue, menu, shop or the map is open; playtime keeps counting and Start still pauses.
+20. Dialogue types at 50 characters a second with a soft blip every third; X completes the page, then turns it; Circle closes. Closing the last page with X opens what follows (a shop, Ilsa's level up, the job question, the map).
+21. Touching an unlit brazier lights it (`NAME KINDLED`) and saves. Up at a lit one: REST (HP and MP full, every enemy back, crumbles reset, the respawn point, a short white frame unless Reduce Flashing is on), TRAVEL (NAMULA, then every lit checkpoint; arriving rests there and keeps running buffs), LEAVE. Namula's hearth is always lit.
+22. Ilsa's first three talks are an introduction; from the fourth she says one line and opens LEVEL UP (the level, cost, names and the stats before and after). It stays open, so several levels can be bought; level 40 is the last.
+23. Marra sells the six items at base price x `PRICE_SCALE[highest world]` up to each carry limit (shards, Sela's locket and Garrick's gift raise them); Brann sells the class's next weapon and the next armor once the hero has entered that tier's world (tier 7 never). Rows that can't be bought are grey and click empty.
+24. Triangle selects the next owned item; Square uses it. Potions take a 0.5 s drink at x0.4 walk and heal at its end (RED 35 %, BIG 70 % of max HP, MANA 50 % of max MP); WHETSTONE (ATK x1.2), IRON TONIC (damage taken x0.8) and SWIFT FEATHER (walk x1.15) run 120 s and restart if used again. Death ends them.
+25. The class mentor gives tier 1 at level 5 once world 1's gate is open and tier 2 at level 15 for a FROZEN FEATHER (taken), after a YES to `BECOME <JOB>?`: full heal, the gold job banner, 30 sparks. Below the level the mentor says `COME BACK AT LEVEL n.`; other mentors talk about their craft.
+26. Chests open with Up: the lid lifts, the contents float up for 1.5 s; a full bag shows `YOUR BAG IS FULL` and the chest stays shut. Opened chests stay open.
+27. A world's gate opens with `THE GATE OPENS` (the gate shakes, then vanishes top to bottom); a lever hit by any attack opens its area's shortcut doors for good.
+28. A surveyor says one line, then shows the world map: visited areas filled, the rest outlined, the current one blinking, lit checkpoints, closed gates, edge links as gaps.
+29. Each world plays a quiet 4 s ambience loop (Namula: the hearth's crackle; TEST GROUNDS: none), also in the pause menu over the quest.
+
 ## Edge cases
 - Start does nothing on the slot, class and intro screens; it pauses in play and while `YOU FADED` shows.
 - A controller unplugged in play opens the pause menu, which waits for it (D-014).
@@ -37,3 +50,4 @@ Rules and numbers: see the work-plan spec [`spec.md`](../../work-plan/name-quest
 - 2026-11-20: designed with the user (D-035 to D-051); phase 1 engine built.
 - 2026-11-20: phase 2 combat built (rules 10-18).
 - 2026-11-21: phase 2 reviewed: R2 cancels a basic swing, spikes bounce.
+- 2026-11-21: phase 3 RPG systems built (rules 19-29).

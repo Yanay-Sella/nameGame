@@ -1,6 +1,6 @@
 # NAME game — Game Design Document
 
-**Version:** 0.31 · **Updated:** 2026-11-21 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
+**Version:** 0.32 · **Updated:** 2026-11-21 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
 
 ## Summary
 You pilot a small ship at the bottom of the screen against waves of pixel-art aliens. Hold R1 to spray bullets, and save the scarce R2 rocket for the moment a wave gets out of hand. Waves get harder, and every 5th wave is a boss. The run goes through five levels of 20 waves each, every one harder than the last: level 1 (space), the jungle, the glacier, the volcano and the deep sea. It ends when you beat the deep sea's wave-20 bosses or lose your last life, and you chase the saved high score. Big bosses drop level buffs that stack until you die. Classic offers a five-level run in 1–2 Players or expanded 1–4 Players, and its Level Picker plays any single level on its own. NAME QUEST is a separate RPG platformer on the main menu, set in the same worlds, with four classes, a hub village, checkpoints and three save slots.
@@ -188,3 +188,4 @@ Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN ME
 **0.29 (2026-11-20):** NAME QUEST designed (D-035 to D-051); phase 1 engine.
 **0.30 (2026-11-20):** NAME QUEST combat: classes, job skills, enemies, damage, death and the name echo.
 **0.31 (2026-11-21):** Classic variants and live controller lobby (D-055).
+**0.32 (2026-11-21):** NAME QUEST RPG systems: checkpoints and travel, Namula's people, levels, shops, items and buffs, jobs, chests, gates, shortcuts, the map, ambience.

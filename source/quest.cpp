@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <algorithm>
 
 const char* const CLASS_NAMES[CLASS_COUNT] = {"KNIGHT", "ARCHER", "MAGICIAN", "THIEF"};
 
@@ -24,6 +25,11 @@ const float TRAUMA_DECAY = 1.5f, TRAUMA_DEATH = 0.6f;
 const float ECHO_SIZE = 8 * DP, NAMES_TEXT_TIME = 1.2f, DEATH_PARTICLES = 20;
 const float SELECT_HOLD_TIME = 2;                   // dev: Select held this long → TEST GROUNDS area 0 (spec §20)
 const float CAMERA_LEAD = 32 * DP, CAMERA_EASE_X = 5, CAMERA_EASE_Y = 6;
+// RPG systems (spec §10, §11, §14): how near Up must be (dp from the hero's centre, same floor), and the timings.
+const float NPC_REACH = 14 * DP, CHEST_REACH = 10 * DP, CHECKPOINT_REACH = 12 * DP, SURVEYOR_REACH = 20 * DP;
+const float KINDLE_BANNER_TIME = 1.5f, LID_TIME = 0.3f, POPUP_TIME = 1.5f, REST_FADE = 0.3f, GATE_ANIMATION = 1.0f;
+const float DRINK_TIME = 0.5f, BUFF_TIME = 120;
+const float POTION_HEAL[3] = {0.35f, 0.70f, 0.50f};   // RED and BIG: of max HP; MANA: of max MP
 
 const char* const INTRO_PAGES[4] = {
     "LONG AGO, EVERY THING HAD A NAME,\nAND EVERY NAME KEPT ITS THING ALIVE.",
@@ -213,7 +219,7 @@ bool heroInLiquid(const Hero& h, const AreaState& area) {
 }
 
 // Appends one spec §18 line for main.cpp to print.
-static void logLine(Quest& q, const char* format, ...) {
+void logLine(Quest& q, const char* format, ...) {
     char text[160];
     va_list args;
     va_start(args, format);
@@ -267,12 +273,15 @@ static void enterArea(Quest& q, int world, int index, int tx, int ty) {
     q.hero.lastSafeY = q.hero.y;
     updateCamera(q, 0, true);
     spawnEnemies(q);
+    if (index == 0 && world >= 1 && world <= 6 && world > q.save.highest) q.save.highest = world;   // spec §11 highestWorld
+    q.ambient = world == WORLD_TEST ? 0 : world + 1;   // 1 Namula, 2-8 worlds 1-7 (spec §16)
     bool firstVisit = world < SAVED_WORLDS && !(q.save.visited[world] >> index & 1);
     if (world < SAVED_WORLDS) q.save.visited[world] |= 1u << index;
     if (newWorld || firstVisit) {
         q.banner = newWorld ? worldDef(world).name : def.name;
         q.bannerScale = newWorld ? 2 : 1;
         q.bannerTimer = BANNER_TIME;
+        q.bannerColor = newWorld ? 'w' : 'b';
     }
     logLine(q, "quest: area %d.%d %s", world, index, def.name);
 }
@@ -343,7 +352,140 @@ void questOpen(Quest& q, const char* folder) {
 }
 
 bool questCanPause(const Quest& q) {
-    return q.mode == QMODE_PLAY || q.mode == QMODE_DEAD;
+    return q.mode == QMODE_PLAY || q.mode == QMODE_DEAD || q.mode == QMODE_DIALOGUE || q.mode == QMODE_MENU ||
+           q.mode == QMODE_SHOP || q.mode == QMODE_MAP;
+}
+
+int objectIndex(int world, int area, int tile, char letter) {
+    int n = 0;
+    for (int i = 0; i <= area && i < worldDef(world).count; i++) {
+        const AreaDef& def = worldDef(world).areas[i];
+        int end = i == area ? tile : def.cols * def.rows;
+        for (int t = 0; t < end; t++) n += def.tiles[t] == letter;
+    }
+    return n;
+}
+
+std::vector<int> travelCheckpoints(const SaveData& save) {
+    std::vector<int> list = {0};   // the hearth, always lit
+    for (int world = 1; world < WORLD_COUNT; world++) {
+        int count = objectIndex(world, worldDef(world).count, 0, 'C');   // every C of the world
+        for (int id = 0; id < count && id < 2; id++)
+            if (save.lit >> (world * 2 + id) & 1) list.push_back(world * 2 + id);
+    }
+    return list;
+}
+
+std::string checkpointName(int bit) {
+    if (bit == 0) return "HEARTH OF NAMES";
+    return std::string(worldDef(bit / 2).name) + (bit % 2 ? " DEPTHS" : " ENTRY");
+}
+
+// Rest resets the crumbled blocks (phase 4) and dropped icicles (phase 5) by reloading the area's tiles.
+static void resetHazards(Quest& q) {
+    loadArea(q.area, q.area.world, q.area.index, q.save.gates, q.save.shortcuts[q.area.world]);
+}
+
+// REST (spec §11): HP and MP full, every enemy and mini-boss back, hazards reset, the respawn point, a white fade, autosave.
+static void rest(Quest& q, int bit) {
+    for (auto& killed : q.killed) killed.assign(killed.size(), 0);
+    resetHazards(q);
+    spawnEnemies(q);
+    questRefreshStats(q, true);
+    q.save.checkpointWorld = bit / 2;
+    q.save.checkpointId = bit % 2;
+    q.fadeTimer = q.reduceFlashing ? 0 : REST_FADE;
+    logLine(q, "quest: rest at %d.%d", bit / 2, bit % 2);
+    questSave(q);
+}
+
+void openGate(Quest& q, int world) {
+    if (q.save.gates >> world & 1) return;
+    q.save.gates |= 1u << world;
+    q.banner = "THE GATE OPENS";
+    q.bannerScale = 2;
+    q.bannerColor = 'w';
+    q.bannerTimer = BANNER_TIME;
+    q.soundRequested[SOUND_Q_GATE] = true;
+    if (q.area.def && q.area.world == world) {   // solid no more at once; the tiles shake, then vanish top to bottom
+        for (char& t : q.area.tiles)
+            if (t == 'g') t = '.';
+        q.gateTimer = GATE_ANIMATION;
+    }
+    logLine(q, "quest: gate %d open", world);
+    questSave(q);
+}
+
+void openShortcut(Quest& q) {
+    const AreaDef& def = *q.area.def;
+    uint32_t& open = q.save.shortcuts[q.area.world];
+    if (def.shortcut < 0 || (open >> def.shortcut & 1)) return;
+    open |= 1u << def.shortcut;
+    for (char& t : q.area.tiles)
+        if (t == 'k') t = '.';
+    q.soundRequested[SOUND_Q_GATE] = true;
+    logLine(q, "quest: shortcut %d.%d open", q.area.world, def.shortcut);
+    questSave(q);
+}
+
+// Up at a chest (spec §10): the contents go to the bag, or "YOUR BAG IS FULL" and the chest stays shut.
+static void openChest(Quest& q, int tile, int chestId) {
+    SaveData& s = q.save;
+    int world = q.area.world;
+    const ChestContent& c = chestContent(world, chestId);
+    char text[40];
+    bool full = false;
+    switch (c.kind) {
+    case CHEST_ITEM:
+        full = s.items[c.item] + c.count > carryLimit(s, c.item);
+        if (!full) s.items[c.item] += c.count;
+        if (c.count > 1) snprintf(text, sizeof text, "%d %s", c.count, ITEM_NAMES[c.item]);
+        else snprintf(text, sizeof text, "%s", ITEM_NAMES[c.item]);
+        break;
+    case CHEST_NAMES: {
+        int names = enemyNames(statsWorld(world), (float)c.count, 0, false);   // WORLD_NAMES[world] x count
+        s.names = s.names > MAX_NAMES - names ? MAX_NAMES : s.names + names;
+        snprintf(text, sizeof text, "+%d NAMES", names);
+        break;
+    }
+    case CHEST_KEY:
+        s.keys |= 1u << c.item;
+        snprintf(text, sizeof text, "%s", KEY_NAMES[c.item]);
+        break;
+    case CHEST_SHARD:
+        s.shards++;
+        snprintf(text, sizeof text, "VIAL SHARD");
+        break;
+    case CHEST_PAGE:
+        s.keys |= 1u << (KEY_PAGE_1 + c.item - 1);
+        snprintf(text, sizeof text, "MAP PAGE %d", c.item);
+        break;
+    }
+    const AreaDef& def = *q.area.def;
+    q.popupX = (tile % def.cols) * TILE + TILE / 2.0f;
+    q.popupY = (float)((tile / def.cols + 1) * TILE) - 16 * DP;
+    if (full) {
+        q.popup = "YOUR BAG IS FULL";
+        q.popupTimer = POPUP_TIME;
+        q.soundRequested[SOUND_ROCKET_EMPTY] = true;
+        return;
+    }
+    q.popup = text;
+    q.popupTimer = LID_TIME + POPUP_TIME;   // shown once the lid is up
+    q.chestTile = tile;
+    q.chestTimer = LID_TIME;
+    s.chests[world] |= 1u << chestId;
+    q.soundRequested[SOUND_Q_CHEST] = true;
+    logLine(q, "quest: chest %d.%d %s", world, chestId, text);
+    questSave(q);
+}
+
+static void openMenu(Quest& q, int kind, std::vector<std::string> items) {
+    q.menu.kind = kind;
+    q.menu.items = items;
+    q.menu.cursor = q.menu.scroll = 0;
+    q.mode = QMODE_MENU;
+    q.modeTimer = 0;
 }
 
 void questStartDev(Quest& q, const char* spec) {
@@ -393,6 +535,10 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
     q.modeTimer += dt;
     q.bannerTimer = fmaxf(0, q.bannerTimer - dt);
     q.trauma = fmaxf(0, q.trauma - TRAUMA_DECAY * dt);
+    q.popupTimer = fmaxf(0, q.popupTimer - dt);
+    q.chestTimer = fmaxf(0, q.chestTimer - dt);
+    q.gateTimer = fmaxf(0, q.gateTimer - dt);
+    q.fadeTimer = fmaxf(0, q.fadeTimer - dt);
     switch (q.mode) {
     case QMODE_SLOTS:
         if (a.up || a.down) {
@@ -407,6 +553,7 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
             q.slot = q.cursor;
             saveRead(q.folder.c_str(), q.slot, q.save);
             q.save.heroClass = q.save.heroClass >= 0 && q.save.heroClass < CLASS_COUNT ? q.save.heroClass : 0;
+            q.save.lit |= 1;   // the hearth is always lit
             logLine(q, "quest: slot %d loaded (class %s, level %d)", q.slot + 1, CLASS_NAMES[q.save.heroClass], q.save.level);
             q.area.def = nullptr;
             enterAtCheckpoint(q);
@@ -487,22 +634,102 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
         }
         Hero& h = q.hero;
         const AreaDef& def = *q.area.def;
-        // Up on the ground at a portal uses it (if open) and never grabs a ladder there.
-        int portal = -1, seen = 0;
+        SaveData& s = q.save;
+        int world = q.area.world;
+        // What the hero touches: objects stand on the tile below their letter; Up uses the first of NPC, chest,
+        // checkpoint, surveyor, portal (spec §2), and never grabs a ladder while one is touched.
+        float heroCx = h.x + HERO_W / 2, heroBottom = h.y + HERO_H;
+        int npc = -1, chestTile = -1, chestId = -1, checkpoint = -1, surveyor = -1, portal = -1;
+        int npcs = 0, chests = 0, portals = 0;
         for (int t = 0; t < def.cols * def.rows; t++) {
-            if (def.tiles[t] != 'P') continue;
-            float px = (t % def.cols) * TILE + TILE / 2.0f, bottom = (float)((t / def.cols + 1) * TILE);
-            if (h.x < px + 8 * DP && h.x + HERO_W > px - 8 * DP && h.y < bottom && h.y + HERO_H > bottom - 24 * DP) portal = seen;
-            seen++;
+            char letter = def.tiles[t];
+            if (!strchr("NTCMP", letter)) continue;
+            float cx = (t % def.cols) * TILE + TILE / 2.0f, bottom = (float)((t / def.cols + 1) * TILE);
+            float dx = fabsf(cx - heroCx);
+            bool sameFloor = fabsf(bottom - heroBottom) < TILE / 2.0f;
+            if (letter == 'N') {
+                int id = npcs < 8 ? def.npcs[npcs] : -1;
+                npcs++;
+                if (npc < 0 && id >= 0 && sameFloor && dx <= NPC_REACH && npcPresent(s, id, world, q.area.index)) npc = id;
+            } else if (letter == 'T') {
+                int id = chests < 4 ? def.chests[chests] : -1;
+                chests++;
+                if (chestTile < 0 && id >= 0 && sameFloor && dx <= CHEST_REACH && !(s.chests[world] >> id & 1)) chestTile = t, chestId = id;
+            } else if (letter == 'C' && sameFloor && dx <= CHECKPOINT_REACH) {
+                int bit = world == WORLD_NAMULA ? 0 : world * 2 + objectIndex(world, q.area.index, t, 'C');
+                if (bit < 32 && !(s.lit >> bit & 1)) {   // touching an unlit brazier lights it (spec §11)
+                    s.lit |= 1u << bit;
+                    q.banner = "NAME KINDLED";
+                    q.bannerScale = 2;
+                    q.bannerColor = 'o';
+                    q.bannerTimer = KINDLE_BANNER_TIME;
+                    q.soundRequested[SOUND_Q_KINDLE] = true;
+                    logLine(q, "quest: checkpoint %d.%d lit", bit / 2, bit % 2);
+                    questSave(q);
+                }
+                if (checkpoint < 0) checkpoint = bit;
+            } else if (letter == 'M' && surveyor < 0 && sameFloor && dx <= SURVEYOR_REACH) {
+                int m = objectIndex(world, q.area.index, t, 'M');   // 2 per world; TEST GROUNDS uses the first
+                surveyor = world >= 1 && world <= 6 ? NPC_SURVEYOR_FIRST + (world - 1) * 2 + m % 2 : NPC_SURVEYOR_FIRST;
+            } else if (letter == 'P') {
+                if (h.x < cx + 8 * DP && h.x + HERO_W > cx - 8 * DP && h.y < bottom && h.y + HERO_H > bottom - 24 * DP) portal = portals;
+                portals++;
+            }
         }
+        bool touching = npc >= 0 || chestTile >= 0 || checkpoint >= 0 || surveyor >= 0 || portal >= 0;
         Actions move = a;
-        if (portal >= 0 && h.onGround && move.moveY < 0) move.moveY = 0;
-        if (portal >= 0 && h.onGround && a.up && def.portals[portal].area >= 0) {
-            AreaLink link = def.portals[portal];
-            q.soundRequested[SOUND_Q_PORTAL] = true;
-            h.vx = 0;
-            enterArea(q, q.area.world, link.area, link.tileX, link.tileY);
-            break;
+        if (touching && h.onGround && move.moveY < 0) move.moveY = 0;
+        if (h.onGround && a.up && touching) {
+            if (npc >= 0) {
+                talkTo(q, npc);
+            } else if (chestTile >= 0) {
+                openChest(q, chestTile, chestId);
+            } else if (checkpoint >= 0) {
+                q.atCheckpoint = checkpoint;
+                openMenu(q, MENU_CHECKPOINT, {"REST", "TRAVEL", "LEAVE"});
+            } else if (surveyor >= 0) {
+                talkTo(q, surveyor);
+            } else if (def.portals[portal].area >= 0) {
+                AreaLink link = def.portals[portal];
+                q.soundRequested[SOUND_Q_PORTAL] = true;
+                h.vx = 0;
+                enterArea(q, q.area.world, link.area, link.tileX, link.tileY);
+                break;
+            }
+            if (q.mode != QMODE_PLAY) break;
+        }
+
+        // Items (spec §10): Triangle selects the next owned one, Square drinks a potion (healing at the drink's end)
+        // or starts a buff's 120 s at once.
+        if (a.item) {
+            int next = -1;
+            for (int k = 1; k <= ITEM_COUNT && next < 0; k++)
+                if (s.items[(q.selectedItem + k) % ITEM_COUNT] > 0) next = (q.selectedItem + k) % ITEM_COUNT;
+            if (next >= 0) q.selectedItem = next, q.soundRequested[SOUND_Q_BLIP] = true;
+            else q.soundRequested[SOUND_ROCKET_EMPTY] = true;
+        }
+        if (a.cycle && h.drinkTimer <= 0) {
+            int item = q.selectedItem;
+            if (s.items[item] <= 0) {
+                q.soundRequested[SOUND_ROCKET_EMPTY] = true;
+            } else {
+                s.items[item]--;
+                if (item <= ITEM_MANA) {
+                    h.drinkTimer = DRINK_TIME;
+                    h.drinkItem = item;
+                    q.soundRequested[SOUND_Q_DRINK] = true;
+                } else {
+                    h.buffTimers[item - ITEM_WHETSTONE] = BUFF_TIME;
+                    q.soundRequested[SOUND_PICKUP] = true;
+                }
+                for (int k = 0; k < ITEM_COUNT && s.items[q.selectedItem] == 0; k++)   // the last one used: select the next owned
+                    if (s.items[(item + k) % ITEM_COUNT] > 0) q.selectedItem = (item + k) % ITEM_COUNT;
+            }
+        }
+        if (h.drinkTimer > 0 && (h.drinkTimer -= dt) <= 0) {
+            if (h.drinkItem == ITEM_MANA) h.mp = std::min(q.stats.maxMp, h.mp + (int)(q.stats.maxMp * POTION_HEAL[2]));
+            else h.hp = std::min(q.stats.maxHp, h.hp + (int)(q.stats.maxHp * POTION_HEAL[h.drinkItem]));
+            h.drinkTimer = 0;
         }
 
         bool wasOnGround = h.onGround;
@@ -538,7 +765,6 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
         else if (h.hp <= 0) die(q, "hp");
 
         // Touching the name echo gives the names back.
-        SaveData& s = q.save;
         if (q.mode == QMODE_PLAY && s.echoNames > 0 && s.echoWorld == q.area.world && s.echoArea == q.area.index &&
             h.x < s.echoX + ECHO_SIZE && s.echoX < h.x + HERO_W && h.y < s.echoY + ECHO_SIZE && s.echoY < h.y + HERO_H) {
             s.names = s.names > MAX_NAMES - s.echoNames ? MAX_NAMES : s.names + s.echoNames;
@@ -551,6 +777,105 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
         if (q.mode == QMODE_PLAY) updateCamera(q, dt, false);
         break;
     }
+    case QMODE_DIALOGUE: {   // spec §14: types at 50 chars/s; X completes the page or turns it; Circle closes
+        q.save.playtime += dt;
+        updateEffects(q, dt);
+        DialogueState& d = q.dialogue;
+        float length = (float)d.pages[d.page].size();
+        int before = (int)d.typed;
+        d.typed = fminf(length, d.typed + TALK_CHARS_PER_S * dt);
+        if ((int)d.typed / 3 > before / 3) q.soundRequested[SOUND_Q_TALK] = true;
+        if (a.back) {
+            q.mode = QMODE_PLAY;
+        } else if (a.jump && d.typed < length) {
+            d.typed = length;
+        } else if (a.jump && d.page + 1 < (int)d.pages.size()) {
+            d.page++;
+            d.typed = 0;
+        } else if (a.jump) {
+            q.mode = QMODE_PLAY;
+            switch (d.after) {
+            case AFTER_POTION_SHOP:
+            case AFTER_GEAR_SHOP:
+                q.shopKind = d.after;
+                q.shopCursor = 0;
+                q.mode = QMODE_SHOP;
+                break;
+            case AFTER_LEVEL_UP: openMenu(q, MENU_LEVEL_UP, {"LEVEL UP", "LEAVE"}); break;
+            case AFTER_JOB: openMenu(q, MENU_JOB_CONFIRM, {"YES", "NOT YET"}); break;
+            case AFTER_MAP: q.mode = QMODE_MAP; break;
+            case AFTER_YES_NO: openMenu(q, MENU_YES_NO, {"YES", "NOT YET"}); break;
+            }
+        }
+        break;
+    }
+    case QMODE_MENU: {
+        q.save.playtime += dt;
+        updateEffects(q, dt);
+        MenuState& m = q.menu;
+        int count = (int)m.items.size();
+        if (a.up || a.down) {
+            m.cursor = (m.cursor + (a.up ? count - 1 : 1)) % count;
+            m.scroll = std::max(std::min(m.scroll, m.cursor), m.cursor - MENU_ROWS + 1);
+            q.soundRequested[SOUND_Q_BLIP] = true;
+        }
+        if (a.back) {
+            q.mode = QMODE_PLAY;
+        } else if (a.jump) {
+            switch (m.kind) {
+            case MENU_CHECKPOINT:
+                if (m.cursor == 0) {
+                    rest(q, q.atCheckpoint);
+                    q.mode = QMODE_PLAY;
+                } else if (m.cursor == 1) {
+                    std::vector<std::string> names;
+                    for (int bit : travelCheckpoints(q.save)) names.push_back(bit == 0 ? "NAMULA" : checkpointName(bit));
+                    openMenu(q, MENU_TRAVEL, names);
+                } else {
+                    q.mode = QMODE_PLAY;
+                }
+                break;
+            case MENU_TRAVEL: {   // moves the hero to that checkpoint and rests there; buffs keep running
+                int bit = travelCheckpoints(q.save)[m.cursor];
+                float buffs[3] = {q.hero.buffTimers[0], q.hero.buffTimers[1], q.hero.buffTimers[2]};
+                q.save.checkpointWorld = bit / 2;
+                q.save.checkpointId = bit % 2;
+                logLine(q, "quest: travel to %d.%d", bit / 2, bit % 2);
+                enterAtCheckpoint(q);
+                for (int k = 0; k < 3; k++) q.hero.buffTimers[k] = buffs[k];
+                rest(q, bit);
+                q.soundRequested[SOUND_Q_PORTAL] = true;
+                break;
+            }
+            case MENU_LEVEL_UP:   // the menu stays open, so several levels can be bought in one visit
+                if (m.cursor == 0) levelUp(q);
+                else q.mode = QMODE_PLAY;
+                break;
+            case MENU_JOB_CONFIRM:
+                if (m.cursor == 0) grantJob(q);
+                q.mode = QMODE_PLAY;
+                break;
+            case MENU_YES_NO: q.mode = QMODE_PLAY; break;   // phase 8: Claude's New Game+
+            }
+        }
+        break;
+    }
+    case QMODE_SHOP: {
+        q.save.playtime += dt;
+        int rows = (int)shopRows(q.save, q.shopKind).size();
+        if ((a.up || a.down) && rows > 0) {
+            q.shopCursor = (q.shopCursor + (a.up ? rows - 1 : 1)) % rows;
+            q.soundRequested[SOUND_Q_BLIP] = true;
+        }
+        if (a.back) q.mode = QMODE_PLAY;
+        else if (a.jump) shopBuy(q, q.shopCursor);
+        break;
+    }
+    case QMODE_MAP:   // the game stays frozen while the map is open
+        q.save.playtime += dt;
+        if (a.back || a.jump) q.mode = QMODE_PLAY;
+        break;
+    case QMODE_CREDITS: break;   // phase 8
     case QMODE_DEAD:
         updateEffects(q, dt);
         if (q.modeTimer >= DEATH_TIME) {   // respawn: every enemy back, full HP and MP, buffs off

@@ -203,6 +203,7 @@ int main(int argc, char** argv) {
             a.jump |= questCarry.jump; a.item |= questCarry.item; a.back |= questCarry.back; a.up |= questCarry.up;
             a.down |= questCarry.down; a.left |= questCarry.left; a.right |= questCarry.right;
             a.godMode |= questCarry.godMode; a.autopilot |= questCarry.autopilot; a.rocket |= questCarry.rocket;
+            a.cycle |= questCarry.cycle;
         }
         questCarry = {};
         // Every controller drives the menus.
@@ -567,6 +568,9 @@ int main(int argc, char** argv) {
                 quest.soundRequested[s] = false;
             }
         }
+        // NAME QUEST's ambience plays in the quest and in the pause menu and settings over it (spec §16).
+        bool overQuest = scene == SCENE_QUEST || (questPaused && (scene == SCENE_PAUSED || scene == SCENE_SETTINGS));
+        audioSetAmbient(overQuest ? quest.ambient : 0);
         for (const std::string& line : quest.logLines) debugNetPrintf(INFO, "%s\n", line.c_str());
         quest.logLines.clear();
         quest.shakeStrength = settings.shake / 100.0f;

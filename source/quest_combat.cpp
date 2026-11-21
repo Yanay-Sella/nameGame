@@ -51,6 +51,9 @@ const float INFLATE_RANGE = 32 * DP, INFLATE_TIME = 1, INFLATE_MULT = 1.5f, EMBE
 const float SPIKE_DAMAGE = 0.20f, PANEL_DAMAGE = 0.15f, JET_DAMAGE = 0.20f, SPIKE_BOUNCE = 180 * DP;   // spikes bounce up (spec §4)
 const float PANEL_ON = 2.0f, JET_CYCLE = 2.5f, JET_WARNING = 0.5f, JET_FLAME = 0.8f;
 const int JET_TILES = 3;
+// Buffs (spec §10): Whetstone ATK, Iron Tonic damage taken, Swift Feather walk; drinking a potion slows the walk.
+const float WHETSTONE_ATK = 1.2f, TONIC_DAMAGE = 0.8f, FEATHER_WALK = 1.15f, DRINK_WALK = 0.4f;
+const float LEVER_W = 8 * DP, LEVER_H = 14 * DP;   // the lever K's box, standing on the tile below its letter
 
 const char ROSTER_LETTERS[ROSTER_SLOTS + 1] = "ABDEF";
 
@@ -521,7 +524,7 @@ static void updateEnemy(Quest& q, Enemy& e, float dt) {
 static void hurtHero(Quest& q, int damage, float sourceX, float bounceVy = HURT_VY) {
     Hero& h = q.hero;
     if (h.iframes > 0 || q.godMode || h.hp <= 0) return;
-    if (h.buffTimers[1] > 0) damage = (int)fmaxf(1, lroundf(damage * 0.8f));   // Iron Tonic (phase 3)
+    if (h.buffTimers[1] > 0) damage = (int)fmaxf(1, lroundf(damage * TONIC_DAMAGE));   // Iron Tonic
     h.hp = h.hp > damage ? h.hp - damage : 0;
     float away = sourceX > h.x + HERO_W / 2 ? -1 : 1;
     h.vx = away * HURT_VX;
@@ -566,7 +569,7 @@ static void hitEnemy(Quest& q, int index, float mult, bool strong, float sourceX
         mod = GUARD_MOD;
     if (type.behaviour == BEH_CHARGER && e.state == ES_STUNNED) mod = STUNNED_MOD;
     bool crit = random01(q) < q.stats.crit;
-    float atk = q.stats.atk * (h.buffTimers[0] > 0 ? 1.2f : 1);   // Whetstone (phase 3)
+    float atk = q.stats.atk * (h.buffTimers[0] > 0 ? WHETSTONE_ATK : 1);   // Whetstone
     int damage = damageToEnemy(atk, mult, 0.9f + 0.2f * random01(q), crit, q.stats.critMult, mod);
     e.hp -= damage;
     e.flash = FLASH_TIME;
@@ -594,9 +597,21 @@ static void hitEnemy(Quest& q, int index, float mult, bool strong, float sourceX
     if (e.spawn < 64 && q.area.index < (int)killed.size()) killed[q.area.index] |= 1ull << e.spawn;
 }
 
+// Any hero attack box touching the area's lever K opens its shortcut doors (spec §11).
+static void touchLever(Quest& q, float x, float y, float w, float h) {
+    const AreaDef& def = *q.area.def;
+    if (def.shortcut < 0 || (q.save.shortcuts[q.area.world] >> def.shortcut & 1)) return;
+    for (int t = 0; t < def.cols * def.rows; t++) {
+        if (def.tiles[t] != 'K') continue;
+        float lx = (t % def.cols) * TILE + TILE / 2 - LEVER_W / 2, ly = (t / def.cols + 1) * TILE - LEVER_H;
+        if (overlaps(x, y, w, h, lx, ly, LEVER_W, LEVER_H)) openShortcut(q);
+    }
+}
+
 // Hits every living enemy overlapping the box once per swing id (the partner's swings are tracked apart).
 static int hitBox(Quest& q, float x, float y, float w, float h, float mult, bool strong, int swing, bool partner, float stun = 0) {
     int hits = 0;
+    touchLever(q, x, y, w, h);
     for (int i = 0; i < (int)q.enemies.size(); i++) {
         Enemy& e = q.enemies[i];
         int& last = partner ? e.lastPartnerSwing : e.lastSwing;
@@ -611,6 +626,7 @@ static int hitBox(Quest& q, float x, float y, float w, float h, float mult, bool
 
 // Hits every living enemy whose hitbox touches the circle, once (each call is one hit).
 static void hitCircle(Quest& q, float cx, float cy, float radius, float mult) {
+    touchLever(q, cx - radius, cy - radius, 2 * radius, 2 * radius);
     for (int i = 0; i < (int)q.enemies.size(); i++) {
         Enemy& e = q.enemies[i];
         float nx = fmaxf(e.x, fminf(cx, e.x + e.w)), ny = fmaxf(e.y, fminf(cy, e.y + e.h));
@@ -932,8 +948,10 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
         h.vx = 0;
         move.moveX = move.moveY = 0;
         move.jump = false;
-    } else if (h.attackTimer > 0 && basic.speed > 0) {
-        move.moveX *= BASIC_SLOW;
+    } else {
+        if (h.attackTimer > 0 && basic.speed > 0) move.moveX *= BASIC_SLOW;
+        if (h.buffTimers[2] > 0) move.moveX *= FEATHER_WALK;
+        if (h.drinkTimer > 0) move.moveX *= DRINK_WALK;
     }
     if (h.skill >= 0) move.jumpHeld = true;   // the Rising Slash hop isn't cut
     moveHero(h, move, q.area, (HeroClass)cls, dt);
@@ -974,6 +992,7 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
             gone |= boxInSolid(q.area, p.x, p.y, (float)p.w, (float)p.h);
         }
         if (!gone && p.fromHero) {
+            touchLever(q, p.x, p.y, (float)p.w, (float)p.h);
             for (int k = 0; k < (int)q.enemies.size() && k < 64 && !gone; k++) {
                 Enemy& e = q.enemies[k];
                 const EnemyType& type = rosterType(e.world, e.type);

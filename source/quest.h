@@ -8,7 +8,8 @@
 // Design pixels (dp, the 320x180 design's units) → real pixels at 640x360 (spec "Resolution", D-053).
 const float DP = 2;
 const int TILE = (int)(8 * DP), WIDE_COLS = 80, WIDE_ROWS = 23, TALL_COLS = 40, TALL_ROWS = 45;
-const int WORLD_NAMULA = 0, WORLD_SECRET = 7, WORLD_TEST = 8, WORLD_COUNT = 9, SAVED_WORLDS = 8;   // 1-6 the worlds
+const int WORLD_NAMULA = 0, WORLD_SECRET = 7, WORLD_TEST = 8, WORLD_COUNT = 9;   // 1-6 the worlds
+const int SAVED_WORLDS = 9;   // per-world save keys for 0-7 (spec §17) and TEST GROUNDS' dev progress
 const int SLOT_COUNT = 3, MAX_LEVEL = 40;
 enum HeroClass { CLASS_KNIGHT, CLASS_ARCHER, CLASS_MAGICIAN, CLASS_THIEF, CLASS_COUNT };
 enum AreaFlag { AREA_MINIBOSS = 1, AREA_BOSS = 2, AREA_DARK = 4, AREA_RISING_LAVA = 8 };
@@ -26,7 +27,7 @@ struct AreaDef {
     AreaLink left, right, up, down;   // edge exits
     AreaLink portals[4];     // by 'P' order
     int chests[4];           // ChestId by 'T' order, -1 unused
-    int npcs[2];             // NpcId by 'N' order, -1 unused
+    int npcs[8];             // NpcId by 'N' order, -1 unused (Namula's cliffs hold 7)
     int mapX, mapY;          // top-left cell on the world map: wide areas take 2x1 cells, tall 1x2
     int band;                // 0 calm, 1 medium, 2 intense (§13 ramp)
     int flags;               // AREA_MINIBOSS, AREA_BOSS, AREA_DARK (world 5), AREA_RISING_LAVA (world 4)
@@ -129,8 +130,9 @@ struct Hero {
     float attackTimer, strongTimer, castTimer;   // s left of the basic cycle, the strong attack, its rooted cast
     float rollTimer, rollCooldown, iframes, hurtTimer;
     float partnerTimer;          // Shadow Partner's s left
-    float buffTimers[3];         // ATK, DEF, SPD (phase 3)
-    float drinkTimer;            // phase 3
+    float buffTimers[3];         // ATK, DEF, SPD: s left of Whetstone, Iron Tonic, Swift Feather
+    float drinkTimer;            // s left of drinking a potion (heals at its end)
+    int drinkItem;               // the potion being drunk (ItemType)
     int swing;                   // id of the current melee swing (each enemy is hit once per swing)
     int skill = -1;              // the strong attack playing (job tier), -1 none
     int volleys;                 // Storm Volley fans still to fire
@@ -140,7 +142,17 @@ struct Hero {
 // The current area's tiles as they are now (gates, crumbles, shortcut doors change them).
 struct AreaState { int world, index; const AreaDef* def; std::vector<char> tiles; };
 
-enum QuestMode { QMODE_SLOTS, QMODE_DELETE, QMODE_CLASS, QMODE_INTRO, QMODE_PLAY, QMODE_DEAD };   // later phases add more
+enum QuestMode { QMODE_SLOTS, QMODE_DELETE, QMODE_CLASS, QMODE_INTRO, QMODE_PLAY, QMODE_DEAD, QMODE_DIALOGUE, QMODE_MENU,
+                 QMODE_SHOP, QMODE_MAP, QMODE_CREDITS };   // CREDITS: phase 8
+
+// One generic list menu (spec §15); the confirm is one switch on kind in questUpdate.
+enum MenuKind { MENU_CHECKPOINT, MENU_TRAVEL, MENU_LEVEL_UP, MENU_JOB_CONFIRM, MENU_YES_NO };
+struct MenuState { int kind; std::vector<std::string> items; int cursor, scroll; };
+const int MENU_ROWS = 8;                                   // rows shown before the list scrolls
+// The NPC dialogue box (spec §14): pages of up to 4 lines split by '\n'; `after` opens when the last page closes.
+enum DialogueAfter { AFTER_NONE, AFTER_POTION_SHOP, AFTER_GEAR_SHOP, AFTER_LEVEL_UP, AFTER_JOB, AFTER_MAP, AFTER_YES_NO };
+struct DialogueState { std::vector<std::string> pages; int page; float typed; std::string speaker; int after; };
+const float TALK_CHARS_PER_S = 50;
 
 struct Quest {
     QuestMode mode;
@@ -171,6 +183,18 @@ struct Quest {
     float hitStop;
     uint32_t seed = 12345;              // the combat RNG
     float selectHeldTime;               // dev: Select held 2 s → TEST GROUNDS
+    // RPG systems (phase 3)
+    char bannerColor;
+    DialogueState dialogue;
+    MenuState menu;
+    int atCheckpoint;                   // world * 2 + id of the checkpoint whose menu is open
+    int shopKind, shopCursor;           // AFTER_POTION_SHOP or AFTER_GEAR_SHOP; the selected row
+    int selectedItem;                   // ItemType Square uses
+    std::string popup; float popupTimer, popupX, popupY;   // chest text over the chest (shown after the lid opens)
+    int chestTile; float chestTimer;    // the chest whose lid is opening, s left
+    float gateTimer;                    // s left of the gate shaking and vanishing (spec §11)
+    float fadeTimer;                    // s left of the rest's white fade
+    int ambient;                        // audioSetAmbient id: 0 off, 1 Namula, 2-8 worlds 1-7
 };
 
 void questOpen(Quest& q, const char* folder);             // reads the slot summaries, shows the slot screen
@@ -178,7 +202,7 @@ void questUpdate(Quest& q, const Actions& a, float dt);
 void questDraw(const Quest& q);
 extern double (*questClock)();                            // dev timing in s, set by main.cpp; nullptr: drawPlay doesn't measure
 extern float questDrawMs[3];                              // worst ms of layers, tiles + props, lights + vignette; main.cpp resets it
-bool questCanPause(const Quest& q);                       // true in PLAY (and, later, its menus)
+bool questCanPause(const Quest& q);                       // true in PLAY, DEAD and the quest menus
 bool questSave(Quest& q);                                 // writes the current slot (spec §17); false on failure
 void questStartDev(Quest& q, const char* spec);           // NAMEGAME_QUEST (spec §20)
 // Movement and tiles, also used by the reachability test:
@@ -194,6 +218,38 @@ void updateEffects(Quest& q, float dt);                   // particles, damage n
 bool panelOn(const Quest& q);                             // electric panels `z` (spec §9)
 bool jetBurning(const Quest& q);                          // fire jets `f`
 float jetWarning(const Quest& q);                         // > 0 while a jet sparks before burning
+int objectIndex(int world, int area, int tile, char letter);   // the n-th `letter` of the world (areas in order, rows top to bottom)
+std::string checkpointName(int bit);                      // spec §11: <WORLD> ENTRY / DEPTHS, HEARTH OF NAMES
+std::vector<int> travelCheckpoints(const SaveData& save); // world * 2 + id: the hearth, then every lit checkpoint in world order
+void openGate(Quest& q, int world);                       // spec §11: the mini-boss's death opens the world's gate
+void openShortcut(Quest& q);                              // a hero attack touched the area's lever K
+void logLine(Quest& q, const char* format, ...);          // one spec §18 line for main.cpp to print
+
+// --- NPCs, shops, levels and chests (quest_story.cpp; spec §10, §14). ---
+enum NpcId { NPC_ILSA, NPC_MARRA, NPC_BRANN, NPC_LIO, NPC_PELL, NPC_SELA, NPC_ODO, NPC_WREN, NPC_YSOLDE, NPC_KIT,
+             NPC_GATEKEEPER, NPC_TOBIN, NPC_GARRICK, NPC_STRANGER, NPC_CALDER, NPC_CLAUDE, NPC_SURVEYOR_FIRST,
+             NPC_COUNT = NPC_SURVEYOR_FIRST + 12 };
+const char* npcName(int id);
+bool npcPresent(const SaveData& save, int id, int world, int area);   // the Stranger after world 3, Garrick moving, Claude after the credits
+void talkTo(Quest& q, int id);                                        // fills the dialogue pages and `after`, applies quest effects
+extern const char* const ITEM_NAMES[ITEM_COUNT];
+extern const char* const KEY_NAMES[KEY_COUNT];
+extern const char* const WEAPON_NAMES[CLASS_COUNT][7];
+extern const char* const ARMOR_NAMES[6];
+// One shop row: an item, or the next weapon or armor tier (spec §10).
+enum ShopGoods { GOODS_WEAPON = ITEM_COUNT, GOODS_ARMOR };
+struct ShopRow { int goods; std::string name, detail; int price; bool canBuy; };
+std::vector<ShopRow> shopRows(const SaveData& save, int shopKind);   // AFTER_POTION_SHOP or AFTER_GEAR_SHOP
+void shopBuy(Quest& q, int row);                          // buys the row if it can, else SOUND_ROCKET_EMPTY
+bool levelUp(Quest& q);                                   // spends levelCost(level) with Ilsa; false when unaffordable or at 40
+void grantJob(Quest& q);                                  // the next job tier from the class mentor (spec §6 "Jobs")
+enum ChestKind { CHEST_ITEM, CHEST_NAMES, CHEST_KEY, CHEST_SHARD, CHEST_PAGE };
+struct ChestContent { ChestKind kind; int item; int count; };   // item: ItemType, KeyItem or page number
+const ChestContent& chestContent(int world, int chestId);        // spec §10 chest table; world 8 has 2 test chests
+int itemPrice(const SaveData& save, int item);            // base x PRICE_SCALE[highest] (quest_stats.cpp)
+int carryLimit(const SaveData& save, int item);           // spec §10 with shards, the locket and Garrick's gift
+int gearPrice(int tier, bool weapon);                     // tiers 1..6
+
 // Save files (quest_save.cpp; stdio only):
 bool saveWrite(const char* folder, int slot, const SaveData& save, bool* renameFailed = nullptr);   // renameFailed: wrote directly
 bool saveRead(const char* folder, int slot, SaveData& save);    // false when missing
