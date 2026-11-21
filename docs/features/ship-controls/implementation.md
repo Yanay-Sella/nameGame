@@ -5,6 +5,8 @@
 ## Approach
 `input.cpp` turns each controller into named `Actions` (move, fire, rocket, pause, confirm, stress); gameplay never reads button numbers. `main.cpp` runs the game in fixed 1/60 s steps and `updatePlayer` in `game.cpp` applies the actions. Players are a `std::vector<Player>` with one controller each (GDD D-007); player 2 is appended when they join ([co-op](../co-op/implementation.md)).
 
+In dev builds, Triangle triggers the shooter stress test during Level Picker runs only.
+
 ## Code map
 | File / module | Role in this feature |
 |---|---|

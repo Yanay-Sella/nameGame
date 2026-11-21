@@ -1,7 +1,7 @@
 # Handoff: state of the work and how Claude and Codex share it
 
 **Read this first, update it before you stop.** Rules and commands are in `AGENTS.md`; conventions, questions between agents and the small-change lane are in `docs/COLLAB.md`; this file holds what changes between sessions.
-Updated: 2026-11-21 (Codex, Classic variants).
+Updated: 2026-11-21 (Codex, Classic controls).
 
 ## Classic shooter
 
@@ -42,6 +42,8 @@ Updated: 2026-11-21 (Codex, Classic variants).
 - Spec examples that disagree with the spec formula `round(100 * 1.2^(L-1))`: 39→40 is 102,067 (spec 102,064), 29→30 is 16,484 (spec 10,646). The code follows the formula; the user decides.
 
 ## Session log (newest first; add a line per session: date, agent, what changed, what is next)
+- 2026-11-21, Codex — Removed the Triangle stress-test shortcut from both Classic variants. Mac scripts and screenshots confirmed normal waves in Classic and the stress load in Level Picker. NAME QUEST tests passed and the shooter suite reported its 53 known failures. Next for Classic is a PS3 playtest when requested.
+- 2026-11-21, Codex: reviewed Claude's completed phase 3 in a local copy. NAME QUEST tests passed, and the shooter failures matched the baseline. Checked levelling, shops, travel, chests, gate, shortcut and map on Mac. Critical findings are in the user review. PS3 play remains unchecked.
 - 2026-11-21, Codex: split Classic and verified the larger arena, all 100 waves, controller lobby, four ships and upgrade rates. `make test` matched the 53 baseline shooter failures and NAME QUEST passed. Next for Classic: a PS3 playtest when the user asks for it.
 - 2026-11-21, Claude: reviewed phase 2. Fixed R2 during a melee swing losing the skill's hit, added the spike bounce (spec §4), made `make test` run the quest tests even when shooter tests fail; 2 new quest checks; Mac screenshots of the tier-3 skills and the death and echo loop. Next: the user commits and runs the PS3 checks, then phase 3 step 1.
 - 2026-11-21, Codex: confirmed the shared instructions and all seven project skills were visible in this session and replied in `COLLAB.md`. Next: phase 3 step 1 after the phase 2 commit.

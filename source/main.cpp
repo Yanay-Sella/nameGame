@@ -73,7 +73,7 @@ static void watchdog(void*) {
     }
 }
 
-// Dev aid (Triangle): tops the screen up to the 60 fps stress case of 60 aliens, 100 bullets and 2 explosions.
+// Dev aid (Triangle in Level Picker): adds up to 60 aliens, 100 bullets and 2 explosions for a stress test.
 static void addStressLoad(Game& game) {
     for (int i = 0; i < 100; i++) {
         Shot bullet = {(float)(i * 3 % game.arenaWidth()), (float)(game.arenaHeight() - 20 - i % 60), -40, 0, 0};
@@ -394,7 +394,7 @@ int main(int argc, char** argv) {
                     setScene(SCENE_PAUSED);
                     break;   // a second Start in the same frame can't act
                 }
-                if (DEV_AIDS && a.stress) addStressLoad(game);
+                if (DEV_AIDS && game.singleLevel && a.stress) addStressLoad(game);
                 if (DEV_AIDS && a.godMode) {
                     godMode = !godMode;
                     if (!godMode) for (Player& player : game.players) player.invincibleTimer = 0;
