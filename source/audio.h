@@ -7,4 +7,5 @@ void audioOpen(const char* folder);   // folder holding music.ogg and dubstep.og
 void audioStartMusic(Music song);   // from the beginning, looping; MUSIC_OFF or a missing song stops the music
 void audioStopMusic();
 void audioPlay(Sound sound);
+void audioSetAmbient(int id);   // 0 off, 1 Namula, 2-8 worlds 1-7: loops on the reserved channel 1
 void audioClose();

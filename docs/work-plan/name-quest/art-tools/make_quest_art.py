@@ -373,6 +373,142 @@ def chest(opened):
     return g
 
 
+# --- NPCs (spec §14, §22): like the heroes, small old-school templates with a baked outline, doubled, facing right.
+# 14x18 art px (16x20 dp with the outline); Tobin 10x10 (12x12 dp), the Gatekeeper 14x22 (16x24 dp). Frame B breathes
+# (head and shoulders 1 px lower) and blinks. Keys map to the global palette per NPC. ---
+NPC_TEMPLATES = {
+    "ILSA": ([".....AAA......", "....AAAAA.....", "...AAAAAAA....", "...AABSSSA....", "...AASSESA....", "...AASSSSA....",
+              "...AAA$$AA....", "..AAAAAAAAA...", "..AAAAAAAAAG..", "..BAAAAAAAA.L.", "..BAAAAAAAA.L.", "..BAAAAAAAALOL",
+              "..BAAAAAAAALNL", "..BBAAAAAAA.L.", "..BBAAAAAAAA..", "..BBBAAAAAAA..", "...BBBAAAAA...", "...FF...FF...."],
+             dict(A="7", B="4", S="@", E="k", F="&", G="@", L="K", O="o", N="N")),
+    "MARRA": (["....HHHH......", "...HHHHHH.....", "...HHSSSS.....", "...HSSESS.....", "...HSSSSS.....", "....$SSS......",
+               "...CCCCCC.....", "..CAAAAAAC....", "..AAAAAAAAG...", "..AAWWWWAA.ll.", "..AAWWWWAA.l..", "..AAWWWWAA....",
+               "..AAWWWWAA....", "..AAAAAAAA....", "..BAAAAAAB....", "..BBAAAABB....", "...BB..BB.....", "...FF..FF....."],
+              dict(H="h", S="@", E="k", A="g", B="G", C="P", W="b", G="@", l="l", F="&")),
+    "BRANN": (["....HHHH......", "...HHHHHH.....", "...HSSSSS..XXX", "...HSSESS..XXX", "...SSSSSS...T.", "...DDDDDD...T.",
+               "..SDDDDDDS..T.", ".SSAWWWWASS.T.", ".SSAWWWWAASSG.", "..SAWWWWAA....", "..AAWWWWAA....", "..AAWWWWAA....",
+               "..AAWWWWAA....", "..BBWWWWBB....", "..BBBBBBBB....", "..BB....BB....", "..BB....BB....", ".FFF...FFF...."],
+              dict(H="&", S="@", E="k", D="h", A="X", W="W", B="d", X="s", T="&", G="@", F="x")),
+    "LIO": (["........r.....", "...CCCCCr.....", "..CCCCCCC.....", "...HSSSSS.....", "...HSSESS.....", "...HSSSSS.....",
+             "....$SS$......", "...AAAAAA.....", "..AAAAAAAA....", "..AALLLLLLLLG.", "..AOOOAAAA....", "..OOOOOAAA....",
+             "..OOkOOAAA....", "..AOOOAAAA....", "..BBBBBBBB....", "...KK..JJ.....", "...KK..JJ.....", "..FFF..FFF...."],
+            dict(r="Y", C="r", H="H", S="@", E="k", A="u", B="U", L="&", O="S", k="x", K="U", J="u", G="@", F="&")),
+    "PELL": (["....HHHH......", "...HHHHHH.....", "...HSSSSS.....", "...HSwEwS.....", "...HSSSSS.....", "....$SS$......",
+              "...AAAAAA.....", "..AAAAAAAAOO..", ".OOOOOOOOOOOC.", "COOOOOOOOOOOC.", ".OOOOOOOOOOOC.", "..AAAAAAAAG...",
+              "..AAAAAAAA....", "..AAAAAAAA....", "..BBBBBBBB....", "...KK..JJ.....", "...KK..JJ.....", "..FFF..FFF...."],
+             dict(H="s", S="@", E="k", w="b", A="h", B="W", O="H", C="S", G="@", K="W", J="h", F="&")),
+    "SELA": (["..............", "....HHHH......", "...HHHHHH.....", "...HHSSSS.....", "...HSSESS.....", "...HSSSS$.....",
+              "..CCC$$CC.....", ".CCCCCCCCC....", ".CCCCCCCCCG...", "..CCCCCCCC.T..", "..AAAAAAAA.T..", "..AAAAAAAA.T..",
+              "..AAAAAAAA.T..", "..AAAAAAAA.T..", "..BAAAAAAB.T..", "..BBAAAABB.T..", "..BBBBBBBB.T..", "...FF..FF..T.."],
+             dict(H="b", S="@", E="k", C="p", A="d", B="n", G="@", T="&", F="&")),
+    "ODO": (["....AAAA......", "...AAAAAA.....", "...ABBBBA.....", "...ASSESA.....", "...ASSSSA.....", "...HHHHHH.....",
+             "...HHHHH......", "..AAAAAAAA....", ".AACCCCCCAA...", ".AACCCCCCAG...", ".A.CCCCCC.T...", "...CCCCCC.T...",
+             "...CCCCCC.T...", "...AAAAAA.T...", "...AA..AA.T...", "...AA..AA.T...", "...AA..AA.T...", "..FFF.FFF.L..."],
+            dict(A="b", B="s", S="@", E="k", H="w", C="r", G="s", T="b", L="s", F="d")),
+    "WREN": ([".....AAA......", "....AAAAA.....", "...AAAAAAA....", "...AASSSSA....", "...AASSESS....", "...AASSSSS....",
+              "..LAAA$$A.....", ".L.AAAAAAA....", ".L.ABBBBBA....", ".L.ABBBBBAG...", ".L.ABBBBBA....", ".L.ABBBBBA....",
+              "..LACCCCCA....", "...ABBBBBA....", "...KK..JJ.....", "...KK..JJ.....", "...KK..JJ.....", "..FFF..FFF...."],
+             dict(A="G", B="g", S="@", E="k", L="h", C="&", G="@", K="W", J="&", F="&")),
+    "YSOLDE": (["......A....N..", ".....AA...NcN.", "....AAA....T..", "...AAAAA...T..", "..CCCCCCC..T..", "...HSSSS...T..",
+                "...HSSES...T..", "...HHSS$...T..", "..AAAAAAA..T..", "..AAAAAAAAGT..", "..AAAAAAA..T..", "..AACCAAA..T..",
+                "..AAAAAAA..T..", "..AAAAAAAA.T..", "..BAAAAAAA.T..", ".BBAAAAAAAAT..", ".BBBBBBBBBBT..", "...FF..FF..T.."],
+               dict(A="p", B="U", C="U", H="b", S="@", E="k", N="w", c="c", T="&", G="@", F="&")),
+    "KIT": (["..............", "...HHHHH......", "..HHHHHHH.....", "..HHSSSSS.....", "..HCCwCCw.....", "..HSSSSSS.....",
+             "...DDDDDDD....", "..DDAAAADDD...", "..AAAAAAA.DD..", "..AAAAAAAG....", "..AAAAAAA.w...", "..ACCCCCA.....",
+             "..AAAAAAA.....", "...KK..JJ.....", "...KK...JJ....", "...KK...JJ....", "..KK.....JJ...", "..FF.....FF..."],
+            dict(H="&", S="@", C="x", w="w", D="R", A="d", G="@", K="n", J="d", F="x")),
+    "TOBIN": (["...HHHH...", "..HHHHHH..", "..HSSSSS..", "..HSSESS..", "...SSSS...", "..AAAAAA..", ".SAAAAAAS.", "..AAAAAA..",
+               "..KK..JJ..", "..FF..FF.."],
+              dict(H="H", S="@", E="k", A="o", K="h", J="h", F="&")),
+    "GATEKEEPER": ([".....AAAA.....", "....AAAAAA....", "....ABBBBA....", "....AwBBwA....", "....ABBBBA....", ".....AAAA.....",
+                    "...AAAAAAAA...", "..AAAAAAAAAA..", "..AA.AAAA.AA..", "..AA.AAAA.AA..", "..AAGAAAAGAA..", "..A..ATTA..A..",
+                    ".....ATTA.....", "....AAAAAA....", "....AATTAA....", "....AATTAA....", "...AAATTAAA...", "..CCCCCCCCCC..",
+                    "..CoCoCoCoCo..", ".CCCCCCCCCCCC.", ".DDDDDDDDDDDD.", "DDDDDDDDDDDDDD"],
+                   dict(A="s", B="d", w="c", G="s", T="b", C="X", o="!", D="d")),
+    "SURVEYOR": (["....CCCC......", "..CCCCCCCC....", "...HSSSSS.....", "...HSSESS.....", "...HSSSSS..LL.", "....$SS$..LL..",
+                  "...AAAAAA.LL..", "..AAAAAAAGL...", "..AOAAAAAA....", "..AAOAAAAA....", ".DDDOAAAAA....", ".DDDDAAAAA....",
+                  ".DDDDAAAAA....", "..AAAAAAAA....", "...KK..JJ.....", "...KK..JJ.....", "...KK..JJ.....", "..FFF..FFF...."],
+                 dict(C="W", H="&", S="@", E="k", A="P", O="&", D="S", L="z", G="@", K="W", J="P", F="&")),
+}
+
+
+def npc(name, frame):
+    rows, colours = NPC_TEMPLATES[name]
+    rows = [list(r) for r in rows]
+    w, h = len(rows[0]), len(rows)
+    assert all(len(r) == w for r in rows), name + ": rows of different widths"
+    if frame == 1 and name != "GATEKEEPER":   # breathe: the head and shoulders 1 px lower; blink
+        top = 8 if h >= 18 else 5
+        rows = [["."] * w] + rows[:top - 1] + rows[top:]
+        rows = [["S" if k == "E" else k for k in r] for r in rows]
+    g = Grid(w + 2, h + 2)
+    for r in range(h):
+        for c in range(w):
+            k = rows[r][c]
+            if k != ".":
+                col = colours.get(k, {"S": "@", "$": "$", "E": "k"}.get(k, k))
+                if name == "GATEKEEPER" and frame == 1 and k == "w":   # the statue doesn't breathe: its eyes glow
+                    col = "w"
+                g.set(c + 1, r + 1, col)
+    for (x, y) in [(x, y) for y in range(h + 2) for x in range(w + 2)]:
+        if g.get(x, y) == "." and any(g.get(x + dx, y + dy) not in (".", "#") for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+            g.set(x, y, "#")
+    big = Grid((w + 2) * 2, (h + 2) * 2)
+    for y in range(h + 2):
+        for x in range(w + 2):
+            ch = g.get(x, y)
+            for dy in range(2):
+                for dx in range(2):
+                    big.set(x * 2 + dx, y * 2 + dy, "x" if ch == "#" else ch)
+    return big
+
+
+def lever(on):
+    """A shortcut lever (8x14 dp): an iron box with a handle, tilted left (closed) or right (pulled)."""
+    g = Grid(16, 28)
+    g.paint(rect(3, 20, 10, 8), ("x", "d", "s"))
+    g.fill(rect(4, 21, 8, 1), "b")
+    tip = (13, 7) if on else (3, 7)
+    g.fill(line(8, 21, tip[0], tip[1]) | line(9, 21, tip[0] + 1, tip[1]), "h")
+    g.paint(disc(tip[0] + 0.5, tip[1], 2.2), ("R", "r", "r"))
+    return g
+
+
+def chest_ajar():
+    g = Grid(24, 20)
+    g.paint(rect(2, 9, 20, 11), ("W", "P", "S"))
+    g.fill(rect(2, 13, 20, 1), "W")
+    g.paint(poly([(2, 9), (22, 9), (22, 4), (3, 3)]), ("W", "P", "S"))
+    g.fill(rect(4, 8, 16, 1), "z")
+    for x in (5, 18):
+        g.paint(rect(x, 9, 2, 11), ("d", "s", "b"))
+    g.paint(rect(10, 8, 4, 5), ("Y", "z", "N"))
+    return g
+
+
+def item_icon(kind):
+    """The HUD's 8x8 dp item icons (spec §15), authored at 16x16."""
+    g = Grid(16, 16)
+    if kind in ("RED", "BIG", "MANA"):
+        body = {"RED": ("R", "r", "o"), "BIG": ("R", "r", "o"), "MANA": ("U", "u", "c")}[kind]
+        r = 5.5 if kind == "BIG" else 4.5
+        g.paint(disc(8, 15.5 - r, r), body)
+        g.paint(rect(6, 2 if kind == "BIG" else 4, 4, 4), ("d", "b", "w"))
+        g.fill(rect(6, 1 if kind == "BIG" else 3, 4, 2), "h")
+        g.set(6, 15 - int(r * 1.4), "w")
+    elif kind == "WHETSTONE":
+        g.paint(poly([(1, 13), (11, 4), (15, 8), (5, 15)]), ("d", "s", "b"))
+        g.fill(line(4, 12, 11, 6), "b")
+    elif kind == "TONIC":
+        g.paint(rect(5, 5, 6, 10), ("x", "X", "s"))
+        g.paint(rect(6, 2, 4, 3), ("d", "s", "b"))
+        g.fill(rect(6, 9, 4, 2), "R")
+    else:   # SWIFT FEATHER
+        g.paint(poly([(2, 15), (5, 7), (11, 1), (13, 3), (9, 10)]), ("c", "b", "w"))
+        g.fill(line(2, 15, 11, 3), "s")
+    return g
+
+
 # --- Output ---
 def sprite_text(name, g, prefix="const Sprite"):
     rows = ['    "%s"' % "".join(g.c[y]) for y in range(g.h)]
@@ -401,6 +537,14 @@ def build_objects():
     out.append(("ARCH_CLOSED", arch_closed()))
     out.append(("CHEST_CLOSED", chest(False)))
     out.append(("CHEST_OPEN", chest(True)))
+    out.append(("CHEST_AJAR", chest_ajar()))
+    out.append(("LEVER_OFF", lever(False)))
+    out.append(("LEVER_ON", lever(True)))
+    for name in NPC_TEMPLATES:
+        for i, n in enumerate("AB"):
+            out.append(("NPC_%s_%s" % (name, n), npc(name, i)))
+    for kind in ("RED", "BIG", "MANA", "WHETSTONE", "TONIC", "FEATHER"):
+        out.append(("ICON_" + kind, item_icon(kind)))
     return out
 
 

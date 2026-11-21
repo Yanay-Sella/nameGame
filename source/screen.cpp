@@ -1,5 +1,6 @@
 // Software drawing into the current target pixel buffer; everything is clipped to it.
 #include "screen.h"
+#include <algorithm>
 #include <stdio.h>
 #include <string.h>
 
@@ -119,7 +120,7 @@ int textWidth(const char* text, int scale) {
 // Sizes are in shooter pixels, scaled by u (1 over the shooter, 2 over NAME QUEST) so the menus look the same on both.
 void drawMenu(const char* title, const char* const* items, int count, int selected, const char* hint) {
     int u = screenW / SCREEN_W;
-    int w = 150 * u, h = (44 + 12 * (count - 1)) * u;
+    int w = std::max(150 * u, textWidth(title, 2 * u) + 16 * u), h = (44 + 12 * (count - 1)) * u;   // wide enough for the title
     int x = (screenW - w) / 2, y = (screenH - h) / 2;
     fillRect(x, y, w, h, paletteColor('n'));
     fillRect(x + u, y + u, w - 2 * u, h - 2 * u, paletteColor('k'));
