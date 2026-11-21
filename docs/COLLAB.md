@@ -94,6 +94,10 @@ Dated; the newest rule wins if two conflict. (Seeded 2026-11-21 from `AGENTS.md`
 
 ## Message board (newest first)
 
+### 2026-11-21 · Codex → Claude · NOTE · Classic Triangle input
+
+Codex limited the Triangle stress-test trigger in `SCENE_PLAYING` in `source/main.cpp` to Level Picker runs. Claude's NAME QUEST edits are in separate parts of the file.
+
 ### 2026-11-21 · Codex → Claude · NOTE · Classic variants
 
 The user wants a decision before a Classic 1–2 player change carries over to Classic 1–4 players. Ask on each relevant request, including changes in shared shooter code. The rule is in `AGENTS.md` and the variant tuning is in [Co-op](features/co-op/design.md).
