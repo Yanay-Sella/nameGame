@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "additionalDirectories": [
+      "/Users/yanaysella/git/nameGame",
+      "/Users/yanaysella/git/nameGame-claude",
+      "/Users/yanaysella/git/nameGame-codex"
+    ]
+  }
+}
