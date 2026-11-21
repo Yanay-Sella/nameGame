@@ -1,6 +1,6 @@
 # NAME game — Game Design Document
 
-**Version:** 0.33 · **Updated:** 2026-11-21 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
+**Version:** 0.34 · **Updated:** 2026-11-21 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
 
 ## Summary
 You pilot a small ship at the bottom of the screen against waves of pixel-art aliens. Hold R1 to spray bullets, and save the scarce R2 rocket for the moment a wave gets out of hand. Waves get harder, and every 5th wave is a boss. The run goes through five levels of 20 waves each, every one harder than the last: level 1 (space), the jungle, the glacier, the volcano and the deep sea. It ends when you beat the deep sea's wave-20 bosses or lose your last life, and you chase the saved high score. Big bosses drop level buffs that stack until you die. Classic offers a five-level run in 1–2 Players or expanded 1–4 Players, and its Level Picker plays any single level on its own. NAME QUEST is a separate RPG platformer on the main menu, set in the same worlds, with four classes, a hub village, checkpoints and three save slots.
@@ -144,11 +144,12 @@ Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN ME
 | D-046 | 2026-11-20 | Pits and deadly liquids kill instantly | pits cost HP and put you back at the edge | user's choice | [NAME QUEST](features/name-quest/design.md) |
 | D-047 | 2026-11-20 | A normal enemy hit takes 20 % of the reference hero's max HP; enemy stats derive from a reference hero per world | hand-tuned stats per enemy | user's choice | [NAME QUEST](features/name-quest/design.md) |
 | D-048 | 2026-11-20 | The final boss is Claude, never hinted before the citadel's last room; after the credits Claude waits in Namula and offers New Game+ | the Name-Eater as the last boss; no New Game+ | user's choice | [NAME QUEST](features/name-quest/design.md) |
-| D-049 | 2026-11-20 | No music in NAME QUEST for now: synthesized ambience per world and sound effects | the shooter's songs; a song per world | user's choice | [NAME QUEST](features/name-quest/design.md) |
+| D-049 | 2026-11-20 | No music in NAME QUEST for now: synthesized ambience per world and sound effects (replaced by D-057) | the shooter's songs; a song per world | user's choice | [NAME QUEST](features/name-quest/design.md) |
 | D-050 | 2026-11-20 | Each world's mini-boss holds the key to the gate in front of the world's second half | no gates; keys found in chests | user's choice | [NAME QUEST](features/name-quest/design.md) |
 | D-051 | 2026-11-20 | Worlds 1–5 reuse the shooter's enemy and boss sprites where the theme matches (the RPG is set in the same worlds) | all-new sprites | user's choice | [NAME QUEST](features/name-quest/design.md) |
 | D-055 | 2026-11-21 | Classic has a 1–2 player variant and an expanded 1–4 player variant with a three-pad entry gate and its own high score | one scale and balance for every party | user requested more room and denser waves for larger parties | [Co-op](features/co-op/design.md), [Screens](features/screens/design.md) |
 | D-056 | 2026-11-21 | Put Level Picker under Classic and remove the shooter stress test | Level Picker on the main menu and a Triangle stress-test shortcut | the user grouped all shooter play under Classic and requested removal of the test | [Screens](features/screens/design.md), [Ship controls](features/ship-controls/implementation.md) |
+| D-057 | 2026-11-21 | NAME QUEST plays the user's own songs: one per place (Namula, worlds 1-7) instead of its ambience, and one boss song during boss fights; a missing song falls back to the ambience, Settings' music OFF too. Claude makes every other sound | no music (D-049); a song per world with the ambience under it; one song for the whole mode | the user heard the ambience's square-wave hums as white noise on the PS3 and prefers to provide music | [NAME QUEST](features/name-quest/design.md) |
 
 ## Open questions
 - **Assumptions to confirm:** sprites as text grids in code (D-006); every number marked `[ASSUMPTION]` in the feature notes.
@@ -190,3 +191,4 @@ Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN ME
 **0.31 (2026-11-21):** Classic variants and live controller lobby (D-055).
 **0.32 (2026-11-21):** NAME QUEST RPG systems: checkpoints and travel, Namula's people, levels, shops, items and buffs, jobs, chests, gates, shortcuts, the map, ambience.
 **0.33 (2026-11-21):** NAME QUEST world 1, THE DRIFTING STATION: its look (approved from the style frame), 20 areas, five redrawn enemies, electric panels and vents, the boss framework, THE OVERSEER and THE STAR MAGE; world 2's entry lights when the Star Mage falls.
+**0.34 (2026-11-21):** NAME QUEST music from the user's songs, one per place plus a boss song (D-057); the hums heard as white noise under Namula and world 1 removed.

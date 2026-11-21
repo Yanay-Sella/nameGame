@@ -165,7 +165,7 @@ int main(int argc, char** argv) {
         debugNetPrintf(INFO, "scene: %s\n", SCENE_NAMES[next]);
     };
     auto openQuest = [&]() {
-        audioStopMusic();   // NAME QUEST has no music (D-049)
+        audioStopMusic();   // the shooter's song stops; NAME QUEST picks its own sound (D-057)
         questOpen(quest, exeFolder.c_str());
         quest.devAids = DEV_AIDS;
         setScene(SCENE_QUEST);
@@ -568,9 +568,9 @@ int main(int argc, char** argv) {
                 quest.soundRequested[s] = false;
             }
         }
-        // NAME QUEST's ambience plays in the quest and in the pause menu and settings over it (spec §16).
+        // NAME QUEST's song or ambience plays in the quest and in the pause menu and settings over it (spec §16, D-057).
         bool overQuest = scene == SCENE_QUEST || (questPaused && (scene == SCENE_PAUSED || scene == SCENE_SETTINGS));
-        audioSetAmbient(overQuest ? quest.ambient : 0);
+        audioSetQuestSound(overQuest ? quest.ambient : 0, quest.arenaLocked, settings.music != MUSIC_OFF);
         for (const std::string& line : quest.logLines) debugNetPrintf(INFO, "%s\n", line.c_str());
         quest.logLines.clear();
         quest.shakeStrength = settings.shake / 100.0f;
@@ -723,6 +723,9 @@ int main(int argc, char** argv) {
         frame++;
     }
 
+    // Quitting (the PS button menu's Quit Game) autosaves a NAME QUEST slot in play, also from its pause menu (spec §17).
+    if ((scene == SCENE_QUEST || questPaused) && questCanPause(quest)) questSave(quest);
+    for (const std::string& line : quest.logLines) debugNetPrintf(INFO, "%s\n", line.c_str());
     debugNetPrintf(INFO, "nameGame exiting\n");
 #ifndef NAMEGAME_MAC
     inputClose();

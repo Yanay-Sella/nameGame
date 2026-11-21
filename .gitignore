@@ -6,3 +6,4 @@ pkgfiles/USRDIR/music.ogg
 pkgfiles/USRDIR/dubstep.ogg
 local.mk
 pkgfiles/USRDIR/quest*.txt
+pkgfiles/USRDIR/quest_*.ogg

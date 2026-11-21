@@ -54,6 +54,10 @@
 - [x] On the Mac: the Overseer slams and takes hits; the Star Mage fades between anchors and summons crawlers (TEST GROUNDS areas 4 and 5). *(`make mac-run` 2026-11-21)*
 - [ ] On the PS3: load slot 1, TRAVEL to THE DRIFTING STATION ENTRY, walk right. *(PS3 log: `quest: travel to 1.0`, `quest: area 1.0 DOCKING RING`; fps ≈ 60)*
 - [ ] On the PS3: the Star Mage in god mode from a dev save (`quest3.txt`, phase 4 step 10): its beam on screen. *(PS3 log: `quest: boss THE STAR MAGE start`, `phase 2`, `down after`; fps ≥ 59 during beams)*
+- [x] Quitting the app saves the slot: `quest: save slot 3 ok` before `nameGame exiting`, the playtime kept. *(`make mac-run` with a scripted `quit`, 2026-11-21)*
+- [ ] On the PS3: Quit Game from the PS button menu in NAME QUEST, then load the slot: the playtime and names are kept. *(PS3 log: `quest: save slot n ok` before `nameGame exiting`)*
+- [ ] On the PS3: no white noise left under Namula and the DRIFTING STATION ENTRY (the hums removed). *(the user listens)*
+- [ ] On the PS3: with `quest_namula.ogg`, `quest_world1.ogg` and `quest_boss.ogg` packaged, each plays in its place, the boss song during a fight and the world's song after; a missing song falls back to the ambience. *(the user listens; PS3 log: `audio: quest_world1.ogg loaded`)*
 - [ ] The user plays world 1 from a new slot: a first run takes at least 2 hours; each boss takes more than one try; never stuck. Notes: *(user)*
 
 ## Playtest checks

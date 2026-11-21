@@ -1,5 +1,6 @@
 #!/bin/bash
-# Run a command while holding the one-PS3 lock (shared by every checkout/worktree); waits its turn, quits the game when done.
+# Run a command while holding the one-PS3 lock (shared by every checkout/worktree); waits its turn, and when done quits
+# the game its run started (a game already running when it took the lock, such as the user's, is left alone).
 # Usage: scripts/ps3-lock.sh <command...>   e.g. scripts/ps3-lock.sh bash -c 'make install launch && make shot'
 set -u
 [ $# -gt 0 ] || { echo "Usage: $0 <command...>"; exit 1; }
@@ -21,8 +22,11 @@ done
 
 echo "$$
 $(pwd) since $(date +%H:%M:%S)" > "$LOCK/owner"
-# Always release the lock and leave the PS3 at the XMB so the next run's deploy isn't refused.
-trap 'make -s quit >/dev/null 2>&1; rm -rf "$LOCK"' EXIT
+# Always release the lock; leave the PS3 at the XMB so the next run's deploy isn't refused, unless a game was already
+# running when the lock was taken: that one is someone's game (the run's install refuses to replace it anyway).
+before=$(make -s ps3-state 2>/dev/null)
+[ "$before" = running ] && echo "A game was already running on the PS3; it will be left running."
+trap '[ "$before" = running ] || make -s quit >/dev/null 2>&1; rm -rf "$LOCK"' EXIT
 trap 'exit 130' INT TERM
 
 echo "PS3 lock acquired after $((SECONDS - waiting_since))s."

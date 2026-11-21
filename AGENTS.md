@@ -22,7 +22,7 @@ Full setup history, debugging toolkit and new-project checklist: `docs/ps3-new-p
   and runs every step that touches the PS3 (install, launch, pad, shot, quit) in ONE locked command, never as separate calls:
   `scripts/ps3-lock.sh bash -c 'make install launch && make pad BUTTONS=... && make shot'`.
   It waits while another session holds the lock (`~/.nameGame-ps3.lock`, shared by all worktrees), drops a lock whose owner died,
-  and quits the game when done. Run `make log` inside the locked command too (UDP 18195 is shared). Don't call `make deploy/launch/pad/shot` unlocked.
+  and quits the game its run started when done; a game already running when it took the lock (e.g. the user's) is left alone. Run `make log` inside the locked command too (UDP 18195 is shared). Don't call `make deploy/launch/pad/shot` unlocked.
 - `make deploy` — build, upload via FTP to `/dev_hdd0/packages/`, install with webMAN (`/install.ps3/...`).
   Then `make launch` starts NAME game on the PS3 (no controller needed).
 - `make mac` / `make mac-run [BUTTONS=...]` — native Mac build (Homebrew SDL2, no Docker, no PS3) for fast iteration: the real game code,
@@ -43,6 +43,7 @@ Full setup history, debugging toolkit and new-project checklist: `docs/ps3-new-p
 - `make release` — release build (no dev aids, logs to 127.0.0.1, song required) → `dist/NAME-game-<VERSION>.pkg` and the README.
 - `make deploy SOURCES=prototypes/<idea>` — build and install a throwaway prototype instead of `source/` (same app ID).
 - `make music MUSIC_SRC=<song>` — convert a song to `pkgfiles/USRDIR/music.ogg` (MIZRAHIT); add `MUSIC_OUT=dubstep.ogg` for the DUBSTEP song. Both gitignored, packaged next to EBOOT.BIN.
+  NAME QUEST songs (D-057, all optional): `MUSIC_OUT=quest_namula.ogg`, `quest_world1.ogg` .. `quest_world7.ogg`, `quest_boss.ogg`; a missing one falls back to that place's ambience.
 - `python3 docs/xmb-art/make_xmb_art.py` — redraw the XMB Game menu art (`pkgfiles/ICON0.PNG` 320x176, `PIC1.PNG` 1920x1080)
   from the sprites in `source/sprites.h`; rerun it after changing sprites or the palette.
 

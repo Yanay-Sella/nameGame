@@ -22,14 +22,24 @@ const char* const SONG_FILES[MUSIC_CHOICES] = {NULL, "music.ogg", "dubstep.ogg"}
 static Mix_Music* songs[MUSIC_CHOICES] = {};   // songs[MUSIC_OFF] stays NULL
 static Mix_Chunk* sounds[SOUND_COUNT];
 static Mix_Chunk* ambients[AMBIENT_COUNT];   // ambients[0] stays NULL
-static int ambientPlaying = 0;
+// NAME QUEST songs (D-057): one per place (index = ambience id) and the boss song last; loaded on first use.
+const int QUEST_SONGS = AMBIENT_COUNT + 1, BOSS_SONG = AMBIENT_COUNT;
+const char* const QUEST_SONG_FILES[QUEST_SONGS] = {NULL, "quest_namula.ogg", "quest_world1.ogg", "quest_world2.ogg",
+    "quest_world3.ogg", "quest_world4.ogg", "quest_world5.ogg", "quest_world6.ogg", "quest_world7.ogg", "quest_boss.ogg"};
+static Mix_Music* questSongs[QUEST_SONGS];
+static bool questSongTried[QUEST_SONGS];
+static std::string songFolder;
+static int questPlace = 0, questSong = -1;   // what audioSetQuestSound last set up; questSong -1: no quest song playing
+static bool questBoss = false, questMusicOn = false;
+static int ambientPlaying = 0;   // the ambience loop on channel 1, 0 none
 
-// Mixes the tones into one chunk in the mixer's own sample format (16-bit or float, as the PS3 device reports).
-static Mix_Chunk* synthesize(const std::vector<Tone>& tones) {
+// Mixes the tones into one chunk in the mixer's own sample format (16-bit or float, as the PS3 device reports),
+// at least minSeconds long (ambience loops keep their full length even when their last sound ends early).
+static Mix_Chunk* synthesize(const std::vector<Tone>& tones, float minSeconds = 0) {
     int freq, channels;
     Uint16 format;
     Mix_QuerySpec(&freq, &format, &channels);
-    float seconds = 0;
+    float seconds = minSeconds;
     for (const Tone& t : tones) seconds = fmaxf(seconds, t.start + t.seconds);
     int frames = (int)(seconds * freq);
     std::vector<float> mix(frames, 0.0f);
@@ -67,6 +77,19 @@ static Mix_Chunk* synthesize(const std::vector<Tone>& tones) {
     return Mix_QuickLoad_RAW(data, frames * channels * sampleBytes);
 }
 
+// Reads an OGG into memory (kept for the game's lifetime) and opens it as music; NULL when missing or unreadable.
+static Mix_Music* loadSong(const std::string& path) {
+    SDL_RWops* file = SDL_RWFromFile(path.c_str(), "rb");
+    Sint64 size = file ? SDL_RWsize(file) : -1;
+    void* songBytes = size > 0 ? SDL_malloc((size_t)size) : NULL;
+    Mix_Music* music = NULL;
+    if (songBytes && SDL_RWread(file, songBytes, (size_t)size, 1) == 1)   // one object of `size` bytes
+        music = Mix_LoadMUS_RW(SDL_RWFromConstMem(songBytes, (int)size), 1);
+    if (file) SDL_RWclose(file);
+    if (!music) SDL_free(songBytes);
+    return music;
+}
+
 void audioOpen(const char* folder) {
     if (Mix_OpenAudio(48000, AUDIO_S16SYS, 2, 1024) != 0) {
         debugNetPrintf(ERROR, "audio: Mix_OpenAudio failed: %s\n", Mix_GetError());
@@ -81,6 +104,7 @@ void audioOpen(const char* folder) {
         return;
     }
     audioReady = true;
+    songFolder = folder;
     Mix_AllocateChannels(MIXER_CHANNELS);
     Mix_ReserveChannels(2);   // channel 0 is SHOOT_CHANNEL, 1 AMBIENT_CHANNEL
     Mix_VolumeMusic(MUSIC_VOLUME);
@@ -88,17 +112,8 @@ void audioOpen(const char* folder) {
     // The song is read into memory once (~190 ms at boot): restarting it after a game over took ~350 ms when it
     // streamed from the hard drive and 1 ms from memory.
     for (int song = MUSIC_MIZRAHIT; song < MUSIC_CHOICES; song++) {
-        std::string path = std::string(folder) + "/" + SONG_FILES[song];
-        SDL_RWops* file = SDL_RWFromFile(path.c_str(), "rb");
-        Sint64 size = file ? SDL_RWsize(file) : -1;
-        void* songBytes = size > 0 ? SDL_malloc((size_t)size) : NULL;   // kept for the game's lifetime
-        if (songBytes && SDL_RWread(file, songBytes, (size_t)size, 1) == 1)   // one object of `size` bytes
-            songs[song] = Mix_LoadMUS_RW(SDL_RWFromConstMem(songBytes, (int)size), 1);
-        if (file) SDL_RWclose(file);
-        if (!songs[song]) {
-            debugNetPrintf(ERROR, "audio: loading %s failed: %s\n", path.c_str(), Mix_GetError());
-            SDL_free(songBytes);
-        }
+        songs[song] = loadSong(std::string(folder) + "/" + SONG_FILES[song]);
+        if (!songs[song]) debugNetPrintf(ERROR, "audio: loading %s failed: %s\n", SONG_FILES[song], Mix_GetError());
     }
 
     // Effects from music-and-sound/design.md: {start s, length s, start Hz, end Hz, volume, noise}.
@@ -177,27 +192,29 @@ void audioOpen(const char* folder) {
         for (int i = 0; i < count; i++) loop.push_back({random01() * (AMBIENT_SECONDS - seconds), seconds, fromHz, toHz, volume, noise});
     };
     const float S = AMBIENT_SECONDS, H = AMBIENT_SECONDS / 2;
-    loop = {{0, S, 70, 70, 0.02f, false, 0}};                       // Namula: the hearth's low hum and its crackle
+    // Namula and world 1 had a low square-wave hum (70 / 55 Hz) under them; TV speakers drop its low tone and keep its
+    // harsh harmonics, which the user heard as white noise on the PS3, so it was removed (2026-11-21).
+    loop = {};                                                     // Namula: the hearth's crackle
     scatter(36, 0.03f, 2500, 600, 0.06f, true);
-    ambients[1] = synthesize(loop);
-    loop = {{0, S, 55, 55, 0.03f, false, 0}};                       // world 1: a station's drone and clicks
+    ambients[1] = synthesize(loop, S);
+    loop = {};                                                     // world 1: a station's clicks
     for (int i = 0; i < 8; i++) loop.push_back({i * 0.5f + 0.13f, 0.01f, 4000, 3500, 0.04f, true});
-    ambients[2] = synthesize(loop);
+    ambients[2] = synthesize(loop, S);
     loop = {};                                                     // world 2: chirps
     scatter(10, 0.06f, 3000, 3600, 0.05f, false);
-    ambients[3] = synthesize(loop);
+    ambients[3] = synthesize(loop, S);
     loop = {{0, H, 400, 900, 0.06f, true, 0}, {H, H, 900, 400, 0.06f, true, 0}};   // world 3: wind swells
-    ambients[4] = synthesize(loop);
+    ambients[4] = synthesize(loop, S);
     loop = {{0, H, 80, 200, 0.08f, true, 0}, {H, H, 200, 80, 0.08f, true, 0}};     // world 4: rumble
-    ambients[5] = synthesize(loop);
+    ambients[5] = synthesize(loop, S);
     loop = {{0, S, 300, 300, 0.04f, true, 0}};                      // world 5: water and bubbles
     scatter(8, 0.08f, 300, 900, 0.05f, false);
-    ambients[6] = synthesize(loop);
+    ambients[6] = synthesize(loop, S);
     loop = {{0, H, 500, 900, 0.05f, true, 0}, {H, H, 900, 500, 0.05f, true, 0}, {0, 1.5f, 660, 660, 0.05f, false}};   // world 6: wind, a bell
-    ambients[7] = synthesize(loop);
+    ambients[7] = synthesize(loop, S);
     loop = {{0, S, 2000, 2000, 0.015f, true, 0}};                   // world 7: near silence and a pen's scratch
     scatter(4, 0.15f, 5000, 3000, 0.03f, true);
-    ambients[8] = synthesize(loop);
+    ambients[8] = synthesize(loop, S);
     debugNetPrintf(INFO, "audio: %d Hz, format 0x%x, %d channels, mizrahit %s, dubstep %s\n", freq, format, channels,
                    songs[MUSIC_MIZRAHIT] ? "loaded" : "missing", songs[MUSIC_DUBSTEP] ? "loaded" : "missing");
 }
@@ -216,11 +233,33 @@ void audioPlay(Sound sound) {
     if (audioReady && sounds[sound]) Mix_PlayChannel(sound == SOUND_SHOOT ? SHOOT_CHANNEL : -1, sounds[sound], 0);
 }
 
-void audioSetAmbient(int id) {
-    if (!audioReady || id == ambientPlaying || id < 0 || id >= AMBIENT_COUNT) return;
-    ambientPlaying = id;
-    if (ambients[id]) Mix_PlayChannel(AMBIENT_CHANNEL, ambients[id], -1);
-    else Mix_HaltChannel(AMBIENT_CHANNEL);
+void audioSetQuestSound(int place, bool boss, bool musicOn) {
+    if (!audioReady || place < 0 || place >= AMBIENT_COUNT) return;
+    if (place == questPlace && boss == questBoss && musicOn == questMusicOn) return;
+    questPlace = place;
+    questBoss = boss;
+    questMusicOn = musicOn;
+    // The song wanted: the boss song in a fight, else the place's; each file is tried once, a missing one is logged.
+    int want = place == 0 || !musicOn ? -1 : boss ? BOSS_SONG : place;
+    if (want >= 0 && !questSongTried[want]) {
+        questSongTried[want] = true;
+        questSongs[want] = loadSong(songFolder + "/" + QUEST_SONG_FILES[want]);
+        debugNetPrintf(INFO, "audio: %s %s\n", QUEST_SONG_FILES[want], questSongs[want] ? "loaded" : "missing");
+    }
+    if (want == BOSS_SONG && !questSongs[want]) want = questSongs[place] ? place : -1;   // no boss song: the place's
+    if (want >= 0 && !questSongs[want]) want = -1;
+    if (want != questSong) {
+        if (want >= 0) Mix_PlayMusic(questSongs[want], -1);
+        else if (questSong >= 0) Mix_HaltMusic();   // only a quest song is stopped, never the shooter's
+        questSong = want;
+    }
+    // The ambience plays only where no song does; it keeps running across a fight's start and end.
+    int ambience = want < 0 && ambients[place] ? place : 0;
+    if (ambience != ambientPlaying) {
+        if (ambience) Mix_PlayChannel(AMBIENT_CHANNEL, ambients[ambience], -1);
+        else Mix_HaltChannel(AMBIENT_CHANNEL);
+        ambientPlaying = ambience;
+    }
 }
 
 void audioClose() {

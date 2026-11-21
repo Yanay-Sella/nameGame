@@ -16,7 +16,7 @@ SHOT_SIZE  := 172854
 EXPANDED_SHOT_SIZE := 248886
 QUEST_SHOT_SIZE := 691254
 
-.PHONY: ps3 image deploy install release log clean music test launch quit pad shot mac mac-run quest-maps
+.PHONY: ps3 image deploy install release log clean music test launch quit pad shot mac mac-run quest-maps ps3-state
 
 # Compile and package build/nameGame.pkg inside the container (always a full rebuild so LOG_HOST/LOG_PORT changes apply).
 # SOURCES=prototypes/<idea> builds a prototype instead of the game.
@@ -90,6 +90,11 @@ mac-run: mac
 # Print the game's UDP log output (Ctrl+C to stop).
 log:
 	python3 -u -c 'import socket; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.bind(("", $(LOG_PORT))); [print(s.recv(4096).decode(errors="replace"), end="", flush=True) for _ in iter(int, 1)]'
+
+# Print `running` if an app or game runs on the PS3, else `idle`; fails when webMAN doesn't answer (scripts/ps3-lock.sh).
+ps3-state:
+	@status=$$(curl -sS --fail -m 10 http://$(PS3_IP)/home.ps3mapi 2>/dev/null) || exit 1; \
+	echo "$$status" | grep -io '[0-9A-F]\{8\}_[^<" ]*\.\(self\|bin\|elf\)' | grep -qv main_vsh && echo running || echo idle
 
 # Start the installed game (webMAN mounts it and starts it); refuses while an app or game already runs.
 launch:
