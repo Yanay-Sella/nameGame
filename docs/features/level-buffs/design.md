@@ -1,6 +1,6 @@
 # Level buffs
 
-**Status:** implemented · **Updated:** 2026-11-18 · [GDD](../../GDD.md) · [Rocket](../rocket/design.md) · [Bosses](../bosses/design.md) · [Implementation](implementation.md) · [Testing](testing.md)
+**Status:** implemented · **Updated:** 2026-11-21 · [GDD](../../GDD.md) · [Rocket](../rocket/design.md) · [Bosses](../bosses/design.md) · [Implementation](implementation.md) · [Testing](testing.md)
 
 Every big boss (waves 15 and 20) drops a buff for its level, and each level has its own ship skin. Buffs stack until the ship dies; three of them add a strong attack that R2 can fire instead of the rocket, and Square picks which one. Level 1's numbers and every enemy stay unchanged.
 
@@ -10,7 +10,7 @@ Every big boss (waves 15 and 20) drops a buff for its level, and each level has 
 3. **Stacking:** buffs from different levels stack, and in Classic they carry into the next level with the score. Dying loses every buff (and then the weapon keeps its level), the armed strong attack, a raised shield and a charging beam.
 4. **Strong attack:** R2 fires the armed strong attack, by default the rocket. The space, glacier and deep-sea buffs each add one, and collecting one arms it at once. Square cycles rocket → magic beam → frost wave → bubble shield, skipping ones not held. Every strong attack costs 1 rocket and shares the rocket's 0.5 s cooldown and R2 buffer; with 0 rockets R2 plays the empty click.
 5. **HUD:** held buffs show as 5×5 icons above the rocket icons, in level order; the armed strong attack's icon is underlined in yellow.
-6. **Space (wand):** a wand sits on the ship's right wing. Magic beam: a ball grows at the wand's star for 0.8 s, then fires: the ball stays at the base and a 12 px beam shoots up to the top of the screen in 0.1 s and stays 0.4 s in all, throwing the odd spark, then breaks into small shards. When it reaches the top, every alien, boss and live fish touching the column takes 60 damage once (3x a rocket's 20). Cyan edges, white core, never magenta. It kicks the screen when it fires and rumbles while it's on.
+6. **Space (wand):** a wand sits on the ship's right wing. Magic beam: a ball grows at the wand's star for 0.8 s, then fires: the ball stays at the base and a 12 px beam shoots up to the top of the screen in 0.1 s and stays 0.4 s in all, throwing the odd spark, then breaks into small shards. When it reaches the top, every alien and boss touching the column takes 100 damage once, and any live fish it touches dies. Cyan edges, white core, never magenta. It kicks the screen when it fires and rumbles while it's on.
 7. **Jungle:** bullets are drawn as bananas and pierce: a banana keeps flying after a hit, and each enemy it passes halves its damage (fractions carry over).
 8. **Glacier (frost wave):** an ice ring sweeps out and every enemy freezes for 3 s (no moving, swaying, diving, shooting or attacking; still deadly to touch; still takes damage). Every living alien and boss heals 25 % of its max HP (rounded up). Every enemy projectile and in-flight attack is destroyed: shots, thrown hazards, lobs in flight, live fish, a charging or firing mage ball, beam or eruption, bursts, a gorilla pound or yeti sneeze wind-up and the fisherman's hook (a hooked ship is let go). Peels and stink mists on the ground stay. Clearing the wave ends the freeze. The wave shakes the screen like a rocket blast.
 9. **Volcano:** bullets burn (flame bullets, fire bananas with the jungle buff) and fire 25 % faster. Damage is unchanged.
@@ -25,7 +25,7 @@ Buffs come only from big bosses and must be caught; all are lost on death; each 
 | Buff pickup | 11×11, falls 30 | px, px/s | catchable before it leaves the screen |
 | Held-buff payout | 5,000 | points | |
 | Magic ball / beam | 0.8 / 0.4 (grows in 0.1), 12 wide | s, px | beam reads clearly |
-| Magic beam damage | 60 | HP per enemy | 3x a rocket, to pay for the 0.8 s charge and the boss that dropped it |
+| Magic beam damage | 100 | HP per enemy | 5× a standard rocket's damage |
 | Frost freeze | 3 | s | long enough to matter, short enough to risk |
 | Frost heal | 25 | % of max HP | a big boss gets back 85-105 HP |
 | Volcano fire rate | interval × 0.8 | | |
@@ -44,3 +44,4 @@ Buffs come only from big bosses and must be caught; all are lost on death; each 
 ## History
 - 2026-11-18: designed and implemented (D-030, D-031).
 - 2026-11-18: beam build-up, shards and shake (D-032).
+- 2026-11-21: the user increased beam damage from 60 to 100 per enemy (D-060).

@@ -5,5 +5,5 @@ void audioOpen(const char*) {}
 void audioStartMusic(Music) {}
 void audioStopMusic() {}
 void audioPlay(Sound) {}
-void audioSetAmbient(int) {}
+void audioSetQuestSound(int, bool, bool) {}
 void audioClose() {}

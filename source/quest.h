@@ -225,7 +225,7 @@ struct Quest {
     int chestTile; float chestTimer;    // the chest whose lid is opening, s left
     float gateTimer;                    // s left of the gate shaking and vanishing (spec §11)
     float fadeTimer;                    // s left of the rest's white fade
-    int ambient;                        // audioSetAmbient id: 0 off, 1 Namula, 2-8 worlds 1-7
+    int ambient;                        // the place for audioSetQuestSound: 0 off, 1 Namula, 2-8 worlds 1-7
     // Bosses (phase 4)
     std::vector<QuestBoss> bosses;
     std::vector<Marker> markers;

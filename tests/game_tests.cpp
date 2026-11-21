@@ -708,6 +708,56 @@ static void twinBossesBothMustDie() {
     CHECK(game.nextWaveTimer > 0);
 }
 
+static void bossWaveRevivesEliminatedTeammates() {
+    Game game;
+    startGame(game, 2, 7);
+    Actions actions[2] = {};
+    Player& survivor = game.players[0];
+    survivor.invincibleTimer = 100;
+    survivor.lives = 1;
+    survivor.nextExtraLife = MAX_SCORE;
+    Player& eliminated = game.players[1];
+    eliminated.alive = false;
+    eliminated.lives = 0;
+    eliminated.score = 49000;
+    eliminated.rockets = 1;
+    eliminated.weaponLevel = 2;
+
+    game.wave = 9;
+    game.aliens.clear();
+    updateGame(game, actions, DT);
+    CHECK(eliminated.lives == 0);
+    for (int step = 0; step < 3 * 60; step++) updateGame(game, actions, DT);
+    CHECK(game.wave == 10 && game.bosses.size() == 2);
+    if (game.bosses.size() != 2) return;
+
+    for (Boss& boss : game.bosses) boss.attackTimer = 100;
+    Boss& first = game.bosses[0];
+    first.hp = 1;
+    game.bullets.push_back({first.x + 10, first.y + 5, 0, 0, 0});
+    updateGame(game, actions, DT);
+    CHECK(!first.alive && game.bosses[1].alive && eliminated.lives == 0);
+    for (int step = 0; step < 20; step++) updateGame(game, actions, DT);
+
+    Boss& last = game.bosses[1];
+    last.hp = 1;
+    game.bullets.push_back({last.x + 10, last.y + 5, 0, 0, 0});
+    Game wipe = game;
+    Player& lastShip = wipe.players[0];
+    lastShip.invincibleTimer = 0;
+    wipe.enemyShots.push_back({lastShip.x + 7, lastShip.y + 5, 0, -1, 0});
+
+    updateGame(game, actions, DT);
+    CHECK(!last.alive && game.nextWaveTimer > 0 && eliminated.lives == 3);
+    CHECK(survivor.lives == 1 && eliminated.score == 49000 && eliminated.nextExtraLife == 50000);
+    for (int step = 0; step < 20; step++) updateGame(game, actions, DT);
+    CHECK(eliminated.alive && eliminated.lives == 3 && eliminated.invincibleTimer > 0);
+    CHECK(eliminated.rockets == 1 && eliminated.weaponLevel == 2);
+
+    for (int step = 0; step < 2 * 60; step++) updateGame(wipe, actions, DT);
+    CHECK(wipe.over && wipe.players[0].lives == 0 && wipe.players[1].lives == 0);
+}
+
 static void mageBallBeamsItsColumnAfterOneAndAHalfSeconds() {
     for (int offset : {0, 20}) {
         Game game;
@@ -1807,7 +1857,7 @@ static void magicBeamHitsItsColumnOnce() {
     const float xs[4] = {158, 158, 158, 100}, ys[4] = {20, 40, 60, 40};
     for (int i = 0; i < 4; i++) {
         game.aliens.push_back(parkedAlien(xs[i], ys[i]));
-        game.aliens.back().hp = 40;
+        game.aliens.back().hp = 200;
     }
     Player& p = game.players[0];
     p.buffs = BUFF_SPACE;
@@ -1818,11 +1868,11 @@ static void magicBeamHitsItsColumnOnce() {
     CHECK(p.rockets == 2 && p.beamCharge > 0);
     p.x = 20;   // moving away doesn't move the column
     run(game, NO_INPUT, 0.5f);
-    CHECK(game.aliens[0].hp == 40 && p.beamTimer == 0);   // still charging
+    CHECK(game.aliens[0].hp == 200 && p.beamTimer == 0);   // still charging
     run(game, NO_INPUT, 0.5f);
-    CHECK(game.aliens[0].hp == 10 && game.aliens[1].hp == 10 && game.aliens[2].hp == 10 && game.aliens[3].hp == 40 && p.beamTimer > 0);
+    CHECK(game.aliens[0].hp == 100 && game.aliens[1].hp == 100 && game.aliens[2].hp == 100 && game.aliens[3].hp == 200 && p.beamTimer > 0);
     run(game, NO_INPUT, 0.5f);
-    CHECK(game.aliens[0].hp == 10 && game.aliens[1].hp == 10 && game.aliens[2].hp == 10);
+    CHECK(game.aliens[0].hp == 100 && game.aliens[1].hp == 100 && game.aliens[2].hp == 100);
 }
 
 static void magicBeamHitsWhenItReachesTheTop() {
@@ -1833,7 +1883,7 @@ static void magicBeamHitsWhenItReachesTheTop() {
     game.diveTimer = 1e9f;
     for (int i = 0; i < 3; i++) {
         game.aliens.push_back(parkedAlien(158, 20 + i * 20));
-        game.aliens.back().hp = 40;
+        game.aliens.back().hp = 200;
     }
     Player& p = game.players[0];
     p.buffs = BUFF_SPACE;
@@ -1842,9 +1892,9 @@ static void magicBeamHitsWhenItReachesTheTop() {
     r2.rocket = true;
     updateGame(game, &r2, DT);
     for (int step = 0; step < 120 && p.beamTimer == 0; step++) updateGame(game, &NO_INPUT, DT);
-    CHECK(p.beamTimer > 0 && game.aliens[0].hp == 40 && game.aliens[1].hp == 40 && game.aliens[2].hp == 40 && game.trauma > 0.6f);
+    CHECK(p.beamTimer > 0 && game.aliens[0].hp == 200 && game.aliens[1].hp == 200 && game.aliens[2].hp == 200 && game.trauma > 0.6f);
     run(game, NO_INPUT, 0.15f);
-    CHECK(game.aliens[0].hp == 10 && game.aliens[1].hp == 10 && game.aliens[2].hp == 10 && game.trauma >= 0.44f);
+    CHECK(game.aliens[0].hp == 100 && game.aliens[1].hp == 100 && game.aliens[2].hp == 100 && game.trauma >= 0.44f);
     run(game, NO_INPUT, 0.3f);
     int shards = 0;
     for (const Particle& q : game.particles) shards += q.h == 2;
@@ -2287,6 +2337,7 @@ int main() {
     secondPlayerJoinsBlinkingWithAFreshRun();
     coOpRunEndsWhenBothPlayersAreOut();
     waveBonusSkipsAPlayerWhoIsOut();
+    bossWaveRevivesEliminatedTeammates();
     screenshotIsAValidBmp();
     shipSkinsKeepTheBody();
     bigBossesDropTheLevelBuff();

@@ -6,6 +6,7 @@
 - [x] A run starts with one player; a joining player 2 has 3 lives, 3 rockets, 0 points, blinks for 2 s, starts 40 px right of the centre, and their bullets are theirs. *(`tests/game_tests.cpp` › secondPlayerJoinsBlinkingWithAFreshRun)*
 - [x] The run goes on while one player is still in and ends when both are out. *(`tests/game_tests.cpp` › coOpRunEndsWhenBothPlayersAreOut)*
 - [x] A player who is out gets no wave clear bonus. *(`tests/game_tests.cpp` › waveBonusSkipsAPlayerWhoIsOut)*
+- [x] In Classic 1–2 Players, an eliminated player returns invincible with three lives after the last boss in a wave falls. The check covers regular-wave clears, the first boss in a twin wave, a full party wipe and preserving score and equipment on return. *(`tests/game_tests.cpp` › bossWaveRevivesEliminatedTeammates)*
 - [x] Start on a second controller joins player 2 on the PS3. *(PS3 log 2026-11-17: "controller 1 connected", then "player 2 joined at wave 1")*
 - [x] Both HUDs and both ships are easy to tell apart on the TV. *(player report 2026-11-17)*
 - [x] 60 fps after player 2 joined, including a Triangle stress press. *(PS3 log 2026-11-17: fps 59.9–60.0, slowest frame 5 ms)*
@@ -34,6 +35,7 @@
 2. Let player 1 lose all lives while player 2 plays on; the run continues. Lose player 2's last life: game over shows both scores.
 3. Press X at game over: the new run has both ships.
 4. Player 2's ship is gold (`playerTwoShipIsGold`, ticked) and looks right on the PS3 (unticked: PS3 look check).
+5. In Classic 1–2 Players, let one player run out of lives, then clear the boss wave with the other. Check that the returning ship blinks and its HUD shows two spare hearts.
 
 
 ## History

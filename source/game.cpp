@@ -94,6 +94,7 @@ const int EXTRA_LIFE_EVERY = 50000;
 const float SHIP_EXPLOSION_RADIUS = 24;   // px
 // Co-op (co-op/design.md)
 const float CO_OP_SPAWN_OFFSET = 40;     // px right of the centre for player 2
+const int BOSS_REVIVE_LIVES = 3;
 // Expanded Classic (co-op/design.md)
 const int EXPANDED_COLUMNS = 12;
 const int SECOND_EXTRA_HEAVY_WAVE = 11;
@@ -201,7 +202,8 @@ const float SEA_BUBBLE_SPEED = 25;     // px/s
 // Level buffs (level-buffs/design.md)
 const int BUFF_PICKUP_SIZE = 11, BUFF_HELD_POINTS = 5000;   // px; points for a buff already held
 const float MAGIC_CHARGE_TIME = 0.8f, MAGIC_BEAM_TIME = 0.4f;   // s
-const int MAGIC_BEAM_W = BEAM_W / 2, MAGIC_BEAM_CORE_W = 4, MAGIC_DAMAGE = 3 * EXPLOSION_DAMAGE;   // px, px, HP per enemy: 3x a rocket
+const int MAGIC_BEAM_W = BEAM_W / 2, MAGIC_BEAM_CORE_W = 4;   // px
+const int MAGIC_DAMAGE = 100;   // HP per enemy
 const int SHIP_WAND_X = 14, SHIP_WAND_Y = 3;   // px in the ship: the wand's star (the WAND sprite is drawn at +13, +2)
 const float FROST_TIME = 3, FROST_RING_TIME = 0.4f, FROST_RING_SPEED = 450, FROST_THAW_BLINK = 0.5f;   // s, s, px/s, s
 const float VOLCANO_FIRE_FACTOR = 0.8f;   // x the fire interval: 25 % faster
@@ -1687,6 +1689,16 @@ void updateGame(Game& game, const Actions* actions, float dt) {
         game.freezeTimer = 0;   // the freeze ends with the wave
         for (Player& player : game.players)
             if (player.lives > 0) addScore(game, player, WAVE_CLEAR_BONUS * game.wave);
+        if (isBossWave(game.wave) && game.variant == CLASSIC_STANDARD && !game.singleLevel &&
+            game.players.size() > 1 &&
+            std::any_of(game.players.begin(), game.players.end(), [](const Player& p) { return p.lives > 0; })) {
+            for (Player& player : game.players) {
+                if (player.lives != 0) continue;
+                player.lives = BOSS_REVIVE_LIVES;
+                player.respawnTimer = 0;
+                game.soundRequested[SOUND_EXTRA_LIFE] = true;
+            }
+        }
         if (game.wave == LEVEL_LAST_WAVE) {   // the level boss is dead (level-1 rule 4)
             game.levelClear = true;
             game.clearTimer = LEVEL_CLEAR_TIME;

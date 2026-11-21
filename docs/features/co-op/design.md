@@ -8,7 +8,7 @@ Classic offers 1–2 Players and 1–4 Players. Both play the same five worlds a
 1. Classic 1–2 Players and the Level Picker start with one ship. Classic 1–4 Players starts with the party chosen in the lobby. During play, Start or X on a spare controller adds a ship up to the variant's limit.
 2. A joining player starts with 3 lives, 3 rockets and 0 points. They arrive blinking as after a respawn.
 3. Each player has their own lives, rockets, score and extra lives. Bullet and rocket kills score for the player who fired. Pickups go to whoever touches them.
-4. A player with no lives left is out until the run ends. Classic ends when all players are out or the Deep Sea is cleared. The Level Picker ends on the selected level's clear or when all players are out.
+4. In Classic 1–2 Players, clearing a boss wave while a teammate still has lives brings back an eliminated player with 3 lives (two spare hearts). This happens when the last boss falls. The ship returns at its usual spawn with normal respawn invincibility. Its score, rockets and current weapon level carry over.
 5. The wave clear bonus goes to every player still in the run.
 6. Any joined player's Start pauses. A disconnect pauses until that player's PS3 port is connected again. Players then resume manually. See [Screens](../screens/design.md) for replay.
 7. Each player has a score, lives, upgrades and rockets display. In 1–4 Players, all four scores have space across the screen. Player 2's hull is gold, player 3's cyan and player 4's purple. Every ship keeps its level skin and hitbox.
@@ -48,7 +48,8 @@ In Classic 1–4 Players, a party of three or four chooses roles before entering
 
 ## Edge cases
 - Joining works during play, including the pause between waves and a teammate's respawn. The next wave starts once any ship is alive.
-- A player who is out can't rejoin until the next run (no continues).
+- Classic ends when all players are out or the Deep Sea is cleared. The Level Picker ends when all players are out or the selected level is cleared.
+- A full party wipe still ends the run when it coincides with a boss-wave clear. In 1–4 Players and the Level Picker, the boss-wave clear gives the remaining players the usual score bonus.
 - Divers steer toward the nearest living ship.
 - The controller minimum applies to starting a 1–4 player run. Once playing, unused pads may disconnect and the joined party can keep playing.
 
@@ -56,4 +57,5 @@ In Classic 1–4 Players, a party of three or four chooses roles before entering
 - 2026-11-17: designed and built as drop-in join (D-009).
 - 2026-11-17: numbers confirmed in single-player and co-op playtests.
 - 2026-11-21: Classic split into two variants with a live pad check and a larger party arena (D-055).
-- 2026-11-21: added role selection and four ship roles for expanded parties of three or four (D-057).
+- 2026-11-21: added role selection and four ship roles for expanded parties of three or four (D-058).
+- 2026-11-21: added boss-wave revives to Classic 1–2 Players (D-059).

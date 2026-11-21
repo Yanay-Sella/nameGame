@@ -39,7 +39,7 @@ Rules and numbers: see the work-plan spec [`spec.md`](../../work-plan/name-quest
 26. Chests open with Up: the lid lifts, the contents float up for 1.5 s; a full bag shows `YOUR BAG IS FULL` and the chest stays shut. Opened chests stay open.
 27. A world's gate opens with `THE GATE OPENS` (the gate shakes, then vanishes top to bottom); a lever hit by any attack opens its area's shortcut doors for good.
 28. A surveyor says one line, then shows the world map: visited areas filled, the rest outlined, the current one blinking, lit checkpoints, closed gates, edge links as gaps.
-29. Each world plays a quiet 4 s ambience loop (Namula: the hearth's crackle; TEST GROUNDS: none), also in the pause menu over the quest.
+29. (D-057 since phase 4) Namula and each world play the user's song for that place (`quest_namula.ogg`, `quest_world1.ogg`..), and the boss song (`quest_boss.ogg`) while a boss fight runs; without the song, or with Settings' music OFF, the place's ambience plays. Before: each world plays a quiet 4 s ambience loop (Namula: the hearth's crackle; TEST GROUNDS: none), also in the pause menu over the quest.
 
 ## Rules (phase 4: world 1 and the bosses; numbers in spec §9, §12, §13)
 30. THE DRIFTING STATION has its own look (spec §22): deep space with a dim red sun and a ringed planet behind station spars, riveted plating with hazard stripes on every ledge, grated catwalks, cables, consoles and red lamps. Pits show open space. Its entry checkpoint is lit from the start.
@@ -62,4 +62,5 @@ Rules and numbers: see the work-plan spec [`spec.md`](../../work-plan/name-quest
 - 2026-11-21: phase 2 reviewed: R2 cancels a basic swing, spikes bounce.
 - 2026-11-21: phase 3 RPG systems built (rules 19-29).
 - 2026-11-21: phase 4 started: world 1's art and style frame, the boss framework, both world 1 bosses (rules 30-36).
+- 2026-11-21: music from the user's songs per place plus a boss song (D-057, rule 29); the ambience hums removed.
 - 2026-11-21: the user approved world 1's style frame; world 1's 20 areas built (rule 37). PS3 check and the user's playtest open.

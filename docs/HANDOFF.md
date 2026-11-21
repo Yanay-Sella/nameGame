@@ -1,7 +1,7 @@
 # Handoff: state of the work and how Claude and Codex share it
 
 **Read this first, update it before you stop.** Rules and commands are in `AGENTS.md`; conventions, questions between agents and the small-change lane are in `docs/COLLAB.md`; this file holds what changes between sessions.
-Updated: 2026-11-21 (Classic ship roles and NAME QUEST phase 4).
+Updated: 2026-11-21 (Classic ship roles and NAME QUEST phase 4 audio and autosave).
 
 ## Classic shooter
 
@@ -40,6 +40,7 @@ Updated: 2026-11-21 (Classic ship roles and NAME QUEST phase 4).
 - `make test`: 53 checks in `tests/game_tests.cpp` fail (e.g. line 1668 `lob.toX ...`, lines 1820-1844 alien hp and beam checks). They fail identically on the committed HEAD, so they predate phase 2. They look like stale shooter tests; investigate before trusting the shooter's behaviour, and don't "fix" them by loosening checks without understanding why.
 - Crumbling blocks are solid until phase 4.
 - Phase 3 numbers to look at in phase 9 (not changed): the NPC talk reach (14 dp) needs the hero almost touching the NPC; Mac scripts missed Marra from 18 dp. World 6's chest 5 (WHETSTONE + IRON TONIC) gives only the WHETSTONE: one `ChestContent` holds one item.
+- Audio: square-wave drones sound like white noise on the PS3's TV speakers; Namula's and world 1's were removed. Worlds 3-7's planned ambiences are continuous noise (wind, rumble, water) and may bother the user the same way. The user supplies NAME QUEST music (D-057): `quest_namula.ogg`, `quest_world1..7.ogg`, `quest_boss.ogg` via `make music`; Claude makes every other sound.
 - Ground enemies must be drawn at least 12 dp tall with their outline (spec §22), or an Archer's basic arrows fly over them; phases 5-9: extend `arrowsHitEveryGroundEnemy` to each redrawn roster.
 - Phase 4 decided: electric panels sit in the air row on a floor and hurt only while the hero overlaps the tile.
 - `check_docs.py docs` reports 7 broken links in old shooter work plans (`boss-lineup-plan.md`, `level-1-ending-plan.md`, `level-buffs-plan.md`); the NAME QUEST docs are clean.
@@ -48,6 +49,10 @@ Updated: 2026-11-21 (Classic ship roles and NAME QUEST phase 4).
 - Spec examples that disagree with the spec formula `round(100 * 1.2^(L-1))`: 39→40 is 102,067 (spec 102,064), 29→30 is 16,484 (spec 10,646). The code follows the formula; the user decides.
 
 ## Session log (newest first; add a line per session: date, agent, what changed, what is next)
+- 2026-11-21, Codex: set the Space buff's Magic Beam to 100 damage in both Classic variants (D-060). The beam checks and NAME QUEST tests passed. The other 50 shooter failures matched the baseline. A headless Mac screenshot confirmed the beam fired through a column of enemies in a three-player run.
+- 2026-11-21, Codex — Added boss-wave revives to Classic 1–2 Players. The focused regression and NAME QUEST passed, and shooter failures matched the baseline. Checked the returning ship and its two spare hearts in a Mac render. PS3 playtest pending.
+- 2026-11-21, Codex: checked the Classic Space buff tuning in code. The beam deals 60 damage per target in its column, and firing again during the charge restarts it and spends another rocket.
+- 2026-11-21, Claude: removed the square-wave hums under Namula and world 1 (the user's PS3 white noise); NAME QUEST music from the user's songs per place plus a boss song (D-057, `audioSetQuestSound`). PS3 listening checks open. Then: quitting the app now saves the NAME QUEST slot (spec §17); `scripts/ps3-lock.sh` leaves a game that was already running alone (new `make ps3-state`).
 - 2026-11-21, Codex — Added Classic ship roles for three- and four-player parties, with a per-controller chooser, role HUD, new sprites, and R2 specials. The new combat checks and NAME QUEST suite passed, and the shooter failures matched the baseline. Checked selection, drop-in and effects on the Mac and built the PS3 package. Next: PS3 couch playtest when requested.
 - 2026-11-21, Claude: the user approved world 1's look. World 1's 20 areas built (`quest_world1.cpp`), world 1 in the reachability test plus gate, layout-rule and chest checks; all 40 map screens read; the Overseer now hovers with its centre at 50 dp (was unreachable); a locked arena's ladder down no longer kills; boss fights measured with scratch bots. Next: step 10 on the PS3 when the user asks.
 - 2026-11-21, Claude: phase 4 steps 0-4 and 7: world 1 art (generator `world1.py`, layers, 13 props, 6 landmarks, space pits), redrawn world 1 enemies (4 movement frames + tell + attack), the boss framework with the Overseer and the Star Mage (tested in new TEST GROUNDS arenas 4-5), panels and vents drawn, `make quest-maps`, world 1's entry lit from the start, Ilsa's world 1 Great Name line, world 2's placeholder room. 5 boss checks; `make ps3` builds. Next: the user's OK on the style frame, then step 5.
