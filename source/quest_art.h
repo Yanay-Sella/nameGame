@@ -30,6 +30,8 @@ struct WorldArt {
     float propDensityTop, propDensityCeiling, propDensityWall;      // spec §22: 0.35, 0.25, 0.10 (Namula top 0.45)
     LightTint propLight;                    // the glow of props marked light
     const Sprite* pit;                      // drawn on air in the bottom 2 rows over a pit (world 1's space), nullptr: none
+    const Sprite* spikes; const Sprite* gate;   // the world's `^` and `g` looks; nullptr: phase 1's flat ones
+    const Sprite* ice; const Sprite* crumble[3];   // `i` and `c` (cracks spreading over its shake); nullptr: ground + flat marks
 };
 const WorldArt* worldArt(int world);   // nullptr: no art yet (worlds 1-8 until their phase)
 

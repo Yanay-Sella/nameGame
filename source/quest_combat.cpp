@@ -2,6 +2,8 @@
 #include "quest.h"
 #include "screen.h"
 #include "quest_sprites_1.h"
+#include "quest_sprites_2.h"
+#include "quest_sprites_3.h"
 #include <math.h>
 #include <string.h>
 #include <string>
@@ -56,6 +58,18 @@ const int JET_TILES = 3;
 // Buffs (spec §10): Whetstone ATK, Iron Tonic damage taken, Swift Feather walk; drinking a potion slows the walk.
 const float WHETSTONE_ATK = 1.2f, TONIC_DAMAGE = 0.8f, FEATHER_WALK = 1.15f, DRINK_WALK = 0.4f;
 const float LEVER_W = 8 * DP, LEVER_H = 14 * DP;   // the lever K's box, standing on the tile below its letter
+// World 2 (spec §9, §12): coconut palms R, banana peels, stink mist.
+const float COCONUT_REACH = 8 * DP, COCONUT_DELAY = 0.3f, COCONUT_SPEED = 200 * DP, COCONUT_REGROW = 4, COCONUT_DAMAGE = 0.20f;
+const int COCONUT_SIZE = (int)(6 * DP);
+// World 3 (spec §9): icicles drop 0.25 s after the hero is within 12 px below; crumbling blocks shake 0.6 s, break, return after 4 s.
+const float ICICLE_REACH = 12 * DP, ICICLE_DELAY = 0.25f, ICICLE_SPEED = 280 * DP, ICICLE_DAMAGE = 0.20f;
+const int ICICLE_W = (int)(4 * DP), ICICLE_H = (int)(9 * DP);
+const int ICICLE_BIT = 40;   // killed bits 40+ are an area's dropped icicles (gone until rest), by 'Y' order
+const float CRUMBLE_SHAKE = 0.6f, CRUMBLE_RETURN = 4;
+const float WIND_FLIP = 3;   // world 3 and 6 wind zones flip every 3 s
+const float FROZEN_TIME = 1.2f, FROZEN_PRESS_CUT = 0.15f;   // the Yeti's ice block (spec §12 world 3)
+const float PEEL_W = 8 * DP, PEEL_H = 6 * DP, PEEL_SLIDE = 0.5f, PEEL_MIN_SPEED = 100 * DP;
+const float MIST_RADIUS = 20 * DP, MIST_HURT = 0.03f, MIST_TIME = 6, PEEL_TIME = 6;   // 40 px across; 3 % of max HP per s inside
 
 const char ROSTER_LETTERS[ROSTER_SLOTS + 1] = "ABDEF";
 
@@ -88,7 +102,7 @@ static const Sprite PLACEHOLDER_ENEMY_B = {12, 12,
     "...ss..ss..."};
 #define PLACEHOLDER_ENEMY {&PLACEHOLDER_ENEMY_A, &PLACEHOLDER_ENEMY_B}
 
-// Rosters of worlds 1-6 (spec §8). World 1's are redrawn side-view (quest_sprites_1); worlds 2-6 still hold the 1x
+// Rosters of worlds 1-6 (spec §8). Worlds 1-2 are redrawn side-view (quest_sprites_1, _2); worlds 3-6 still hold the 1x
 // shooter sprites each will be redrawn from, which rosterType doubles.
 #define ENEMY_ROW(N) {&ENEMY_##N##_WALK_1, &ENEMY_##N##_WALK_2, &ENEMY_##N##_WALK_3, &ENEMY_##N##_WALK_4}
 static EnemyType ROSTERS[6][ROSTER_SLOTS] = {
@@ -97,16 +111,16 @@ static EnemyType ROSTERS[6][ROSTER_SLOTS] = {
      {"GUNNER", BEH_SHOOTER, KIND_SOLDIER, TRAIT_NONE, ENEMY_ROW(GUNNER), 1, SOUND_Q_ZAP, &ENEMY_GUNNER_TELL, &ENEMY_GUNNER_ATTACK},
      {"HOPPER DRONE", BEH_JUMPER, KIND_SOLDIER, TRAIT_NONE, ENEMY_ROW(HOPPER), 1, SOUND_Q_JUMP, &ENEMY_HOPPER_TELL, &ENEMY_HOPPER_ATTACK},
      {"SENTINEL", BEH_ARMORED, KIND_ELITE, TRAIT_NONE, ENEMY_ROW(SENTINEL), 1, SOUND_Q_SWING, &ENEMY_SENTINEL_TELL, &ENEMY_SENTINEL_ATTACK}},
-    {{"LEAFHOPPER", BEH_JUMPER, KIND_FODDER, TRAIT_NONE, {&LEAFHOPPER_A, &LEAFHOPPER_B}, 1, SOUND_Q_JUMP, nullptr, nullptr},
-     {"BEETLE", BEH_WALKER, KIND_FODDER, TRAIT_NONE, {&BEETLE_A, &BEETLE_B}, 1, SOUND_Q_STEP_LEAVES, nullptr, nullptr},
-     {"STAG", BEH_CHARGER, KIND_SOLDIER, TRAIT_NONE, {&STAG_A, &STAG_B}, 1, SOUND_Q_ROAR, nullptr, nullptr},
-     {"TREE MONKEY", BEH_DROPPER, KIND_SOLDIER, TRAIT_BANANA_ON_LAND, PLACEHOLDER_ENEMY, 1, SOUND_BANANA_THROW, nullptr, nullptr},
-     {"RHINO", BEH_ARMORED, KIND_ELITE, TRAIT_NONE, {&RHINO_A, &RHINO_B}, 1, SOUND_Q_SWING, nullptr, nullptr}},
-    {{"SNOWFLAKE", BEH_FLYER, KIND_FODDER, TRAIT_NONE, {&FLAKE_A, &FLAKE_B}, 1, SOUND_FREEZE, nullptr, nullptr},
-     {"ICE BAT", BEH_DROPPER, KIND_FODDER, TRAIT_NONE, {&ICEBAT_A, &ICEBAT_B}, 1, SOUND_SCREECH, nullptr, nullptr},
-     {"FROST SKULL", BEH_SHOOTER, KIND_SOLDIER, TRAIT_NONE, {&FROSTSKULL_A, &FROSTSKULL_B}, 1, SOUND_FREEZE, nullptr, nullptr},
-     {"YETI CUB", BEH_CHARGER, KIND_SOLDIER, TRAIT_NONE, PLACEHOLDER_ENEMY, 1, SOUND_Q_ROAR, nullptr, nullptr},
-     {"ICE KNIGHT", BEH_ARMORED, KIND_ELITE, TRAIT_NONE, PLACEHOLDER_ENEMY, 1, SOUND_Q_SWING, nullptr, nullptr}},
+    {{"LEAFHOPPER", BEH_JUMPER, KIND_FODDER, TRAIT_NONE, ENEMY_ROW(LEAFHOPPER), 1, SOUND_Q_JUMP, &ENEMY_LEAFHOPPER_TELL, &ENEMY_LEAFHOPPER_ATTACK},
+     {"BEETLE", BEH_WALKER, KIND_FODDER, TRAIT_NONE, ENEMY_ROW(BEETLE), 1, SOUND_Q_STEP_LEAVES, &ENEMY_BEETLE_TELL, &ENEMY_BEETLE_ATTACK},
+     {"STAG", BEH_CHARGER, KIND_SOLDIER, TRAIT_NONE, ENEMY_ROW(STAG), 1, SOUND_Q_ROAR, &ENEMY_STAG_TELL, &ENEMY_STAG_ATTACK},
+     {"TREE MONKEY", BEH_DROPPER, KIND_SOLDIER, TRAIT_BANANA_ON_LAND, ENEMY_ROW(TREE_MONKEY), 1, SOUND_BANANA_THROW, &ENEMY_TREE_MONKEY_TELL, &ENEMY_TREE_MONKEY_ATTACK},
+     {"RHINO", BEH_ARMORED, KIND_ELITE, TRAIT_NONE, ENEMY_ROW(RHINO), 1, SOUND_Q_SWING, &ENEMY_RHINO_TELL, &ENEMY_RHINO_ATTACK}},
+    {{"SNOWFLAKE", BEH_FLYER, KIND_FODDER, TRAIT_NONE, ENEMY_ROW(SNOWFLAKE), 1, SOUND_FREEZE, &ENEMY_SNOWFLAKE_TELL, &ENEMY_SNOWFLAKE_ATTACK},
+     {"ICE BAT", BEH_DROPPER, KIND_FODDER, TRAIT_NONE, ENEMY_ROW(ICE_BAT), 1, SOUND_SCREECH, &ENEMY_ICE_BAT_TELL, &ENEMY_ICE_BAT_ATTACK},
+     {"FROST SKULL", BEH_SHOOTER, KIND_SOLDIER, TRAIT_NONE, ENEMY_ROW(FROST_SKULL), 1, SOUND_FREEZE, &ENEMY_FROST_SKULL_TELL, &ENEMY_FROST_SKULL_ATTACK},
+     {"YETI CUB", BEH_CHARGER, KIND_SOLDIER, TRAIT_NONE, ENEMY_ROW(YETI_CUB), 1, SOUND_Q_ROAR, &ENEMY_YETI_CUB_TELL, &ENEMY_YETI_CUB_ATTACK},
+     {"ICE KNIGHT", BEH_ARMORED, KIND_ELITE, TRAIT_NONE, ENEMY_ROW(ICE_KNIGHT), 1, SOUND_Q_SWING, &ENEMY_ICE_KNIGHT_TELL, &ENEMY_ICE_KNIGHT_ATTACK}},
     {{"EMBER", BEH_FLYER, KIND_FODDER, TRAIT_NONE, {&EMBER_A, &EMBER_B}, 1, SOUND_SIZZLE, nullptr, nullptr},
      {"FIRE BAT", BEH_DROPPER, KIND_FODDER, TRAIT_NONE, {&FIREBAT_A, &FIREBAT_B}, 1, SOUND_SCREECH, nullptr, nullptr},
      {"MAGMA SKULL", BEH_SHOOTER, KIND_SOLDIER, TRAIT_NONE, {&MAGMASKULL_A, &MAGMASKULL_B}, 1, SOUND_SIZZLE, nullptr, nullptr},
@@ -149,7 +163,7 @@ int statsWorld(int world) {
 const EnemyType& rosterType(int world, int slot) {
     static bool ready = false;
     if (!ready) {
-        for (int w = 2; w <= 6; w++)
+        for (int w = 4; w <= 6; w++)
             for (EnemyType& t : ROSTERS[w - 1]) t.frames[0] = doubled(t.frames[0]), t.frames[1] = doubled(t.frames[1]);
         ready = true;
     }
@@ -210,10 +224,24 @@ float jetWarning(const Quest& q) {
 void spawnEnemies(Quest& q) {
     q.enemies.clear();
     q.projectiles.clear();
+    q.hazards.clear();
+    q.traps.clear();
+    q.mistDamage = 0;
     const AreaDef& def = *q.area.def;
     std::vector<uint64_t>& killed = q.killed[q.area.world];
     int areas = worldDef(q.area.world).count > q.area.index ? worldDef(q.area.world).count : q.area.index + 1;
     if ((int)killed.size() < areas) killed.resize(areas);
+    int icicle = 0;
+    for (int t = 0; t < def.cols * def.rows; t++) {   // coconut palms (world 2), icicles (world 3), crumbling blocks
+        char letter = def.tiles[t];
+        if (letter == 'R' && q.area.world == 2) q.traps.push_back({t, 'R', 0, 0});
+        if (letter == 'c') q.traps.push_back({t, 'c', 0, 0});
+        if (letter == 'Y' && q.area.world == 3) {
+            bool fallen = icicle < 64 - ICICLE_BIT && (killed[q.area.index] >> (ICICLE_BIT + icicle) & 1);
+            q.traps.push_back({t, 'Y', fallen ? 2 : 0, 0});
+            icicle++;
+        }
+    }
     int world = statsWorld(q.area.world), spawn = 0;
     bool ring = q.save.keys >> KEY_STRANGER_RING & 1;
     for (int t = 0; t < def.cols * def.rows; t++) {
@@ -308,8 +336,8 @@ static bool moveEnemyBody(const AreaState& area, Enemy& e, float dt) {
     return blocked;
 }
 
-// An aimed magenta shot from the enemy's centre toward the hero's (spec §8).
-static void enemyShoot(Quest& q, const Enemy& e) {
+// An aimed magenta shot (or a banana) from the enemy's centre toward the hero's (spec §8).
+static void enemyShoot(Quest& q, const Enemy& e, int kind = PROJ_ENEMY) {
     float ex = e.x + e.w / 2, ey = e.y + e.h / 2;
     float dx = q.hero.x + HERO_W / 2 - ex, dy = q.hero.y + HERO_H / 2 - ey, length = fmaxf(1, sqrtf(dx * dx + dy * dy));
     Projectile p = {};
@@ -320,7 +348,7 @@ static void enemyShoot(Quest& q, const Enemy& e) {
     p.w = p.h = SHOT_SIZE;
     p.damage = e.atk;
     p.range = SHOT_SPEED * SHOT_LIFE;
-    p.kind = PROJ_ENEMY;
+    p.kind = kind;
     q.projectiles.push_back(p);
 }
 
@@ -454,7 +482,7 @@ static void updateEnemy(Quest& q, Enemy& e, float dt) {
         e.vx = 0;
         moveEnemyBody(area, e, dt);
         if (e.state == ES_TELL && e.stateTimer >= SHOOTER_GLOW) {
-            enemyShoot(q, e);
+            enemyShoot(q, e, e.world == 3 ? PROJ_SNOWBALL : PROJ_ENEMY);   // the frost skull spits snowballs
             q.soundRequested[type.attackSound] = true;
             e.state = ES_PATROL;
             e.stateTimer = 0;
@@ -534,7 +562,7 @@ static void updateEnemy(Quest& q, Enemy& e, float dt) {
             if (e.onGround) {
                 e.state = ES_PATROL;
                 e.facingLeft = dx < 0;
-                if (type.trait == TRAIT_BANANA_ON_LAND) enemyShoot(q, e);
+                if (type.trait == TRAIT_BANANA_ON_LAND) enemyShoot(q, e, PROJ_BANANA);
             }
         } else {
             e.vx = (e.facingLeft ? -1 : 1) * DROPPER_WALK * speed;
@@ -939,6 +967,17 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
     h.iframes = fmaxf(0, h.iframes - dt);
     h.hurtTimer = fmaxf(0, h.hurtTimer - dt);
     h.partnerTimer = fmaxf(0, h.partnerTimer - dt);
+    h.slideTimer = fmaxf(0, h.slideTimer - dt);
+    bool firePressed = a.fire && !h.fireWasHeld;
+    h.fireWasHeld = a.fire;
+    if (h.frozenTimer > 0) {   // frozen in the Yeti's ice block: X or R1 presses chip it away
+        h.frozenTimer -= dt + (a.jump || firePressed ? FROZEN_PRESS_CUT : 0);
+        if (h.frozenTimer <= 0) {
+            h.frozenTimer = 0;
+            q.soundRequested[SOUND_CRACK] = true;
+        }
+    }
+    q.area.windFlipped = fmodf(q.time, 2 * WIND_FLIP) >= WIND_FLIP;
     for (float& t : h.buffTimers) t = fmaxf(0, t - dt);
     h.mpFraction += s.mpRegen * dt;
     while (h.mpFraction >= 1) {
@@ -947,7 +986,7 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
     }
 
     // Dodge (Circle): the Magician blinks (also in the air), the others roll on the ground.
-    bool free = h.hurtTimer <= 0 && h.castTimer <= 0 && !h.climbing && h.rollTimer <= 0;
+    bool free = h.hurtTimer <= 0 && h.castTimer <= 0 && !h.climbing && h.rollTimer <= 0 && h.slideTimer <= 0 && h.frozenTimer <= 0;
     if (a.back && free && h.rollCooldown <= 0 && h.skill < 0) {
         if (cls == CLASS_MAGICIAN) {
             float dir = h.facingLeft ? -1 : 1;
@@ -967,12 +1006,13 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
             q.soundRequested[SOUND_Q_DODGE] = true;
         }
     }
-    free = h.hurtTimer <= 0 && h.castTimer <= 0 && !h.climbing && h.rollTimer <= 0;
+    free = h.hurtTimer <= 0 && h.castTimer <= 0 && !h.climbing && h.rollTimer <= 0 && h.slideTimer <= 0 && h.frozenTimer <= 0;
 
     // Strong attack (R2), then the basic attack (R1 held); neither while a skill plays.
     if (a.rocket && free && h.skill < 0) castSkill(q, cls, job);
     if (a.fire && free && h.skill < 0 && h.attackTimer <= 0) {
         h.attackTimer = basic.cycle;
+        h.attackUp = cls == CLASS_THIEF && a.moveY < -0.5f;
         h.swing++;
         q.soundRequested[basic.sound] = true;
         float dir = h.facingLeft ? -1 : 1;
@@ -987,7 +1027,16 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
     // Movement: knockback, roll and dash keep their speed; a cast roots the hero on the ground; ranged basics walk at x0.5.
     Actions move = a;
     float dir = h.facingLeft ? -1 : 1;
-    if (h.hurtTimer > 0 || (h.castTimer > 0 && !h.onGround)) {
+    if (h.frozenTimer > 0) {   // in the ice block: no control
+        h.vx = 0;
+        move.moveX = move.moveY = 0;
+        move.jump = false;
+    } else if (h.slideTimer > 0) {   // on a peel: sliding the way it faced, no control
+        h.vx = h.slideSpeed;
+        move.moveX = h.slideSpeed / walk;
+        move.moveY = 0;
+        move.jump = false;
+    } else if (h.hurtTimer > 0 || (h.castTimer > 0 && !h.onGround)) {
         move.moveX = h.vx / walk;
         move.jump = false;
         move.jumpHeld = true;
@@ -1019,10 +1068,17 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
         float elapsed = basic.cycle - h.attackTimer, x, y;
         if (elapsed >= basic.from && elapsed <= basic.to) {
             frontBox(h, basic.boxW, basic.boxH, &x, &y);
-            int hits = hitBox(q, x, y, basic.boxW, basic.boxH, basic.mult * BASIC_MULT_BY_JOB[job], false, h.swing, false);
+            float w = basic.boxW, bh = basic.boxH;
+            if (h.attackUp) {   // the box turned upright, centred above the head
+                w = basic.boxH;
+                bh = basic.boxW;
+                x = h.x + HERO_W / 2 - w / 2;
+                y = h.y - bh;
+            }
+            int hits = hitBox(q, x, y, w, bh, basic.mult * BASIC_MULT_BY_JOB[job], false, h.swing, false);
             h.mp = h.mp + hits < s.maxMp ? h.mp + hits : s.maxMp;   // every landed basic hit gives +1 MP
             if (h.partnerTimer > 0)
-                hitBox(q, x - dir * PARTNER_BEHIND, y, basic.boxW, basic.boxH, basic.mult * BASIC_MULT_BY_JOB[job] * PARTNER_MULT, false, h.swing, true);
+                hitBox(q, x - dir * PARTNER_BEHIND, y, w, bh, basic.mult * BASIC_MULT_BY_JOB[job] * PARTNER_MULT, false, h.swing, true);
         }
     }
     if (h.skill >= 0) {
@@ -1037,6 +1093,7 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
     // Shots: move, stop at tiles or range, hit.
     for (size_t i = 0; i < q.projectiles.size();) {
         Projectile& p = q.projectiles[i];
+        p.vy += p.gravity * dt;
         float mx = p.vx * dt, my = p.vy * dt;
         p.x += mx;
         p.y += my;
@@ -1072,9 +1129,22 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
                 if (!p.strong) h.mp = h.mp < s.maxMp ? h.mp + 1 : s.maxMp;
                 if (p.pierce-- <= 0) gone = true;
             }
-        } else if (!gone && overlaps(p.x, p.y, (float)p.w, (float)p.h, h.x, h.y, HERO_W, HERO_H)) {
-            hurtHero(q, damageToHero(p.damage, s.def), p.x + p.w / 2);
+        } else if (!gone && p.kind == PROJ_ICE_CUBE && overlaps(p.x, p.y, (float)p.w, (float)p.h, h.x, h.y, HERO_W, HERO_H)) {
+            if (h.iframes <= 0 && h.frozenTimer <= 0) {
+                h.frozenTimer = FROZEN_TIME;
+                q.soundRequested[SOUND_FREEZE] = true;
+            }
             gone = true;
+        } else if (!gone && p.damage > 0 && overlaps(p.x, p.y, (float)p.w, (float)p.h, h.x, h.y, HERO_W, HERO_H)) {
+            hurtHero(q, p.trap ? p.damage : damageToHero(p.damage, s.def), p.x + p.w / 2);
+            gone = true;
+        }
+        if (gone && (p.kind == PROJ_PEEL || p.kind == PROJ_POOP) && p.range > 0) {   // a lobbed peel or poop lands where it hit
+            float bottom = p.y + p.h;
+            int row = (int)floorf(bottom / TILE);
+            if (tileSolid(tileAt(q.area, (int)floorf((p.x + p.w / 2) / TILE), row))) bottom = (float)(row * TILE);
+            if (p.kind == PROJ_PEEL) q.hazards.push_back({HAZARD_PEEL, p.x + p.w / 2, bottom, PEEL_TIME});
+            else q.hazards.push_back({HAZARD_MIST, p.x + p.w / 2, bottom - MIST_RADIUS / 2, MIST_TIME});
         }
         if (gone) q.projectiles.erase(q.projectiles.begin() + i);
         else i++;
@@ -1111,6 +1181,81 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
             for (int k = 1; k <= JET_TILES && r <= r1; k++)
                 if (tileAt(q.area, c, r + k) == 'f' && jetBurning(q)) hurtHero(q, (int)fmaxf(1, lroundf(s.maxHp * JET_DAMAGE)), away);
         }
+    // Tile traps (spec §9): coconut palms (world 2), icicles (world 3) and crumbling blocks, each its own little cycle.
+    const AreaDef& def = *q.area.def;
+    int icicle = 0;
+    for (TileTrap& trap : q.traps) {
+        int col = trap.tile % def.cols, row = trap.tile / def.cols;
+        float tx = col * TILE + TILE / 2.0f, bottom = (float)((row + 1) * TILE);
+        trap.timer -= dt;
+        if (trap.kind == 'R') {   // the hero's centre passing within 8 px below drops the coconut 0.3 s later; it regrows in 4 s
+            if (trap.state == 0 && fabsf(heroCx - tx) <= COCONUT_REACH && h.y > bottom - TILE) trap.state = 1, trap.timer = COCONUT_DELAY;
+            else if (trap.state == 1 && trap.timer <= 0) {
+                Projectile p = {};
+                p.x = tx - COCONUT_SIZE / 2;
+                p.y = bottom - COCONUT_SIZE;
+                p.vy = COCONUT_SPEED;
+                p.w = p.h = COCONUT_SIZE;
+                p.damage = (int)fmaxf(1, lroundf(s.maxHp * COCONUT_DAMAGE));
+                p.trap = true;
+                p.range = (float)(def.rows * TILE);
+                p.kind = PROJ_COCONUT;
+                q.projectiles.push_back(p);
+                trap.state = 2;
+                trap.timer = COCONUT_REGROW;
+            } else if (trap.state == 2 && trap.timer <= 0) trap.state = 0;
+        } else if (trap.kind == 'Y') {   // the hero within 12 px below: it shakes 0.25 s and falls; gone until a rest
+            float top = (float)(row * TILE);
+            if (trap.state == 0 && fabsf(heroCx - tx) <= ICICLE_REACH && h.y > top) trap.state = 1, trap.timer = ICICLE_DELAY;
+            else if (trap.state == 1 && trap.timer <= 0) {
+                Projectile p = {};
+                p.x = tx - ICICLE_W / 2;
+                p.y = top;
+                p.vy = ICICLE_SPEED;
+                p.w = ICICLE_W;
+                p.h = ICICLE_H;
+                p.damage = (int)fmaxf(1, lroundf(s.maxHp * ICICLE_DAMAGE));
+                p.trap = true;
+                p.range = (float)(def.rows * TILE);
+                p.kind = PROJ_ICICLE;
+                q.projectiles.push_back(p);
+                trap.state = 2;
+                std::vector<uint64_t>& killed = q.killed[q.area.world];
+                if (icicle < 64 - ICICLE_BIT && q.area.index < (int)killed.size()) killed[q.area.index] |= 1ull << (ICICLE_BIT + icicle);
+            }
+            icicle++;
+        } else if (trap.kind == 'c') {   // stood on: shakes 0.6 s, breaks, returns after 4 s (not into the hero)
+            bool standing = h.onGround && (int)lroundf((h.y + HERO_H) / TILE) == row && h.x < (col + 1) * TILE && h.x + HERO_W > col * TILE;
+            if (trap.state == 0 && standing) trap.state = 1, trap.timer = CRUMBLE_SHAKE;
+            else if (trap.state == 1 && trap.timer <= 0) {
+                q.area.tiles[trap.tile] = '.';
+                q.soundRequested[SOUND_CRACK] = true;
+                trap.state = 2;
+                trap.timer = CRUMBLE_RETURN;
+            } else if (trap.state == 2 && trap.timer <= 0 && !overlaps(col * TILE, row * TILE, TILE, TILE, h.x, h.y, HERO_W, HERO_H)) {
+                q.area.tiles[trap.tile] = 'c';
+                trap.state = 0;
+            }
+        }
+    }
+    // Peels and stink mists (spec §12 world 2): a peel slides the hero standing on it; a mist takes 3 % of max HP per s.
+    for (size_t i = 0; i < q.hazards.size();) {
+        FloorHazard& z = q.hazards[i];
+        if (z.kind == HAZARD_PEEL && h.onGround && h.slideTimer <= 0 && overlaps(z.x - PEEL_W / 2, z.y - PEEL_H, PEEL_W, PEEL_H, h.x, h.y, HERO_W, HERO_H)) {
+            h.slideTimer = PEEL_SLIDE;
+            h.slideSpeed = (h.facingLeft ? -1 : 1) * fmaxf(fabsf(h.vx), PEEL_MIN_SPEED);
+            q.soundRequested[SOUND_Q_DODGE] = true;
+        }
+        float mx = heroCx - z.x, my = h.y + HERO_H / 2 - z.y;
+        if (z.kind == HAZARD_MIST && mx * mx + my * my <= MIST_RADIUS * MIST_RADIUS && !q.godMode) {
+            q.mistDamage += MIST_HURT * s.maxHp * dt;
+            int whole = (int)q.mistDamage;
+            q.mistDamage -= whole;
+            h.hp = h.hp > whole ? h.hp - whole : 0;
+        }
+        if ((z.timer -= dt) <= 0) q.hazards.erase(q.hazards.begin() + i);
+        else i++;
+    }
     // Panels turning on buzz when one is on screen (spec §9).
     float panelCycle = PANEL_ON + (q.area.def->band >= 2 ? 1.0f : 1.5f);
     if (panelOn(q) && fmodf(q.time - dt, panelCycle) >= PANEL_ON) {

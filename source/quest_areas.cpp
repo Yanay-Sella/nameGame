@@ -5,6 +5,10 @@
 static const AreaLink NO_LINK = {-1, 0, 0};
 extern const AreaDef WORLD1_AREAS[];   // quest_world1.cpp
 extern const int WORLD1_AREA_COUNT;
+extern const AreaDef WORLD2_AREAS[];   // quest_world2.cpp
+extern const int WORLD2_AREA_COUNT;
+extern const AreaDef WORLD3_AREAS[];   // quest_world3.cpp
+extern const int WORLD3_AREA_COUNT;
 
 // Namula (world 0): the last village, safe; its NPCs stand on the N spots (spec §14 locations).
 // Landmarks (L, spec §22): the hearth's stone ring, two market stalls; the well, the statue, a signpost; boats, the hut.
@@ -280,43 +284,12 @@ static const AreaDef TEST_AREAS[] = {
      {{4, 6, 18}, NO_LINK, NO_LINK, NO_LINK}, {-1, -1, -1, -1}, {-1, -1, -1, -1, -1, -1, -1, -1}, 9, 0, 2, AREA_BOSS, -1, {}},
 };
 
-// World 2's entry until phase 5 builds THE GREENDEEP: one closed room with the entry checkpoint, so travelling there
-// after the Star Mage's death works (phase 4 plan; removed in phase 5).
-static const char WORLD2_ENTRY[] =
-    "################################################################################"
-    "################################################################################"
-    "##............................................................................##"
-    "##............................................................................##"
-    "##............................................................................##"
-    "##............................................................................##"
-    "##............................................................................##"
-    "##............................................................................##"
-    "##............................................................................##"
-    "##............................................................................##"
-    "##............................................................................##"
-    "##............................................................................##"
-    "##............................................................................##"
-    "##............................................................................##"
-    "##............................................................................##"
-    "##............................................................................##"
-    "##............................................................................##"
-    "##............................................................................##"
-    "##........C...................................................................##"
-    "################################################################################"
-    "################################################################################"
-    "################################################################################"
-    "################################################################################";
-static const AreaDef WORLD2_AREAS[] = {
-    {"THE EDGE OF GREEN", WIDE_COLS, WIDE_ROWS, WORLD2_ENTRY, NO_LINK, NO_LINK, NO_LINK, NO_LINK,
-     {NO_LINK, NO_LINK, NO_LINK, NO_LINK}, {-1, -1, -1, -1}, {-1, -1, -1, -1, -1, -1, -1, -1}, 0, 0, 0, 0, -1, {}},
-};
-
 // Styles: ground top / fill, one-way platforms, ladders, the two liquid colours, the map colour, footsteps (spec §13).
 static const WorldDef WORLDS[WORLD_COUNT] = {
     {"NAMULA", NAMULA_AREAS, 3, {'%', '*', '%', 'h', '2', '5', '%', SOUND_Q_STEP_STONE}},
     {"THE DRIFTING STATION", WORLD1_AREAS, WORLD1_AREA_COUNT, {'b', 'd', 's', 's', 'n', 'd', 'u', SOUND_Q_STEP_METAL}},
-    {"THE GREENDEEP", WORLD2_AREAS, 1, {'F', 't', 'B', 'G', '3', '4', 'F', SOUND_Q_STEP_LEAVES}},
-    {"THE WHITE SILENCE", nullptr, 0, {'i', 'A', 'E', 'h', 'q', 'I', 'I', SOUND_Q_STEP_SNOW}},
+    {"THE GREENDEEP", WORLD2_AREAS, WORLD2_AREA_COUNT, {'F', 't', 'B', 'G', '3', '4', 'F', SOUND_Q_STEP_LEAVES}},
+    {"THE WHITE SILENCE", WORLD3_AREAS, WORLD3_AREA_COUNT, {'i', 'A', 'E', 'h', 'q', 'I', 'I', SOUND_Q_STEP_SNOW}},
     {"THE EMBER MAW", nullptr, 0, {'K', 'V', 'D', 'h', 'O', 'Z', 'C', SOUND_Q_STEP_ROCK}},
     {"THE SUNKEN HALLS", nullptr, 0, {'4', '3', '5', '7', '1', '2', '6', SOUND_Q_STEP_SAND}},
     {"THE NAMELESS CITADEL", nullptr, 0, {'?', '!', 'z', 'z', 'k', 'n', 'z', SOUND_Q_STEP_MARBLE}},

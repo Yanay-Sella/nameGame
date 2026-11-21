@@ -4,6 +4,8 @@
 #include "quest_art.h"
 #include "quest_sprites.h"
 #include "quest_sprites_1.h"
+#include "quest_sprites_2.h"
+#include "quest_sprites_3.h"
 #include "screen.h"
 #include <algorithm>
 #include <math.h>
@@ -32,7 +34,8 @@ static const Sprite* const NPC_FRAMES[NPC_SURVEYOR_FIRST + 1][2] = {
     NPC_ROW(YSOLDE), NPC_ROW(KIT), NPC_ROW(GATEKEEPER), NPC_ROW(TOBIN), {}, {}, {}, {}, NPC_ROW(SURVEYOR)};
 // Boss frames: idle 1-2, tell, attack, hurt, phase 2 (spec §22); bosses of later phases have none yet.
 #define BOSS_ROW(N) {&BOSS_##N##_IDLE_1, &BOSS_##N##_IDLE_2, &BOSS_##N##_TELL, &BOSS_##N##_ATTACK, &BOSS_##N##_HURT, &BOSS_##N##_PHASE2}
-static const Sprite* const BOSS_FRAMES[2][6] = {BOSS_ROW(OVERSEER), BOSS_ROW(STAR_MAGE)};
+static const Sprite* const BOSS_FRAMES[6][6] = {BOSS_ROW(OVERSEER), BOSS_ROW(STAR_MAGE), BOSS_ROW(MONKEY_KING), BOSS_ROW(SILVERBACK),
+                                                BOSS_ROW(YETI), BOSS_ROW(TITAN)};
 const float BOSS_WHITE = 0.12f, MARKER_BLINK = 4, MARKER_BLINK_LAST = 12, MARKER_LAST = 0.3f, EDGE_WALL = 4 * DP;
 static const Sprite* const ITEM_ICONS[ITEM_COUNT] = {&ICON_RED, &ICON_BIG, &ICON_MANA, &ICON_WHETSTONE, &ICON_TONIC, &ICON_FEATHER};
 enum HeroFrame { FRAME_IDLE_1, FRAME_IDLE_2, FRAME_WALK_1, FRAME_WALK_2, FRAME_WALK_3, FRAME_WALK_4, FRAME_JUMP, FRAME_FALL,
@@ -49,6 +52,25 @@ const char* const CLASS_TEXT[CLASS_COUNT][2] = {
     {"HEAVY ARMOUR,", "A WIDE SWORD."}, {"ARROWS FROM", "FAR AWAY."}, {"BOLTS THAT HIT", "HARD. FRAGILE."}, {"FAST DAGGERS,", "QUICK FEET."}};
 static void drawCentred(int y, const char* text, uint32_t color, int scale = 1) {
     drawText((QUEST_W - textWidth(text, scale * DP)) / 2, y, text, color, scale * DP);
+}
+
+// A 1x shooter sprite (banana, coconut, peel, poop) drawn as 2x2 blocks, the size the spec gives it in dp; see-through
+// ice '~' mixes a quarter of its colour into what is under it, as drawSprite does.
+static void drawDoubled(const Sprite& sprite, int x, int y, bool flip) {
+    for (int row = 0; row < sprite.h; row++)
+        for (int col = 0; col < sprite.w; col++) {
+            char c = sprite.pixels[row * sprite.w + (flip ? sprite.w - 1 - col : col)];
+            if (c == '~') {
+                for (int py = y + row * DP; py < y + (row + 1) * DP; py++)
+                    for (int px = x + col * DP; px < x + (col + 1) * DP; px++)
+                        if (px >= 0 && px < screenW && py >= 0 && py < screenH) {
+                            uint32_t& pixel = screenTarget[py * screenW + px];
+                            pixel = 0xFF000000 | (((pixel >> 1) & 0x7F7F7F) + ((pixel >> 2) & 0x3F3F3F) + ((paletteColor('~') >> 2) & 0x3F3F3F));
+                        }
+            } else if (c != '.') {
+                fillRect(x + col * DP, y + row * DP, DP, DP, paletteColor(c));
+            }
+        }
 }
 
 static void drawPanel(int x, int y, int w, int h, char border) {
@@ -145,10 +167,13 @@ static void drawTileFlat(const Quest& q, char t, int tx, int ty, int sx, int sy)
         }
         break;
     case '<':
-    case '>': {
-        int shift = (int)(q.time * 50) % 8;
-        int x = t == '>' ? shift : 7 - shift;
-        fillRect(sx + std::min(x, 5) * DP, sy + (2 + (tx + ty) % 4) * DP, 3 * DP, DP, paletteColor('n'));
+    case '>': {   // world 3 and 6 wind: two snow streaks blowing the way the zone pushes now
+        bool wind = q.area.world == 3 || q.area.world == 6, right = (t == '>') != (wind && q.area.windFlipped);
+        for (int k = 0; k < (wind ? 2 : 1); k++) {
+            int shift = (int)(q.time * 50 + k * 4 + tx * 3) % 8;
+            int x = right ? shift : 7 - shift;
+            fillRect(sx + std::min(x, 5) * DP, sy + (2 + (tx + ty + k * 3) % 6) * DP, 3 * DP, DP, paletteColor(wind ? 'w' : 'n'));
+        }
         break;
     }
     case 'v': {   // a floor grille and pale streaks rising through the 6 tiles it lifts (spec §4)
@@ -198,6 +223,18 @@ static void drawTile(const Quest& q, const WorldArt& art, int tx, int ty, int sx
         bool down = tileSolid(tileAt(area, tx, ty + 1)), left = tileSolid(tileAt(area, tx - 1, ty));
         const Sprite* const* variants = art.ground[shapeOf(up, right, down, left)];
         const Sprite* sprite = variants[hash % 3] ? variants[hash % 3] : variants[0];
+        if (t == 'i' && art.ice) {
+            drawSpritePal(*art.ice, sx, sy, false, pal);
+            break;
+        }
+        if (t == 'c' && art.crumble[0]) {   // the crack spreads over the shake; the block jitters 1 dp
+            const TileTrap* trap = nullptr;
+            for (const TileTrap& k : q.traps) if (k.tile == ty * area.def->cols + tx) trap = &k;
+            int stage = trap && trap->state == 1 ? std::min(2, (int)((0.6f - trap->timer) / 0.2f)) : 0;
+            int shake = trap && trap->state == 1 ? ((int)(q.time * 40) % 2 ? DP : -DP) : 0;
+            drawSpritePal(*art.crumble[stage], sx + shake, sy, false, pal);
+            break;
+        }
         drawSpritePal(*sprite, sx, sy, false, pal);
         if (t != '#') drawTileFlat(q, t, tx, ty, sx, sy);   // crumble cracks and ice keep phase 1's marks over the ground
         if (!up) {
@@ -235,6 +272,14 @@ static void drawTile(const Quest& q, const WorldArt& art, int tx, int ty, int sx
     }
     case '|':
         drawSpritePal(*art.ladder[tileAt(area, tx, ty - 1) == '|' ? 0 : 1], sx, sy, false, pal);
+        break;
+    case '^':
+        if (art.spikes) drawSpritePal(*art.spikes, sx, sy, hash & 1, pal);
+        else drawTileFlat(q, t, tx, ty, sx, sy);
+        break;
+    case 'g':
+        if (art.gate) drawSpritePal(*art.gate, sx, sy, false, pal);
+        else drawTileFlat(q, t, tx, ty, sx, sy);
         break;
     case '~':
         if (tileAt(area, tx, ty - 1) == '~') {
@@ -294,6 +339,23 @@ static void drawObject(const Quest& q, char letter, int tx, int ty, int camX, in
     } else if (letter == 'K') {
         bool pulled = def.shortcut >= 0 && (q.save.shortcuts[q.area.world] >> def.shortcut & 1);
         sprite = pulled ? &LEVER_ON : &LEVER_OFF;
+    } else if (letter == 'R' && q.area.world == 2) {   // a coconut palm: its trunk down to the ground, the crown, its coconut
+        const WorldArt& art = *worldArt(2);
+        int state = 0;
+        for (const TileTrap& trap : q.traps) if (trap.tile == ty * def.cols + tx) state = trap.state;
+        for (int r = ty + 1; r < def.rows && !tileSolid(tileAt(q.area, tx, r)); r++)
+            drawSpritePal(GREEN_PALM_TRUNK, cx - GREEN_PALM_TRUNK.w / 2, r * TILE - camY, false, art.palette);
+        const Sprite& crown = state == 2 ? GREEN_PALM_BARE : GREEN_PALM;
+        drawSpritePal(crown, cx - crown.w / 2, bottom - crown.h + 6 * DP, false, art.palette);
+        int shake = state == 1 ? ((int)(q.time * 40) % 2 ? DP : -DP) : 0;
+        if (state != 2) drawDoubled(COCONUT, cx - 3 * DP + shake, bottom - 6 * DP, false);
+        return;
+    } else if (letter == 'Y' && q.area.world == 3) {   // an icicle hanging from the ceiling above its letter; it shakes, then falls
+        int state = 0;
+        for (const TileTrap& trap : q.traps) if (trap.tile == ty * def.cols + tx) state = trap.state;
+        int shake = state == 1 ? ((int)(q.time * 40) % 2 ? DP : -DP) : 0;
+        if (state != 2) drawDoubled(ICICLE, cx - 2 * DP + shake, ty * TILE - camY, false);
+        return;
     } else if (letter == 'N' || letter == 'M') {
         int id = NPC_SURVEYOR_FIRST;
         if (letter == 'N') {
@@ -329,6 +391,8 @@ static void drawHero(const Quest& q, int camX, int camY) {
     if (h.iframes > 0 && q.mode != QMODE_DEAD && (int)(h.iframes / IFRAME_BLINK) % 2) return;   // blinks during i-frames
     // Small old-school heroes (the user's choice): the outline is part of the sprite.
     drawSpriteEx(sprite, x, y, h.facingLeft, job ? 'h' : 0, paletteColor(TRIM_BY_JOB[job]));
+    if (h.frozenTimer > 0)   // the Yeti's ice block around the hero
+        drawDoubled(ICE_CUBE, (int)(h.x + HERO_W / 2) - ICE_CUBE.w * DP / 2 - camX, (int)(h.y + HERO_H) - ICE_CUBE.h * DP - camY, false);
 }
 
 // A crescent filling the box: the outer half-ellipse centred on the box's side nearest the hero (sword arcs).
@@ -356,6 +420,24 @@ static void drawCombat(const Quest& q, int camX, int camY) {
         fillRect(ex + 3 * DP, ey, 2 * DP, 2 * DP, paletteColor('y'));
         fillRect(ex + 3 * DP, ey + 4 * DP, 2 * DP, 2 * DP, paletteColor('w'));
     }
+    for (const FloorHazard& z : q.hazards) {
+        int zx = (int)z.x - camX, zy = (int)z.y - camY;
+        if (z.kind == HAZARD_PEEL) {   // blinks in its last second
+            if (z.timer > 1 || fmodf(z.timer, 0.2f) >= 0.1f) drawDoubled(PEEL, zx - 4 * DP, zy - 6 * DP, false);
+            continue;
+        }
+        // The stink mist: a dithered sickly-green circle that shimmers and thins out in its last second (the shooter's).
+        int r = (int)(20 * DP), shimmer = (int)(q.time * 4) % 2;
+        bool fading = z.timer < 1;
+        for (int dy = -r; dy <= r; dy += DP)
+            for (int dx = -r; dx <= r; dx += DP) {
+                int d2 = dx * dx + dy * dy, gx = dx / (int)DP, gy = dy / (int)DP;
+                if (d2 > r * r) continue;
+                bool edge = d2 > r * r * 0.55f;
+                if ((edge || fading) ? ((gx + 2 * gy + shimmer) & 3) == 0 : ((gx + gy + shimmer) & 1) == 0)
+                    fillRect(zx + dx, zy + dy, DP, DP, paletteColor('M'));
+            }
+    }
     for (const Enemy& e : q.enemies) {
         if (!e.alive) continue;
         const EnemyType& type = rosterType(e.world, e.type);
@@ -364,7 +446,7 @@ static void drawCombat(const Quest& q, int camX, int camY) {
         bool telling = e.state == ES_TELL || (type.behaviour == BEH_JUMPER && e.onGround && e.stateTimer >= 1.0f);
         bool attacking = e.state == ES_ACT || (type.behaviour == BEH_SHOOTER && e.state == ES_PATROL && e.stateTimer < 0.2f) ||
                          (type.behaviour == BEH_JUMPER && !e.onGround);
-        if (telling && type.tell) pose = type.tell;
+        if ((telling || (type.behaviour == BEH_DROPPER && e.state == ES_HANG)) && type.tell) pose = type.tell;   // a dropper hangs in its tell pose
         else if (attacking && type.attack) pose = type.attack;
         const Sprite& sprite = *pose;
         int x = (int)floorf(e.x - 2 * DP) - camX, y = (int)floorf(e.y - 2 * DP) - camY;
@@ -386,14 +468,17 @@ static void drawCombat(const Quest& q, int camX, int camY) {
     }
     // Bosses: white on a hit, then the hurt frame; the phase-2 look while shifting and after; the Star Mage fades by dither.
     for (const QuestBoss& b : q.bosses) {
-        if (!b.alive || b.id > QBOSS_STAR_MAGE) continue;
+        if (!b.alive || b.id > QBOSS_TITAN) continue;
         int pose = bossPose(b), frame = b.phase >= 2 ? 5 : (int)(q.time / 0.4f) % 2;
         if (pose == POSE_TELL) frame = 2;
         else if (pose == POSE_ATTACK) frame = 3;
         if (b.shift > 0) frame = 5;
         if (b.flash > 0) frame = 4;
-        const Sprite& sprite = *BOSS_FRAMES[b.id][frame];
-        int x = (int)floorf(b.x - 2 * DP) - camX, y = (int)floorf(b.y - 2 * DP) - camY;
+        bool sliding = b.id == QBOSS_YETI && b.attack == 1 && b.step == 1;   // the Yeti's BELLY SLIDE
+        const Sprite& sprite = sliding && b.flash <= 0 ? BOSS_YETI_SLIDE : *BOSS_FRAMES[b.id][frame];
+        int x = (int)floorf(b.x + b.w / 2.0f - sprite.w / 2.0f) - camX, y = (int)floorf(b.y + b.h + 2 * DP - sprite.h) - camY;
+        if (b.id == QBOSS_YETI && b.attack == 0 && b.step == 0)   // SNEEZE's tell
+            drawText(x + sprite.w / 2 - textWidth("AH... AH...", DP) / 2, y - 6 * DP, "AH... AH...", paletteColor('w'), DP);
         float shown = bossVisibility(b);
         if (b.flash > BOSS_WHITE) {
             drawSpriteSolid(sprite, x, y, paletteColor('w'), b.facingLeft);
@@ -425,7 +510,20 @@ static void drawCombat(const Quest& q, int camX, int camY) {
     }
     for (const Projectile& p : q.projectiles) {
         int x = (int)p.x - camX, y = (int)p.y - camY;
-        if (!p.fromHero) {
+        if (!p.fromHero && (p.kind == PROJ_BANANA || p.kind == PROJ_COCONUT || p.kind == PROJ_PEEL || p.kind == PROJ_POOP)) {
+            const Sprite& sprite = p.kind == PROJ_BANANA ? ((int)(q.time * 8) % 2 ? BANANA_B : BANANA_A)
+                                 : p.kind == PROJ_COCONUT ? COCONUT : p.kind == PROJ_PEEL ? PEEL : POOP;
+            drawDoubled(sprite, x + p.w / 2 - sprite.w * DP / 2, y + p.h / 2 - sprite.h * DP / 2, p.vx < 0);
+        } else if (!p.fromHero && (p.kind == PROJ_ICICLE || p.kind == PROJ_SNOWBALL || p.kind == PROJ_ICE_CUBE || p.kind == PROJ_SHARD)) {
+            const Sprite& sprite = p.kind == PROJ_ICICLE ? ICICLE : p.kind == PROJ_SNOWBALL ? SNOWBALL : p.kind == PROJ_ICE_CUBE ? ICE_CUBE : ICE_SHARD;
+            drawDoubled(sprite, x + p.w / 2 - sprite.w * DP / 2, y + p.h / 2 - sprite.h * DP / 2, p.kind == PROJ_SHARD && p.vx < 0);
+        } else if (!p.fromHero && p.kind == PROJ_WAVE) {   // a boss's shockwave along the floor: a magenta crest
+            for (int k = 0; k < p.w; k += DP) {
+                int hgt = p.h * (k < p.w / 2 ? k + DP : p.w - k) / (p.w / 2);
+                fillRect(x + k, y + p.h - hgt, DP, hgt, paletteColor('m'));
+            }
+            fillRect(x + p.w / 4, y + p.h - 2 * DP, p.w / 2, 2 * DP, paletteColor('w'));
+        } else if (!p.fromHero) {
             fillRect(x, y, p.w, p.h, paletteColor('m'));
         } else if (p.kind == PROJ_WAVE) {
             fillRect(x, y + p.h / 2, p.w, p.h / 2, paletteColor('o'));
@@ -444,6 +542,15 @@ static void drawCombat(const Quest& q, int camX, int camY) {
         switch (f.kind) {
         case FX_SWING: {   // the basic sword arc follows the hero while the swing plays
             if (h.attackTimer <= 0) break;
+            if (h.attackUp) {   // the arc turned upright above the head, bulging up
+                int w = (int)f.h, ah = (int)f.w, bx = (int)(h.x + HERO_W / 2) - w / 2 - camX, by = (int)h.y - ah - camY;
+                for (int row = 0; row < ah; row += DP)
+                    for (int col = 0; col < w; col += DP) {
+                        float nx = (col + DP / 2.0f) / w * 2 - 1, ny = 1 - (row + DP / 2.0f) / ah, d = nx * nx + ny * ny;
+                        if (d <= 1 && d >= 0.45f) fillRect(bx + col, by + row, DP, DP, color);
+                    }
+                break;
+            }
             int bx = (int)(h.facingLeft ? h.x - f.w : h.x + HERO_W) - camX, by = (int)(h.y + HERO_H / 2 - f.h / 2) - camY;
             drawArc(bx, by, (int)f.w, (int)f.h, h.facingLeft, color);
             break;
@@ -541,7 +648,8 @@ static void drawPlay(const Quest& q) {
         for (int t = 0; t < def.cols * def.rows; t++) {
             int tx = t % def.cols, ty = t / def.cols;
             if (def.tiles[t] != 'g' || ty < top + vanished * (bottomRow - top + 1)) continue;
-            drawTileFlat(q, 'g', tx, ty, tx * TILE - camX + shake, ty * TILE - camY);
+            if (art && art->gate) drawSpritePal(*art->gate, tx * TILE - camX + shake, ty * TILE - camY, false, art->palette);
+            else drawTileFlat(q, 'g', tx, ty, tx * TILE - camX + shake, ty * TILE - camY);
         }
     }
     int floorCol0, floorRow, floorState = electricFloor(q, &floorCol0, &floorRow);
@@ -553,6 +661,16 @@ static void drawPlay(const Quest& q) {
         for (int a = 0; a < 2 && floorState == 2; a++) {
             int beat = (int)(q.time * 15) + k * 5 + a * 3;
             for (int y = 1; y <= 6; y++) fillRect(sx + (2 + (beat + y * (a + 1)) % 5) * DP, sy - y * DP, DP, DP, paletteColor(y % 2 ? 'c' : 'w'));
+        }
+    }
+    for (int col = 0, row; col < q.area.def->cols; col++) {   // the Titan's SPIKE LINE: a crack running ahead, then a spike
+        int state = titanSpikeLine(q, col, &row), sx = col * TILE - camX, sy = row * TILE - camY;
+        if (state == 1) for (int k = 0; k < 4; k++) fillRect(sx + k * 2 * DP, sy + (k % 2) * DP, 2 * DP, DP, paletteColor('c'));
+        for (int k = 0; state == 2 && k < (int)(16 * DP); k += DP) {
+            int w = (int)(TILE * (16 * DP - k) / (16 * DP));
+            fillRect(sx + (TILE - w) / 2, sy - k - DP, w, DP, paletteColor(k < 2 * DP ? 'I' : 'i'));
+            fillRect(sx + (TILE - w) / 2 - DP, sy - k - DP, DP, DP, paletteColor('m'));
+            fillRect(sx + (TILE + w) / 2, sy - k - DP, DP, DP, paletteColor('m'));
         }
     }
     if (art) {
@@ -590,11 +708,18 @@ static void drawPlay(const Quest& q) {
     for (int ty = row0; ty <= row0 + QUEST_H / TILE + 4 && ty < def.rows; ty++)
         for (int tx = std::max(col0 - 2, 0); tx <= col0 + QUEST_W / TILE + 2 && tx < def.cols; tx++) {
             char letter = def.tiles[ty * def.cols + tx];
-            if (strchr("CPTKNM", letter)) drawObject(q, letter, tx, ty, camX, camY, lights);
+            if (strchr("CPTKNMRY", letter)) drawObject(q, letter, tx, ty, camX, camY, lights);
         }
 
     drawCombat(q, camX, camY);
     drawHero(q, camX, camY);
+    bool snowing = false;   // the Yeti's phase 2 (cosmetic snow) and the Titan's blizzard: flakes over the whole screen
+    for (const QuestBoss& b : q.bosses) snowing |= b.alive && b.id == QBOSS_YETI && b.phase >= 2;
+    for (int i = 0; (snowing || q.area.wind != 0) && i < 48; i++) {
+        float drift = q.area.wind != 0 ? q.area.wind * 3 : 10 * sinf(q.time + i);
+        int x = (((int)(i * 53 + fmodf(q.time * drift, (float)QUEST_W)) % QUEST_W) + QUEST_W) % QUEST_W, y = (int)(i * 37 + q.time * (30 + i % 5 * 8) * DP) % QUEST_H;
+        fillRect(x, y, q.area.wind != 0 ? 3 * DP : DP, DP, paletteColor(i % 3 ? 'w' : 'i'));
+    }
     // Grass fringe in front of the hero's feet: only its lowest 2 dp above the top line.
     if (art) {
         int heroCol0 = (int)floorf(q.hero.x / TILE) - 1, heroCol1 = (int)floorf((q.hero.x + HERO_W) / TILE) + 1;

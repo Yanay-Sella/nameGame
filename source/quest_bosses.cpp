@@ -1,6 +1,8 @@
 // NAME QUEST bosses (spec §12): the arena lock, phases, attack choice and deaths, then one state machine per boss.
 #include "quest.h"
 #include "quest_sprites_1.h"
+#include "quest_sprites_2.h"
+#include "quest_sprites_3.h"
 #include <math.h>
 #include <string.h>
 
@@ -18,7 +20,7 @@ const int MINI_BOSS[7] = {-1, QBOSS_OVERSEER, QBOSS_MONKEY_KING, QBOSS_YETI, QBO
 const int BIG_BOSS[7] = {-1, QBOSS_STAR_MAGE, QBOSS_SILVERBACK, QBOSS_TITAN, QBOSS_FIRE_LORD, QBOSS_FISHERMAN, QBOSS_NAME_EATER};
 // Gap between attacks and the attacks of phase 1 and 2 (built in phases 4-9; the rest have none yet).
 const float GAP[QBOSS_COUNT] = {1.8f, 1.6f, 1.6f, 1.8f, 1.7f, 1.8f, 1.5f, 1.7f, 1.6f, 1.8f, 2.0f, 2.0f, 1.6f, 1.6f, 1.4f};
-const int ATTACKS[QBOSS_COUNT][2] = {{3, 4}, {3, 3}};
+const int ATTACKS[QBOSS_COUNT][2] = {{3, 4}, {3, 3}, {3, 4}, {3, 4}, {3, 3}, {3, 3}};
 // The Overseer (spec §12 world 1): hovers 50 above the floor sweeping at 40; P2 x1.3 and SUMMON.
 enum { OVERSEER_BURST, OVERSEER_FAN, OVERSEER_SLAM, OVERSEER_SUMMON };
 const float OVERSEER_HOVER = 50 * DP, OVERSEER_SWEEP = 40 * DP, OVERSEER_P2_SPEED = 1.3f;
@@ -30,6 +32,32 @@ const float FADE = 0.3f, BALL_TIME = 1.2f, BEAM_TIME = 0.8f, BEAM_WIDTH = 24 * D
 const float FAN_SPREAD = 120 * 3.14159265f / 180;
 const float FLOOR_PERIOD = 8, FLOOR_FLICKER = 0.6f, FLOOR_ON = 1.5f;
 const int FLOOR_TILES = 6;
+// Lobbed throws (bananas, peels, poop) fly in an arc under this pull and land after LOB_TIME.
+const float LOB_GRAVITY = 300 * DP, LOB_TIME = 0.9f;
+const int LOB_SIZE = (int)(5 * DP);
+// The Monkey King (spec §12 world 2): leaps between its two trees (X anchors 0-1); bananas, peels; P2 coconut rain.
+enum { MONKEY_LEAP, MONKEY_BANANAS, MONKEY_PEELS, MONKEY_COCONUTS };
+const float LEAP_MARK = 0.5f, LEAP_TIME = 0.8f, LEAP_HEIGHT = 48 * DP, BANANA_SPREAD = 24 * DP, PEEL_SPREAD = 32 * DP;
+const float COCONUT_MARK = 0.8f, COCONUT_FALL = 200 * DP, COCONUT_SPACING = 32 * DP;
+const int RAIN_COCONUTS = 5, BOSS_COCONUT = (int)(6 * DP);
+// The Silverback: POUND sends floor shockwaves (12 tall, 140 px/s; P2 two pairs 0.4 s apart), LEAP, STINK; P2 SUMMON stags.
+enum { SILVER_POUND, SILVER_LEAP, SILVER_STINK, SILVER_SUMMON };
+const float POUND_TELL = 0.6f, WAVE_SPEED = 140 * DP, WAVE_GAP = 0.4f, SILVER_MARK = 0.7f, SILVER_LEAP_TIME = 0.6f;
+const float SILVER_LEAP_HEIGHT = 60 * DP, LEAP_TRAUMA = 0.5f, LEAP_SHAKE_RANGE = 64 * DP;
+const int WAVE_W = (int)(16 * DP), WAVE_H = (int)(12 * DP), MAX_STAGS = 2;
+// The Yeti (spec §12 world 3): SNEEZE (AH... AH... 0.5 s, 7 snowballs in a 100° fan; P2 twice in a row), BELLY SLIDE
+// (crouch 0.6 s, across the arena at 180, big), ICE BLOCK (a lobbed cube that freezes the hero 1.2 s, no damage).
+enum { YETI_SNEEZING, YETI_SLIDE, YETI_ICE_BLOCK };   // (YETI_SNEEZE is the shooter's sprite)
+const float SNEEZE_TELL = 0.5f, SNEEZE_SHOW = 0.3f, SNEEZE_SPREAD = 100 * 3.14159265f / 180, SLIDE_CROUCH = 0.6f, SLIDE_SPEED = 180 * DP;
+const int SNEEZE_BALLS = 7, SNOWBALL_SIZE = (int)(6 * DP), ICE_CUBE_SIZE = (int)(8 * DP);
+// The Glacier Titan: ICICLE RAIN (6 marked 0.8 s on the ceiling), VOLLEY (3 aimed shards), SPIKE LINE (cracks run 0.6 s
+// ahead of 16 px ice spikes erupting outward, big); P2 the middle 10 floor tiles turn to crumbling ice and a blizzard
+// pushes 40 px/s, flipping every 4 s.
+enum { TITAN_ICICLES, TITAN_VOLLEY, TITAN_SPIKES };
+const float RAIN_MARK = 0.8f, RAIN_SPACING = 32 * DP, ICICLE_FALL = 280 * DP, VOLLEY_SPACING = 0.2f;
+const float SPIKE_TELL = 0.8f, CRACK_LEAD = 0.6f, SPIKE_STEP = 0.05f, SPIKE_UP = 0.4f, SPIKE_HEIGHT = 16 * DP;
+const float BLIZZARD = 40 * DP, BLIZZARD_FLIP = 4;
+const int RAIN_ICICLES = 6, CRUMBLE_TILES = 10, SHARD_SIZE = (int)(6 * DP);
 
 const char* bossName(int id) {
     static const char* const NAMES[QBOSS_COUNT] = {"THE OVERSEER", "THE STAR MAGE", "MONKEY KING", "SILVERBACK", "YETI",
@@ -63,16 +91,31 @@ static bool anchor(const AreaState& area, int n, float* x, float* y) {
     return false;
 }
 
-static void bossShot(Quest& q, const QuestBoss& b, float x, float y, float angle) {
+static void bossShot(Quest& q, const QuestBoss& b, float x, float y, float angle, int kind = PROJ_ENEMY, int size = BOSS_SHOT) {
     Projectile p = {};
-    p.x = x - BOSS_SHOT / 2;
-    p.y = y - BOSS_SHOT / 2;
+    p.x = x - size / 2;
+    p.y = y - size / 2;
     p.vx = cosf(angle) * BOSS_SHOT_SPEED;
     p.vy = sinf(angle) * BOSS_SHOT_SPEED;
-    p.w = p.h = BOSS_SHOT;
+    p.w = p.h = size;
     p.damage = b.atk;
     p.range = BOSS_SHOT_SPEED * 4;
-    p.kind = PROJ_ENEMY;
+    p.kind = kind;
+    q.projectiles.push_back(p);
+}
+
+// A throw lobbed from (x, y) to land on (tx, ty) after LOB_TIME; damage 0 for harmless ones (peels, poop).
+static void bossLob(Quest& q, float x, float y, float tx, float ty, int kind, int damage) {
+    Projectile p = {};
+    p.x = x - LOB_SIZE / 2;
+    p.y = y - LOB_SIZE / 2;
+    p.vx = (tx - x) / LOB_TIME;
+    p.vy = (ty - LOB_SIZE / 2 - y - 0.5f * LOB_GRAVITY * LOB_TIME * LOB_TIME) / LOB_TIME;
+    p.w = p.h = LOB_SIZE;
+    p.damage = damage;
+    p.range = 2000 * DP;
+    p.kind = kind;
+    p.gravity = LOB_GRAVITY;
     q.projectiles.push_back(p);
 }
 
@@ -93,7 +136,9 @@ static void endAttack(QuestBoss& b) {
 }
 
 void startBoss(Quest& q, int id, float x, float y) {
-    const Sprite& look = id == QBOSS_OVERSEER ? BOSS_OVERSEER_IDLE_1 : BOSS_STAR_MAGE_IDLE_1;
+    const Sprite* const LOOKS[6] = {&BOSS_OVERSEER_IDLE_1, &BOSS_STAR_MAGE_IDLE_1, &BOSS_MONKEY_KING_IDLE_1, &BOSS_SILVERBACK_IDLE_1,
+                                    &BOSS_YETI_IDLE_1, &BOSS_TITAN_IDLE_1};
+    const Sprite& look = *LOOKS[id < 6 ? id : 0];
     bool big = q.area.def->flags & AREA_BOSS;
     int world = statsWorld(q.area.world), ng = q.save.ngPlus;
     QuestBoss b = {};
@@ -131,6 +176,11 @@ void startBoss(Quest& q, int id, float x, float y) {
         b.data[2] = 1;
         b.data[5] = arenaFloor(q.area);
     }
+    if (id == QBOSS_MONKEY_KING) b.data[0] = -1;   // data: 0 the tree it sits in (-1 the Q spot), 1-2 leap start, 3-4 leap end
+    if (id == QBOSS_SILVERBACK) b.data[0] = arenaFloor(q.area);   // data: 0 floor y, 1 leap start x, 2 leap end x, 3 waves sent
+    // Yeti data: 0 floor y, 1 sneezes done, 2 slide direction, 3 standing height. Titan data: 0 floor y, 1 shards fired,
+    // 2-7 the icicle columns.
+    if (id == QBOSS_YETI || id == QBOSS_TITAN) b.data[0] = arenaFloor(q.area);
     q.bosses.push_back(b);
     q.arenaLocked = true;
     q.banner = bossName(id);
@@ -149,7 +199,7 @@ void startArenaFight(Quest& q) {
     if (big && (q.save.bosses >> q.area.world & 1)) return;   // big bosses stay dead
     if (mini && q.area.index < (int)killed.size() && (killed[q.area.index] >> 63 & 1)) return;   // until the next rest or death
     int id = big ? BIG_BOSS[world] : MINI_BOSS[world];
-    if (id != QBOSS_OVERSEER && id != QBOSS_STAR_MAGE) return;   // the other worlds' bosses come in their phases
+    if (id > QBOSS_TITAN) return;   // the other worlds' bosses come in their phases
     const char* spot = strchr(def.tiles, big ? 'W' : 'Q');
     if (!spot) return;
     int t = (int)(spot - def.tiles);
@@ -171,7 +221,7 @@ int bossPose(const QuestBoss& b) {
     if (b.attack < 0) return POSE_IDLE;
     if (b.id == QBOSS_OVERSEER) return b.step == 0 ? POSE_TELL : b.step == 1 ? POSE_ATTACK : POSE_OPEN;
     if (b.id == QBOSS_STAR_MAGE) return b.step <= 1 ? POSE_IDLE : b.step == 2 ? POSE_TELL : b.step == 3 ? POSE_ATTACK : POSE_OPEN;
-    return POSE_IDLE;
+    return b.step == 0 ? POSE_TELL : b.step == 1 ? POSE_ATTACK : POSE_OPEN;
 }
 
 int electricFloor(const Quest& q, int* col0, int* row) {
@@ -338,10 +388,339 @@ static void updateStarMage(Quest& q, QuestBoss& b, float dt) {
     if (b.step == 4 && b.timer >= RECOVER) endAttack(b);
 }
 
+// The y of the first open row from the top in column col (where a coconut hangs before it falls).
+static float ceilingY(const AreaState& area, float x) {
+    int col = (int)floorf(x / TILE), r = 0;
+    while (r < area.def->rows - 1 && tileSolid(tileAt(area, col, r))) r++;
+    return (float)(r * TILE);
+}
+
+// The Monkey King: LEAP to its other tree, BANANA ARC, PEEL TOSS; P2 adds COCONUT RAIN (spec §12 world 2).
+static void updateMonkeyKing(Quest& q, QuestBoss& b) {
+    float cx = b.x + b.w / 2, heroX = q.hero.x + HERO_W / 2, heroFeet = q.hero.y + HERO_H;
+    if (b.attack < 0 || b.step == 2) b.facingLeft = heroX < cx;
+    if (b.attack < 0) return;
+    switch (b.attack) {
+    case MONKEY_LEAP:   // the landing is marked 0.5 s, then an 0.8 s arc onto the other tree
+        if (b.step == 0 && b.timer <= 0) {
+            float ax0, ay0, ax1, ay1;
+            bool two = anchor(q.area, 0, &ax0, &ay0) && anchor(q.area, 1, &ax1, &ay1);
+            int next = !two ? -1 : b.data[0] == 0 ? 1 : b.data[0] == 1 ? 0 : fabsf(ax0 - cx) > fabsf(ax1 - cx) ? 0 : 1;
+            if (next < 0) { endAttack(b); break; }
+            b.data[0] = (float)next;
+            b.data[1] = b.x;
+            b.data[2] = b.y;
+            b.data[3] = (next ? ax1 : ax0) - b.w / 2.0f;
+            b.data[4] = (next ? ay1 : ay0) - b.h;
+            q.markers.push_back({b.data[3], b.data[4] + b.h - 4 * DP, (float)b.w, 4 * DP, LEAP_MARK, 'm'});
+        }
+        if (b.step == 0 && b.timer >= LEAP_MARK) b.step = 1, b.timer = 0, q.soundRequested[SOUND_Q_JUMP] = true;
+        if (b.step == 1) {
+            float t = fminf(b.timer / LEAP_TIME, 1);
+            b.x = b.data[1] + (b.data[3] - b.data[1]) * t;
+            b.y = b.data[2] + (b.data[4] - b.data[2]) * t - LEAP_HEIGHT * 4 * t * (1 - t);
+            b.facingLeft = b.data[3] < b.data[1];
+            if (t >= 1) b.step = 2, b.timer = 0, q.soundRequested[SOUND_Q_LAND] = true;
+        }
+        if (b.step == 2 && b.timer >= RECOVER) endAttack(b);
+        break;
+    case MONKEY_BANANAS:   // tell 0.5 (a banana raised), then 3 bananas lobbed at the hero
+        if (b.step == 0 && b.timer >= TELL) {
+            for (int k = -1; k <= 1; k++) bossLob(q, cx, b.y + b.h * 0.3f, heroX + k * BANANA_SPREAD, heroFeet, PROJ_BANANA, b.atk);
+            q.soundRequested[SOUND_BANANA_THROW] = true;
+            b.step = 2;
+            b.timer = 0;
+        }
+        if (b.step == 2 && b.timer >= RECOVER) endAttack(b);
+        break;
+    case MONKEY_PEELS: {   // tell 0.5, then 2 peels lobbed onto the floor on either side of the hero
+        if (b.step == 0 && b.timer >= TELL) {
+            float floorY = arenaFloor(q.area);
+            for (int k = -1; k <= 1; k += 2) bossLob(q, cx, b.y + b.h * 0.3f, heroX + k * PEEL_SPREAD, floorY, PROJ_PEEL, 0);
+            q.soundRequested[SOUND_BANANA_THROW] = true;
+            b.step = 2;
+            b.timer = 0;
+        }
+        if (b.step == 2 && b.timer >= RECOVER) endAttack(b);
+        break;
+    }
+    case MONKEY_COCONUTS:   // 5 coconuts marked 0.8 s on the ceiling over the hero, then they fall
+        if (b.step == 0 && b.timer <= 0)
+            for (int k = 0; k < RAIN_COCONUTS; k++) {
+                float x = heroX + (k - RAIN_COCONUTS / 2) * COCONUT_SPACING;
+                b.data[3 + k] = x;   // data 3-7: the coconuts' columns
+                q.markers.push_back({x - BOSS_COCONUT / 2, ceilingY(q.area, x), (float)BOSS_COCONUT, 4 * DP, COCONUT_MARK, 'm'});
+            }
+        if (b.step == 0 && b.timer >= COCONUT_MARK) {
+            for (int k = 0; k < RAIN_COCONUTS; k++) {
+                Projectile p = {};
+                p.x = b.data[3 + k] - BOSS_COCONUT / 2;
+                p.y = ceilingY(q.area, b.data[3 + k]);
+                p.vy = COCONUT_FALL;
+                p.w = p.h = BOSS_COCONUT;
+                p.damage = b.atk;
+                p.range = (float)(q.area.def->rows * TILE);
+                p.kind = PROJ_COCONUT;
+                q.projectiles.push_back(p);
+            }
+            q.soundRequested[SOUND_BANANA_THROW] = true;
+            b.step = 2;
+            b.timer = 0;
+        }
+        if (b.step == 2 && b.timer >= RECOVER) endAttack(b);
+        break;
+    }
+}
+
+// Two shockwaves running both ways along the floor from the Silverback's fists (big).
+static void silverbackWaves(Quest& q, const QuestBoss& b) {
+    for (int dir = -1; dir <= 1; dir += 2) {
+        Projectile p = {};
+        p.x = b.x + b.w / 2 + dir * b.w / 2 - (dir < 0 ? WAVE_W : 0);
+        p.y = b.data[0] - WAVE_H;
+        p.vx = dir * WAVE_SPEED;
+        p.w = WAVE_W;
+        p.h = WAVE_H;
+        p.damage = b.bigAtk;
+        p.range = (float)(q.area.def->cols * TILE);
+        p.kind = PROJ_WAVE;
+        q.projectiles.push_back(p);
+    }
+    q.soundRequested[SOUND_POUND] = true;
+}
+
+// The Silverback: POUND, LEAP, STINK; P2 adds SUMMON 2 STAG and a second pair of waves (spec §12 world 2).
+static void updateSilverback(Quest& q, QuestBoss& b) {
+    float cx = b.x + b.w / 2, heroX = q.hero.x + HERO_W / 2;
+    if (b.attack < 0 || b.step == 2) b.facingLeft = heroX < cx;
+    if (b.attack < 0) return;
+    switch (b.attack) {
+    case SILVER_POUND:   // pounds its chest 0.6 s, then the waves (P2: a second pair 0.4 s later)
+        if (b.step == 0 && b.timer >= POUND_TELL) {
+            silverbackWaves(q, b);
+            b.data[3] = 1;
+            b.step = 1;
+            b.timer = 0;
+        }
+        if (b.step == 1 && (b.phase < 2 || b.data[3] >= 2)) b.step = 2, b.timer = 0;
+        else if (b.step == 1 && b.timer >= WAVE_GAP) silverbackWaves(q, b), b.data[3] = 2;
+        if (b.step == 2 && b.timer >= RECOVER) endAttack(b);
+        break;
+    case SILVER_LEAP: {   // its shadow marks the hero's spot 0.7 s, then it lands there (big), trauma 0.5
+        float minX = 2.0f * TILE, maxX = (float)(q.area.def->cols * TILE - 2 * TILE - b.w);
+        if (b.step == 0 && b.timer <= 0) {
+            b.data[1] = b.x;
+            b.data[2] = fmaxf(minX, fminf(heroX - b.w / 2.0f, maxX));
+            q.markers.push_back({b.data[2], b.data[0] - 4 * DP, (float)b.w, 4 * DP, SILVER_MARK, 'm'});
+        }
+        if (b.step == 0 && b.timer >= SILVER_MARK) b.step = 1, b.timer = 0, q.soundRequested[SOUND_Q_JUMP] = true;
+        if (b.step == 1) {
+            float t = fminf(b.timer / SILVER_LEAP_TIME, 1);
+            b.x = b.data[1] + (b.data[2] - b.data[1]) * t;
+            b.y = b.data[0] - b.h - SILVER_LEAP_HEIGHT * 4 * t * (1 - t);
+            if (t >= 1) {
+                b.step = 2;
+                b.timer = 0;
+                q.soundRequested[SOUND_POUND] = true;
+                if (overlaps(b.x, b.y, (float)b.w, (float)b.h, q.hero.x, q.hero.y, HERO_W, HERO_H))
+                    hurtHero(q, damageToHero(b.bigAtk, q.stats.def), b.x + b.w / 2);
+                if (fabsf(heroX - (b.x + b.w / 2)) <= b.w / 2 + LEAP_SHAKE_RANGE) q.trauma = fminf(1, q.trauma + LEAP_TRAUMA);
+            }
+        }
+        if (b.step == 2 && b.timer >= RECOVER) endAttack(b);
+        break;
+    }
+    case SILVER_STINK:   // tell 0.5, then a lobbed poop that leaves a 40 px mist for 6 s where it lands
+        if (b.step == 0 && b.timer >= TELL) {
+            bossLob(q, cx, b.y + b.h * 0.3f, heroX, q.hero.y + HERO_H, PROJ_POOP, 0);
+            q.soundRequested[SOUND_BANANA_THROW] = true;
+            b.step = 2;
+            b.timer = 0;
+        }
+        if (b.step == 2 && b.timer >= RECOVER) endAttack(b);
+        break;
+    case SILVER_SUMMON:   // tell 0.5, then 2 stags beside it (at most 2 alive)
+        if (b.step == 0 && b.timer >= TELL) {
+            for (int k = 0; k < 2 && livingSummons(q) < MAX_STAGS; k++) spawnSummon(q, 2, cx + (k ? 1 : -1) * b.w * 0.8f, b.data[0]);
+            q.soundRequested[SOUND_Q_ROAR] = true;
+            b.step = 2;
+            b.timer = 0;
+        }
+        if (b.step == 2 && b.timer >= RECOVER) endAttack(b);
+        break;
+    }
+}
+
+// The Yeti's box: standing, or flat on its belly for the slide (same bottom).
+static void yetiLies(QuestBoss& b, bool flat) {
+    float bottom = b.y + b.h;
+    if (flat && b.data[3] == 0) b.data[3] = (float)b.h, b.h = BOSS_YETI_SLIDE.h - (int)(4 * DP);
+    if (!flat && b.data[3] > 0) b.h = (int)b.data[3], b.data[3] = 0;
+    b.y = bottom - b.h;
+}
+
+// The Yeti: SNEEZE, BELLY SLIDE, ICE BLOCK; P2 sneezes twice in a row (spec §12 world 3).
+static void updateYeti(Quest& q, QuestBoss& b, float dt) {
+    float cx = b.x + b.w / 2, heroX = q.hero.x + HERO_W / 2, mouthY = b.y + b.h * 0.3f;
+    if (b.attack < 0 || b.step == 0) b.facingLeft = heroX < cx;
+    if (b.attack < 0) return;
+    float mouthX = cx + (b.facingLeft ? -1 : 1) * b.w * 0.4f;
+    switch (b.attack) {
+    case YETI_SNEEZING:   // AH... AH... for 0.5 s, then 7 snowballs fanned at the hero; P2 a second sneeze
+        if (b.step == 0 && b.timer <= 0 && b.data[1] == 0) q.soundRequested[SOUND_SNEEZE] = true;
+        if (b.step == 0 && b.timer >= SNEEZE_TELL) {
+            float aim = angleToHero(q, mouthX, mouthY);
+            for (int k = 0; k < SNEEZE_BALLS; k++)
+                bossShot(q, b, mouthX, mouthY, aim - SNEEZE_SPREAD / 2 + k * SNEEZE_SPREAD / (SNEEZE_BALLS - 1), PROJ_SNOWBALL, SNOWBALL_SIZE);
+            b.data[1]++;
+            b.step = 1;
+            b.timer = 0;
+        }
+        if (b.step == 1 && b.timer >= SNEEZE_SHOW) {
+            b.step = b.phase >= 2 && b.data[1] < 2 ? 0 : 2;
+            b.timer = 0;
+            if (b.step == 0) q.soundRequested[SOUND_SNEEZE] = true;
+        }
+        if (b.step == 2 && b.timer >= RECOVER) b.data[1] = 0, endAttack(b);
+        break;
+    case YETI_SLIDE: {   // crouches 0.6 s, then slides on its belly toward the hero's side until a wall (big)
+        if (b.step == 0 && b.timer >= SLIDE_CROUCH) {
+            b.data[2] = heroX < cx ? -1 : 1;
+            yetiLies(b, true);
+            b.step = 1;
+            b.timer = 0;
+            q.soundRequested[SOUND_Q_DODGE] = true;
+        }
+        if (b.step == 1) {
+            b.x += b.data[2] * SLIDE_SPEED * dt;
+            float lead = b.data[2] > 0 ? b.x + b.w : b.x;
+            bool wall = tileSolid(tileAt(q.area, (int)floorf(lead / TILE), (int)floorf((b.y + b.h - 1) / TILE)));
+            if (overlaps(b.x, b.y, (float)b.w, (float)b.h, q.hero.x, q.hero.y, HERO_W, HERO_H))
+                hurtHero(q, damageToHero(b.bigAtk, q.stats.def), b.x + b.w / 2);
+            if (wall || lead < TILE || lead > (q.area.def->cols - 1) * TILE) {
+                b.x = b.data[2] > 0 ? floorf(lead / TILE) * TILE - b.w : (floorf(lead / TILE) + 1) * TILE;
+                yetiLies(b, false);
+                b.step = 2;
+                b.timer = 0;
+                q.soundRequested[SOUND_POUND] = true;
+            }
+        }
+        if (b.step == 2 && b.timer >= RECOVER) endAttack(b);
+        break;
+    }
+    case YETI_ICE_BLOCK:   // tell 0.5, then an ice cube lobbed at the hero; a hit freezes them 1.2 s
+        if (b.step == 0 && b.timer >= TELL) {
+            bossLob(q, mouthX, mouthY, heroX, q.hero.y + HERO_H / 2, PROJ_ICE_CUBE, 0);
+            Projectile& cube = q.projectiles.back();
+            cube.w = cube.h = ICE_CUBE_SIZE;
+            q.soundRequested[SOUND_BANANA_THROW] = true;
+            b.step = 1;
+            b.timer = 0;
+        }
+        if (b.step == 1 && b.timer >= SNEEZE_SHOW) b.step = 2, b.timer = 0;
+        if (b.step == 2 && b.timer >= RECOVER) endAttack(b);
+        break;
+    }
+}
+
+// The Titan's phase 2: the middle 10 tiles of the arena floor turn to crumbling ice in the live area (the fight's reset
+// reloads the area's tiles).
+static void titanCracksTheFloor(Quest& q, const QuestBoss& b) {
+    const AreaDef& def = *q.area.def;
+    int row = (int)(b.data[0] / TILE);
+    for (int col = def.cols / 2 - CRUMBLE_TILES / 2; col < def.cols / 2 + CRUMBLE_TILES / 2; col++) {
+        int t = row * def.cols + col;
+        if (q.area.tiles[t] != '#') continue;
+        q.area.tiles[t] = 'c';
+        q.traps.push_back({t, 'c', 0, 0});
+    }
+    q.soundRequested[SOUND_CRACK] = true;
+}
+
+int titanSpikeLine(const Quest& q, int col, int* row) {
+    for (const QuestBoss& b : q.bosses) {
+        if (!b.alive || b.id != QBOSS_TITAN || b.attack != TITAN_SPIKES || b.step != 1) continue;
+        *row = (int)(b.data[0] / TILE);
+        int centre = (int)floorf((b.x + b.w / 2) / TILE), half = (int)ceilf(b.w / 2.0f / TILE);
+        int n = abs(col - centre) - half;
+        if (n < 0) return 0;
+        float start = n * SPIKE_STEP;
+        return b.timer < start ? 0 : b.timer < start + CRACK_LEAD ? 1 : b.timer < start + CRACK_LEAD + SPIKE_UP ? 2 : 0;
+    }
+    return 0;
+}
+
+// The Glacier Titan: ICICLE RAIN, VOLLEY, SPIKE LINE; P2 the blizzard (spec §12 world 3).
+static void updateTitan(Quest& q, QuestBoss& b) {
+    float cx = b.x + b.w / 2, heroX = q.hero.x + HERO_W / 2;
+    b.facingLeft = heroX < cx;
+    if (b.phase >= 2) q.area.wind = fmodf(q.time - b.started, 2 * BLIZZARD_FLIP) < BLIZZARD_FLIP ? BLIZZARD : -BLIZZARD;
+    if (b.attack < 0) return;
+    switch (b.attack) {
+    case TITAN_ICICLES:   // 6 columns around the hero marked 0.8 s on the ceiling, then icicles fall at 280
+        if (b.step == 0 && b.timer <= 0)
+            for (int k = 0; k < RAIN_ICICLES; k++) {
+                float x = heroX + (k - (RAIN_ICICLES - 1) / 2.0f) * RAIN_SPACING;
+                x = fmaxf(2.0f * TILE, fminf(x, (q.area.def->cols - 2) * TILE - 1.0f));
+                b.data[2 + k] = x;
+                q.markers.push_back({x - 2 * DP, ceilingY(q.area, x), 4 * DP, 4 * DP, RAIN_MARK, 'c'});
+            }
+        if (b.step == 0 && b.timer >= RAIN_MARK) {
+            for (int k = 0; k < RAIN_ICICLES; k++) {
+                Projectile p = {};
+                p.x = b.data[2 + k] - 2 * DP;
+                p.y = ceilingY(q.area, b.data[2 + k]);
+                p.vy = ICICLE_FALL;
+                p.w = (int)(4 * DP);
+                p.h = (int)(9 * DP);
+                p.damage = b.atk;
+                p.range = (float)(q.area.def->rows * TILE);
+                p.kind = PROJ_ICICLE;
+                q.projectiles.push_back(p);
+            }
+            q.soundRequested[SOUND_CRACK] = true;
+            b.step = 1;
+            b.timer = 0;
+        }
+        if (b.step == 1 && b.timer >= SNEEZE_SHOW) b.step = 2, b.timer = 0;
+        if (b.step == 2 && b.timer >= RECOVER) endAttack(b);
+        break;
+    case TITAN_VOLLEY:   // tell 0.5, then 3 aimed ice shards 0.2 s apart
+        if (b.step == 0 && b.timer >= TELL) b.step = 1, b.timer = 0, b.data[1] = 0;
+        if (b.step == 1 && b.timer >= b.data[1] * VOLLEY_SPACING) {
+            float y = b.y + b.h * 0.4f;
+            bossShot(q, b, cx, y, angleToHero(q, cx, y), PROJ_SHARD, SHARD_SIZE);
+            q.soundRequested[SOUND_FREEZE] = true;
+            if (++b.data[1] >= 3) b.step = 2, b.timer = 0;
+        }
+        if (b.step == 2 && b.timer >= RECOVER) endAttack(b);
+        break;
+    case TITAN_SPIKES: {   // raises its fists 0.8 s, slams; cracks run out both ways 0.6 s ahead of the spikes (big)
+        if (b.step == 0 && b.timer >= SPIKE_TELL) {
+            b.step = 1;
+            b.timer = 0;
+            q.soundRequested[SOUND_POUND] = true;
+            q.trauma = fminf(1, q.trauma + LEAP_TRAUMA);
+        }
+        if (b.step == 1) {
+            const Hero& h = q.hero;
+            int row;
+            for (int c = (int)floorf(h.x / TILE); c <= (int)floorf((h.x + HERO_W - 0.001f) / TILE); c++)
+                if (titanSpikeLine(q, c, &row) == 2 && h.y + HERO_H > row * TILE - SPIKE_HEIGHT)
+                    hurtHero(q, damageToHero(b.bigAtk, q.stats.def), h.x + HERO_W / 2 + (heroX < cx ? -1 : 1));
+            if (b.timer >= q.area.def->cols * SPIKE_STEP + CRACK_LEAD + SPIKE_UP) b.step = 2, b.timer = 0;
+        }
+        if (b.step == 2 && b.timer >= RECOVER) endAttack(b);
+        break;
+    }
+    }
+}
+
 // Big boss: names, the bit, the next world's entry lit, banner, autosave. Mini-boss: names, the gate (spec §12).
 static void bossDown(Quest& q, QuestBoss& b) {
     int world = q.area.world;
     b.alive = false;
+    q.area.wind = 0;   // the Titan's blizzard dies with it
     q.hitStop = fmaxf(q.hitStop, DEATH_STOP);
     q.trauma = DEATH_TRAUMA;
     float cx = b.x + b.w / 2, cy = b.y + b.h / 2;
@@ -392,6 +771,10 @@ void updateBosses(Quest& q, float dt) {
         if (b.phase == 1 && b.hp * 2 <= b.maxHp) {   // phase 2 at 50 %: hit-stop, roar, trauma, 0.8 s invulnerable pose
             b.phase = 2;
             b.shift = PHASE_SHIFT;
+            if (b.id == QBOSS_MONKEY_KING && b.attack == MONKEY_LEAP && b.step == 1) b.x = b.data[3], b.y = b.data[4];   // a leap cut short: on its tree
+            if (b.id == QBOSS_SILVERBACK && b.attack == SILVER_LEAP && b.step == 1) b.x = b.data[2], b.y = b.data[0] - b.h;   // landed
+            if (b.id == QBOSS_YETI) yetiLies(b, false), b.data[1] = 0;   // a slide or sneeze cut short: back on its feet
+            if (b.id == QBOSS_TITAN) titanCracksTheFloor(q, b);
             b.attack = -1;
             b.gap = 0;
             q.hitStop = fmaxf(q.hitStop, PHASE_STOP);
@@ -416,6 +799,10 @@ void updateBosses(Quest& q, float dt) {
         switch (b.id) {
         case QBOSS_OVERSEER: updateOverseer(q, b, dt); break;
         case QBOSS_STAR_MAGE: updateStarMage(q, b, dt); break;
+        case QBOSS_MONKEY_KING: updateMonkeyKing(q, b); break;
+        case QBOSS_SILVERBACK: updateSilverback(q, b); break;
+        case QBOSS_YETI: updateYeti(q, b, dt); break;
+        case QBOSS_TITAN: updateTitan(q, b); break;
         }
         if (bossVisibility(b) >= 1 && overlaps(b.x, b.y, (float)b.w, (float)b.h, q.hero.x, q.hero.y, HERO_W, HERO_H))
             hurtHero(q, damageToHero(b.contactAtk, q.stats.def), b.x + b.w / 2);

@@ -2,6 +2,8 @@
 #include "quest_art.h"
 #include "quest_sprites_0.h"
 #include "quest_sprites_1.h"
+#include "quest_sprites_2.h"
+#include "quest_sprites_3.h"
 #include <algorithm>
 #include <math.h>
 #include <string.h>
@@ -308,6 +310,8 @@ static const WorldArt NAMULA_ART = {
     0.45f, 0.25f, 0.10f,
     {0xFF6A3410, 32},
     nullptr,
+    nullptr, nullptr,
+    nullptr, {},
 };
 
 // --- World 1, The Drifting Station: deep space, a dim sun and a ringed planet, station spars, near pipes (spec §13 row 1) ---
@@ -498,10 +502,323 @@ static const WorldArt STATION_ART = {
     0.35f, 0.25f, 0.10f,
     {0xFF0C3438, 24},
     &STATION_PIT,
+    nullptr, nullptr,
+    nullptr, {},
+};
+
+// --- World 2, The Greendeep: green-gold canopy light, giant trees and a temple in mist, vines and pillars, near fronds (spec §13 row 2) ---
+const int GREEN_TEMPLE_X = 700;   // L1: the temple top in the mist
+const int GREEN_PILLARS[4] = {180, 470, 860, 1130};   // L2: temple pillars
+
+static void paintGreendeep(uint32_t* out[4], int, int) {
+    const WorldPalette& p = GREEN_PALETTE;
+    seed = 4242;
+    // L0: canopy light, dark at the top, a green-gold glow lower down, with dithered sun beams slanting down-right.
+    canvas = out[0];
+    for (int y = 0; y < LAYER_H; y++)
+        for (int x = 0; x < LAYER_W; x++) {
+            float v = fminf(fmaxf((y - 30) / 260.0f, 0), 1) * 2;
+            int band = (int)v + ((v - (int)v) * 16 > bayer4(x, y));
+            uint32_t c = p.c[9 + std::min(band, 2)];
+            float beam = fmodf(x - y * 0.45f + 2000, 230);   // a beam 26 px wide every 230 px
+            if (beam < 26 && y > 20) {
+                float strength = (1 - fabsf(beam - 13) / 13) * 12 * (1 - y / (float)LAYER_H);
+                if (strength > bayer4(x + 2, y)) c = band >= 1 ? p.c[2] : p.c[11];
+            }
+            canvas[y * LAYER_W + x] = c;
+        }
+    // L1: giant tree trunks with crowns of leaves, the temple's stepped top in mist between them.
+    canvas = out[1];
+    for (int i = 0; i < 6; i++) {
+        int x = i * 213 + randomInt(60), w = 26 + randomInt(22);
+        for (int y = 60; y < LAYER_H; y++) {
+            int flare = y > 400 ? (y - 400) / 3 : 0;   // the roots spread at the foot
+            paintRect(x - flare, y, w + 2 * flare, 1, p.c[9]);
+        }
+        for (int k = 0; k < 7; k++) paintDisc((float)(x + w / 2 - 70 + randomInt(140)), (float)(30 + randomInt(70)), 26.0f + randomInt(24), p.c[9]);
+    }
+    for (int k = 0; k < 5; k++) paintRect(GREEN_TEMPLE_X - 90 + k * 18, 210 + k * 22 - 110, 180 - k * 36, 24, p.c[10]);
+    paintRect(GREEN_TEMPLE_X - 12, 70, 24, 30, p.c[10]);
+    for (int y = 230; y < 330; y++)   // mist: a dithered band thinning upward
+        for (int x = 0; x < LAYER_W; x++)
+            if ((1 - fabsf(y - 290.0f) / 60) * 10 > bayer4(x, y) + 3) plot(x, y, p.c[10]);
+    // L2: temple pillars with moss caps, hanging vines, broad leaves.
+    canvas = out[2];
+    for (int x : GREEN_PILLARS) {
+        paintRect(x, 150, 34, LAYER_H - 150, p.c[10]);
+        paintRect(x - 4, 140, 42, 12, p.c[11]);
+        for (int y = 170; y < LAYER_H; y += 40) paintRect(x, y, 34, 2, p.c[9]);
+        paintRect(x - 4, 136, 42, 5, p.c[4]);
+    }
+    for (int i = 0; i < 22; i++) {   // vines from the top, swaying a little along their length
+        int x = randomInt(LAYER_W), length = 80 + randomInt(220);
+        for (int y = 0; y < length; y++) {
+            int sx = x + (int)(4 * sinf(y * 0.05f + i));
+            plot(sx, y, p.c[5]);
+            if (y % 14 == 0) paintDisc((float)sx + (y % 28 ? 3 : -3), (float)y, 2.5f, p.c[4]);
+        }
+    }
+    for (int i = 0; i < 14; i++) {   // broad leaves: long ellipses with a dark rib
+        float cx = (float)randomInt(LAYER_W), cy = 260.0f + randomInt(200), a = (randomInt(100) - 50) / 100.0f;
+        for (int k = -16; k <= 16; k++) {
+            float r = 6 * (1 - (k * k) / 300.0f);
+            paintDisc(cx + cosf(a) * k * 2, cy + sinf(a) * k * 2, r, p.c[5]);
+        }
+        paintLine(cx - cosf(a) * 30, cy - sinf(a) * 30, cx + cosf(a) * 30, cy + sinf(a) * 30, 1, p.c[4]);
+    }
+    // L3: near fronds hanging from the top and roots rising at the bottom, dark and sparse.
+    canvas = out[3];
+    const int fronds[3] = {90, 560, 1010};
+    for (int f = 0; f < 3; f++)
+        for (int k = 0; k < 5; k++) {
+            float a = 0.6f + k * 0.45f, x0 = (float)fronds[f], y0 = -10;
+            for (int i = 0; i < 60; i++) {
+                float t = i / 60.0f, x = x0 + cosf(a) * 120 * t, y = y0 + sinf(a) * 60 * t + 90 * t * t;
+                paintDisc(x, y, 5 * (1 - t) + 1, p.c[8]);
+                if (i % 6 == 3) paintLine(x, y, x + 6, y + 12, 2, p.c[8]);
+            }
+        }
+    const int roots[2] = {330, 820};
+    for (int r = 0; r < 2; r++)
+        for (int k = 0; k < 4; k++)
+            for (int y = LAYER_H; y > 330; y--) {
+                float t = (LAYER_H - y) / 150.0f;
+                paintRect(roots[r] + k * 22 + (int)(30 * t * t * (k - 1.5f)), y, 9 - (int)(5 * t), 1, p.c[0]);
+            }
+}
+
+// Fireflies blinking in L2, leaves falling slowly in L1, butterflies fluttering in L2, drips from the vines.
+static void greendeepDetails(const Quest& q, int camX, int camY) {
+    const WorldPalette& p = GREEN_PALETTE;
+    float t = q.time;
+    auto put = [](int x, int y, uint32_t c) {
+        if (x >= 0 && x < screenW && y >= 0 && y < screenH) screenTarget[y * screenW + x] = c;
+    };
+    auto wrapX = [](int x) { return ((x % LAYER_W) + LAYER_W) % LAYER_W; };
+    int off1X = (int)(camX * LAYER_FACTOR_X[1]), off1Y = (int)(camY * LAYER_FACTOR_Y[1]);
+    int off2X = (int)(camX * LAYER_FACTOR_X[2]), off2Y = (int)(camY * LAYER_FACTOR_Y[2]);
+    for (int i = 0; i < 24; i++) {   // fireflies: 1 px drifting slowly, glowing up every few seconds
+        float glow = sinf(t * (1.1f + i % 4 * 0.3f) + i * 1.7f);
+        if (glow < 0.3f) continue;
+        int x = wrapX((int)(i * 97 + 20 * sinf(t * 0.3f + i)) - off2X), y = 120 + (i * 61) % 240 + (int)(10 * sinf(t * 0.4f + i * 2)) - off2Y;
+        put(x, y, p.c[glow > 0.8f ? 13 : 12]);
+        if (glow > 0.8f) put(x + 1, y, p.c[12]);
+    }
+    for (int i = 0; i < 10; i++) {   // leaves falling at 10-16 px/s, swaying
+        float fall = fmodf(t * (10 + i % 4 * 2) + i * 53, 420);
+        int x = wrapX((int)(i * 131 + 14 * sinf(t * 1.3f + i)) - off1X), y = (int)fall - 30 - off1Y;
+        uint32_t c = p.c[i % 2 ? 2 : 5];
+        put(x, y, c);
+        put(x + ((int)(t * 2 + i) % 2 ? 1 : -1), y + 1, c);
+    }
+    for (int i = 0; i < 3; i++) {   // butterflies: two wings opening and closing
+        int x = wrapX((int)(i * 400 + t * (6 + i * 2) + 20 * sinf(t * 0.7f + i)) - off2X);
+        int y = 200 + i * 50 + (int)(12 * sinf(t * 0.9f + i * 3)) - off2Y;
+        bool open = (int)(t * 6 + i) % 2;
+        put(x, y, p.c[1]);
+        put(x - 1, y - (open ? 1 : 0), p.c[i == 1 ? 12 : 3]);
+        put(x + 1, y - (open ? 1 : 0), p.c[i == 1 ? 12 : 3]);
+    }
+    for (int i = 0; i < 6; i++) {   // drips falling from the vines' tips in L2
+        float fall = fmodf(t * 40 + i * 37, 90);
+        int x = wrapX(i * 211 + 40 - off2X), y = 150 + (i * 47) % 100 + (int)fall - off2Y;
+        if (fall < 60) put(x, y, p.c[11]);
+    }
+}
+
+static const PropDef GREEN_PROPS[] = {
+    {{&GREEN_FERN_1, &GREEN_FERN_2}, 2, 0.9f, PROP_TOP, false, 6},
+    {{&GREEN_MUSHROOMS_BROWN}, 1, 1, PROP_TOP, false, 3},
+    {{&GREEN_MUSHROOM_TALL}, 1, 1, PROP_TOP, false, 2},
+    {{&GREEN_MUSHROOMS_GLOW_1, &GREEN_MUSHROOMS_GLOW_2}, 2, 0.8f, PROP_TOP, true, 2},
+    {{&GREEN_FLOWERS}, 1, 1, PROP_TOP, false, 3},
+    {{&GREEN_LEAVES}, 1, 1, PROP_TOP, false, 5},
+    {{&GREEN_ROOT}, 1, 1, PROP_TOP, false, 3},
+    {{&GREEN_SNAIL}, 1, 1, PROP_TOP, false, 1},
+    {{&GREEN_STONE}, 1, 1, PROP_TOP, false, 2},
+    {{&GREEN_BONE}, 1, 1, PROP_TOP, false, 1},
+    {{&GREEN_CEILING_VINES_1, &GREEN_CEILING_VINES_2}, 2, 1.2f, PROP_CEILING, false, 4},
+    {{&GREEN_DRIP_1, &GREEN_DRIP_2}, 2, 0.6f, PROP_CEILING, false, 1},
+    {{&GREEN_WALL_FERN}, 1, 1, PROP_WALL, false, 2},
+};
+// Ids 1-6 for AreaDef::landmarks: fallen statue head, temple stairs, waterfall, giant flower, rope bridge, idol.
+static const LandmarkDef GREEN_LANDMARKS[] = {
+    {{&GREEN_STATUE_HEAD}, 1, 1, 0, 0, 0, 0},
+    {{&GREEN_TEMPLE_STAIRS}, 1, 1, 0, 0, 0, 0},
+    {{&GREEN_WATERFALL_1, &GREEN_WATERFALL_2}, 2, 0.15f, 20, 64, 40, 0xFF0C3020},
+    {{&GREEN_FLOWER_1, &GREEN_FLOWER_2}, 2, 0.9f, 0, 0, 0, 0},
+    {{&GREEN_ROPE_BRIDGE}, 1, 1, 0, 0, 0, 0},
+    {{&GREEN_IDOL_1, &GREEN_IDOL_2}, 2, 0.5f, 20, 17, 36, 0xFF104838},
+};
+static const WorldArt GREEN_ART = {
+    GREEN_PALETTE,
+    {{&GREEN_TOP_1, &GREEN_TOP_2, &GREEN_TOP_3}, {&GREEN_TOP_LEFT}, {&GREEN_TOP_RIGHT}, {&GREEN_LEFT}, {&GREEN_RIGHT},
+     {&GREEN_FILL_1, &GREEN_FILL_2, &GREEN_FILL_3}, {&GREEN_BOTTOM}, {&GREEN_BOTTOM_LEFT}, {&GREEN_BOTTOM_RIGHT},
+     {&GREEN_COLUMN_TOP}, {&GREEN_COLUMN}, {&GREEN_SINGLE}},
+    {&GREEN_FRINGE_1, &GREEN_FRINGE_2, &GREEN_FRINGE_3},
+    &GREEN_DRAPE_LEFT, &GREEN_DRAPE_RIGHT,
+    &GREEN_BRANCH_LEFT, &GREEN_BRANCH_MID, &GREEN_BRANCH_RIGHT,
+    &GREEN_BRACKET, &GREEN_HANGING_VINE, &GREEN_POST,
+    {&GREEN_VINE, &GREEN_VINE_TOP},
+    {&GREEN_WATER_1, &GREEN_WATER_2, &GREEN_WATER_3},
+    GREEN_PROPS, (int)(sizeof GREEN_PROPS / sizeof GREEN_PROPS[0]),
+    GREEN_LANDMARKS, (int)(sizeof GREEN_LANDMARKS / sizeof GREEN_LANDMARKS[0]),
+    paintGreendeep, greendeepDetails,
+    0.35f, 0.25f, 0.10f,
+    {0xFF0C3428, 24},
+    nullptr,
+    &GREEN_THORNS, &GREEN_THORN_GATE,
+    nullptr, {},
+};
+
+// --- World 3, The White Silence: a dim blue cave glow, far ice cliffs and a frozen waterfall, crystals and frozen trees, near ice pillars (spec §13 row 3) ---
+const int FROST_FALL_X = 640;   // L1: the frozen waterfall between the cliffs
+
+static void paintWhiteSilence(uint32_t* out[4], int, int) {
+    const WorldPalette& p = FROST_PALETTE;
+    seed = 3131;
+    // L0: dark at the top and bottom, a cold glow band in the middle, dithered between the steps.
+    canvas = out[0];
+    for (int y = 0; y < LAYER_H; y++)
+        for (int x = 0; x < LAYER_W; x++) {
+            float v = (1 - fabsf(y - 250.0f) / 230) * 3;
+            int step = std::min(std::max((int)v + ((v - (int)v) * 16 > bayer4(x, y)), 0), 3);
+            canvas[y * LAYER_W + x] = p.c[8 + step];
+        }
+    // L1: jagged ice cliffs along the bottom with a pale rim on their peaks, the frozen waterfall pouring from a notch.
+    canvas = out[1];
+    int peaks[12];
+    for (int i = 0; i < 12; i++) peaks[i] = 190 + randomInt(90);
+    for (int x = 0; x < LAYER_W; x++) {
+        int i = x * 12 / LAYER_W, x0 = i * LAYER_W / 12, span = LAYER_W / 12;
+        float t = (x - x0) / (float)span;   // a sawtooth ridge between two peaks
+        int next = peaks[(i + 1) % 12], top = (int)(peaks[i] + (next - peaks[i]) * t + 40 * sinf(t * 3.14159f) + 6 * sinf(x * 0.3f));
+        if (abs(x - FROST_FALL_X) < 70) top += 60 - abs(x - FROST_FALL_X) * 60 / 70;
+        paintRect(x, top, 1, LAYER_H - top, p.c[10]);
+        paintRect(x, top, 1, 2, p.c[11]);
+    }
+    // L2: crystal clusters on the floor, blunt blue-white icicles from the top, frozen trees.
+    canvas = out[2];
+    for (int i = 0; i < 9; i++) {
+        float cx = (float)(i * 142 + randomInt(60)), base = 400.0f + randomInt(50);
+        for (int k = 0; k < 4; k++) {
+            float lean = (k - 1.5f) * 9, h = 30.0f + randomInt(50);
+            for (int j = 0; j < (int)h; j++) {
+                float t = j / h, w = 7 * (1 - t);
+                paintRect((int)(cx + k * 10 + lean * t - w), (int)(base - j), (int)(2 * w) + 1, 1, p.c[t > 0.1f && k % 2 ? 2 : 11]);
+            }
+        }
+    }
+    for (int i = 0; i < 40; i++) {   // decorative icicles: short, rounded at the tip, never the hazard's sharp shape
+        int x = randomInt(LAYER_W), length = 20 + randomInt(70);
+        for (int y = 0; y < length; y++) paintRect(x - 3 + y * 3 / length, y, 6 - y * 5 / length, 1, p.c[y < length / 2 ? 11 : 2]);
+        paintDisc((float)x, (float)length, 2, p.c[2]);
+    }
+    for (int i = 0; i < 4; i++) {   // frozen trees: a trunk and bare branches, rimed
+        int x = 150 + i * 330 + randomInt(40);
+        paintLine((float)x, 470, (float)x, 250, 5, p.c[10]);
+        for (int k = 0; k < 5; k++) {
+            float y = 290.0f + k * 30, dir = k % 2 ? 1.0f : -1.0f;
+            paintLine((float)x, y, x + dir * (40 + randomInt(30)), y - 40 - randomInt(30), 2, p.c[10]);
+        }
+        for (int k = 0; k < 8; k++) paintDisc((float)(x - 50 + randomInt(100)), (float)(220 + randomInt(100)), 2, p.c[11]);
+    }
+    // L3: near ice pillars, dark and sparse, with a pale rim.
+    canvas = out[3];
+    const int pillars[3] = {60, 520, 980};
+    for (int x : pillars)
+        for (int y = 0; y < LAYER_H; y++) {
+            int w = 26 + (int)(10 * sinf(y * 0.02f + x));
+            paintRect(x, y, w, 1, p.c[9]);
+            plot(x + w - 1, y, p.c[11]);
+        }
+}
+
+// Snow falling at three depths, crystals glinting in L2, breath-like mist drifting, a shimmer running down the far waterfall.
+static void whiteSilenceDetails(const Quest& q, int camX, int camY) {
+    const WorldPalette& p = FROST_PALETTE;
+    float t = q.time;
+    auto put = [](int x, int y, uint32_t c) {
+        if (x >= 0 && x < screenW && y >= 0 && y < screenH) screenTarget[y * screenW + x] = c;
+    };
+    auto wrapX = [](int x) { return ((x % LAYER_W) + LAYER_W) % LAYER_W; };
+    for (int depth = 0; depth < 3; depth++) {   // far flakes slow and dim, near flakes fast, bright and 2 px
+        float factor = depth == 0 ? LAYER_FACTOR_X[1] : depth == 1 ? LAYER_FACTOR_X[2] : 0.8f;
+        int offX = (int)(camX * factor), offY = (int)(camY * factor * 0.5f);
+        for (int i = 0; i < 30 - depth * 8; i++) {
+            float fall = fmodf(t * (8 + depth * 10 + i % 3 * 2) + i * 41, 400);
+            int x = wrapX((int)(i * 89 + depth * 300 + 10 * sinf(t * 0.8f + i)) - offX) % screenW, y = (int)fall - 20 - offY % 400;
+            uint32_t c = p.c[depth == 0 ? 3 : depth == 1 ? 5 : 7];
+            put(x, y, c);
+            if (depth == 2) put(x + 1, y, c), put(x, y + 1, c), put(x + 1, y + 1, c);
+        }
+    }
+    int off2X = (int)(camX * LAYER_FACTOR_X[2]), off2Y = (int)(camY * LAYER_FACTOR_Y[2]);
+    for (int i = 0; i < 9; i++) {   // a glint on each crystal cluster, every few seconds
+        float glint = sinf(t * 0.9f + i * 2.3f);
+        if (glint < 0.85f) continue;
+        int x = wrapX(i * 142 + 30 - off2X), y = 380 - off2Y;
+        put(x, y, p.c[13]);
+        put(x - 1, y, p.c[12]);
+        put(x + 1, y, p.c[12]);
+        put(x, y - 1, p.c[12]);
+    }
+    for (int i = 0; i < 4; i++) {   // mist puffs drifting low across the floor
+        int cx = wrapX((int)(i * 330 + t * 6) - off2X), cy = 300 + i * 13 - off2Y;
+        for (int y = -6; y <= 6; y++)
+            for (int x = -24; x <= 24; x++)
+                if ((1 - (x * x / 576.0f + y * y / 36.0f)) * 16 > bayer4(cx + x, cy + y) + 10) put(cx + x, cy + y, p.c[11]);
+    }
+    int off1X = (int)(camX * LAYER_FACTOR_X[1]), off1Y = (int)(camY * LAYER_FACTOR_Y[1]);
+    int shimmer = (int)fmodf(t * 40, 300);   // a pale line sliding down the frozen waterfall
+    for (int k = 0; k < 5; k++) put(wrapX(FROST_FALL_X - 34 + k * 17 - off1X), 160 + shimmer - off1Y, p.c[5]);
+}
+
+static const PropDef FROST_PROPS[] = {
+    {{&FROST_SNOW_MOUND}, 1, 1, PROP_TOP, false, 5},
+    {{&FROST_SNOW_MOUND_SMALL}, 1, 1, PROP_TOP, false, 4},
+    {{&FROST_CRYSTALS_1, &FROST_CRYSTALS_2}, 2, 0.7f, PROP_TOP, true, 3},
+    {{&FROST_GRASS}, 1, 1, PROP_TOP, false, 4},
+    {{&FROST_BONES}, 1, 1, PROP_TOP, false, 1},
+    {{&FROST_LANTERN_1, &FROST_LANTERN_2}, 2, 0.4f, PROP_TOP, true, 1},
+    {{&FROST_PEBBLES}, 1, 1, PROP_TOP, false, 3},
+    {{&FROST_SHRUB}, 1, 1, PROP_TOP, false, 2},
+    {{&FROST_ROCK}, 1, 1, PROP_TOP, false, 2},
+    {{&FROST_CEILING_1, &FROST_CEILING_2}, 2, 1.1f, PROP_CEILING, false, 4},
+    {{&FROST_WALL_FROST}, 1, 1, PROP_WALL, false, 2},
+};
+// Ids 1-6 for AreaDef::landmarks: ice cathedral arch, frozen mammoth, frozen waterfall, crystal geode, explorer's camp, frozen tree.
+static const LandmarkDef FROST_LANDMARKS[] = {
+    {{&FROST_CATHEDRAL}, 1, 1, 0, 0, 0, 0},
+    {{&FROST_MAMMOTH}, 1, 1, 0, 0, 0, 0},
+    {{&FROST_FROZEN_FALL_1, &FROST_FROZEN_FALL_2}, 2, 0.12f, 0, 0, 0, 0},
+    {{&FROST_GEODE_1, &FROST_GEODE_2}, 2, 0.6f, 24, 24, 40, 0xFF103850},
+    {{&FROST_CAMP_1, &FROST_CAMP_2}, 2, 0.35f, 49, 31, 36, 0xFF3A2410},
+    {{&FROST_TREE}, 1, 1, 0, 0, 0, 0},
+};
+static const WorldArt FROST_ART = {
+    FROST_PALETTE,
+    {{&FROST_TOP_1, &FROST_TOP_2, &FROST_TOP_3}, {&FROST_TOP_LEFT}, {&FROST_TOP_RIGHT}, {&FROST_LEFT}, {&FROST_RIGHT},
+     {&FROST_FILL_1, &FROST_FILL_2, &FROST_FILL_3}, {&FROST_BOTTOM}, {&FROST_BOTTOM_LEFT}, {&FROST_BOTTOM_RIGHT},
+     {&FROST_COLUMN_TOP}, {&FROST_COLUMN}, {&FROST_SINGLE}},
+    {&FROST_FRINGE_1, &FROST_FRINGE_2, &FROST_FRINGE_3},
+    &FROST_DRAPE_LEFT, &FROST_DRAPE_RIGHT,
+    &FROST_SLAB_LEFT, &FROST_SLAB_MID, &FROST_SLAB_RIGHT,
+    &FROST_BRACKET, &FROST_ROPE, &FROST_PILLAR,
+    {&FROST_LADDER, &FROST_LADDER_TOP},
+    {&FROST_WATER_1, &FROST_WATER_2, &FROST_WATER_3},
+    FROST_PROPS, (int)(sizeof FROST_PROPS / sizeof FROST_PROPS[0]),
+    FROST_LANDMARKS, (int)(sizeof FROST_LANDMARKS / sizeof FROST_LANDMARKS[0]),
+    paintWhiteSilence, whiteSilenceDetails,
+    0.35f, 0.25f, 0.10f,
+    {0xFF0C2838, 24},
+    nullptr,
+    &FROST_SPIKES, &FROST_ICE_WALL,
+    &FROST_ICE, {&FROST_CRACKED_1, &FROST_CRACKED_2, &FROST_CRACKED_3},
 };
 
 const WorldArt* worldArt(int world) {
-    return world == WORLD_NAMULA ? &NAMULA_ART : world == 1 ? &STATION_ART : nullptr;
+    return world == WORLD_NAMULA ? &NAMULA_ART : world == 1 ? &STATION_ART : world == 2 ? &GREEN_ART : world == 3 ? &FROST_ART : nullptr;
 }
 
 // --- Props (spec §22: deterministic, never near spots, objects or hazards) ---
@@ -517,7 +834,7 @@ bool propTileExcluded(const AreaState& area, int tx, int ty) {
         for (int dx = -2; dx <= 2; dx++) {
             char t = tileAt(area, tx + dx, ty + dy);
             if (strchr("^~zf", t)) return true;
-            if (abs(dx) <= 1 && abs(dy) <= 1 && strchr("SCMNPTKQWXLO", t)) return true;
+            if (abs(dx) <= 1 && abs(dy) <= 1 && strchr("SCMNPTKQWXLORYg", t)) return true;
         }
     return false;
 }

@@ -111,8 +111,12 @@ struct Enemy {
     int stolen; float stolenTimer;     // name wraith: names taken, s left to win them back
 };
 const int PROJ_ENEMY = 0, PROJ_ARROW = 1, PROJ_BOLT = 2, PROJ_STAR = 3, PROJ_ORB = 4, PROJ_WAVE = 5, PROJ_RAIN = 6;
+const int PROJ_BANANA = 7, PROJ_COCONUT = 8, PROJ_PEEL = 9, PROJ_POOP = 10;   // enemy throws drawn with their sprites (spec §21)
+const int PROJ_ICICLE = 11, PROJ_SNOWBALL = 12, PROJ_ICE_CUBE = 13, PROJ_SHARD = 14;   // world 3's (the ice cube freezes, no damage)
+// Hero shots: multiplier, skill or basic, enemies and bosses already hit. gravity: a lobbed throw's pull (px/s²);
+// trap: damage is taken as it is (a share of the hero's max HP, spec §7), not through DEF.
 struct Projectile { float x, y, vx, vy; int w, h; int damage; bool fromHero; int pierce; float range; int kind;
-                    float mult; bool strong; uint64_t hitMask; uint8_t bossMask; };   // hero shots: multiplier, skill or basic, enemies and bosses already hit
+                    float mult; bool strong; uint64_t hitMask; uint8_t bossMask; float gravity; bool trap; };
 struct DamageNumber { float x, y, age; int value; uint32_t color; float life; bool names; };   // names: "+n NAMES"
 // Short-lived skill shapes for drawing (arcs, bursts, chains, Meteor's marker, a boss's beam and growing ball); x2/y2: a chain link's end.
 enum EffectKind { FX_SWING, FX_ARC, FX_BURST, FX_CHAIN, FX_METEOR, FX_SPIN, FX_BEAM, FX_BALL };
@@ -135,10 +139,20 @@ struct Hero {
     float drinkTimer;            // s left of drinking a potion (heals at its end)
     int drinkItem;               // the potion being drunk (ItemType)
     int swing;                   // id of the current melee swing (each enemy is hit once per swing)
+    bool attackUp;               // the basic attack aims up (the Thief with up held)
     int skill = -1;              // the strong attack playing (job tier), -1 none
     int volleys;                 // Storm Volley fans still to fire
     float dashDir, skillX, skillY;   // Shadow Dash's direction; Meteor's target
+    float slideTimer, slideSpeed;    // a banana peel: s left of sliding without control, signed speed (spec §12 world 2)
+    float frozenTimer;               // the Yeti's ice block: s left without control; X or R1 presses cut it (spec §12 world 3)
+    bool fireWasHeld;                // R1 held last frame (a press is a new hold)
 };
+// Things lying in the area for a while: the Monkey King's peels and the Silverback's stink mist (spec §12 world 2).
+enum FloorHazardKind { HAZARD_PEEL, HAZARD_MIST };
+struct FloorHazard { int kind; float x, y, timer; };   // x, y: a peel's bottom-centre, a mist's centre; s left
+// A tile that reacts to the hero: a coconut palm 'R' (world 2), an icicle 'Y' (world 3), a crumbling block 'c'.
+// state 0 ready, 1 shaking until `timer` runs out, 2 spent (regrowing, gone, broken) until `timer` runs out.
+struct TileTrap { int tile; char kind; int state; float timer; };
 
 // --- Bosses (quest_bosses.cpp; spec §12). QuestBoss, since the shooter's game.h already has a QuestBoss. ---
 struct Quest;
@@ -169,9 +183,14 @@ bool bossHittable(const QuestBoss& b);                         // alive, not shi
 int bossPose(const QuestBoss& b);                              // BossPose for drawing: idle, telegraph, attacking, open
 float bossVisibility(const QuestBoss& b);                      // 1 shown, 0 faded out (the Star Mage's teleport)
 int electricFloor(const Quest& q, int* col0, int* row);   // the Star Mage's phase-2 floor: 0 off, 1 flicker, 2 on; 6 tiles from col0
+int titanSpikeLine(const Quest& q, int col, int* row);    // the Titan's SPIKE LINE at a floor column: 0 none, 1 crack, 2 spike up
 
 // The current area's tiles as they are now (gates, crumbles, shortcut doors change them).
-struct AreaState { int world, index; const AreaDef* def; std::vector<char> tiles; };
+struct AreaState {
+    int world, index; const AreaDef* def; std::vector<char> tiles;
+    bool windFlipped = false;   // world 3 and 6 wind zones push the other way (they flip every 3 s)
+    float wind = 0;             // px/s pushed on the hero everywhere (the Glacier Titan's blizzard)
+};
 
 enum QuestMode { QMODE_SLOTS, QMODE_DELETE, QMODE_CLASS, QMODE_INTRO, QMODE_PLAY, QMODE_DEAD, QMODE_DIALOGUE, QMODE_MENU,
                  QMODE_SHOP, QMODE_MAP, QMODE_CREDITS };   // CREDITS: phase 8
@@ -230,6 +249,10 @@ struct Quest {
     std::vector<QuestBoss> bosses;
     std::vector<Marker> markers;
     bool arenaLocked;                   // a boss fight runs: every exit of the area is closed (spec §12)
+    // Worlds 2-3 (phase 5)
+    std::vector<FloorHazard> hazards;
+    std::vector<TileTrap> traps;
+    float mistDamage;                   // the stink mist's HP loss not yet taken (whole points are taken as they add up)
 };
 
 void questOpen(Quest& q, const char* folder);             // reads the slot summaries, shows the slot screen

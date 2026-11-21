@@ -16,6 +16,7 @@ const float GROUND_ACCEL = 900 * DP, AIR_ACCEL = 500 * DP, ICE_ACCEL = 120 * DP;
 const float COYOTE_TIME = 0.08f, JUMP_BUFFER = 0.10f, DOUBLE_JUMP_SPEED = 200 * DP, CLIMB_SPEED = 50 * DP;
 const float DROP_TIME = 0.2f;                       // s one-way tops are ignored after down + X
 const float CURRENT_PUSH = 50 * DP;                 // px/s added to x inside < and >
+const float WIND_PUSH = 40 * DP;                    // world 3 and 6: wind zones push less and flip (spec §9)
 const float VENT_LIFT = 900 * DP, VENT_MAX_RISE = 160 * DP;   // net px/s² upward inside a vent's column, up to this rise speed
 const int VENT_REACH = 6;                           // tiles above a vent that still lift
 // Flow
@@ -57,6 +58,7 @@ void loadArea(AreaState& area, int world, int index, uint32_t gates, uint32_t sh
     area.index = index;
     area.def = &def;
     area.tiles.assign(def.tiles, def.tiles + def.cols * def.rows);
+    area.wind = 0;
     bool gateOpen = gates & (1u << world);
     bool doorOpen = def.shortcut >= 0 && (shortcuts & (1u << def.shortcut));
     for (char& t : area.tiles)
@@ -135,17 +137,17 @@ void moveHero(Hero& h, const Actions& a, const AreaState& area, HeroClass heroCl
     float dx = h.vx * dt;
     if (!h.climbing) {
         h.vy = fminf(h.vy + GRAVITY * dt, MAX_FALL);
-        float push = 0;
+        float push = 0, zone = area.world == 3 || area.world == 6 ? (area.windFlipped ? -WIND_PUSH : WIND_PUSH) : CURRENT_PUSH;
         bool inVent = false;
         for (int c = firstCol(h); c <= lastCol(h); c++) {
             for (int r = firstRow(h); r <= lastRow(h); r++) {
                 char t = tileAt(area, c, r);
-                if (t == '<') push = -CURRENT_PUSH;
-                if (t == '>') push = CURRENT_PUSH;
+                if (t == '<') push = -zone;
+                if (t == '>') push = zone;
             }
             for (int r = firstRow(h); r <= lastRow(h) + VENT_REACH; r++) inVent |= tileAt(area, c, r) == 'v';
         }
-        dx += push * dt;
+        dx += (push + area.wind) * dt;
         if (inVent && h.vy > -VENT_MAX_RISE) h.vy = fmaxf(h.vy - (GRAVITY + VENT_LIFT) * dt, -VENT_MAX_RISE);
     }
     float dy = (vyBefore + h.vy) / 2 * dt;
