@@ -1,6 +1,7 @@
 // NAME QUEST combat (spec §5-§8): the hero's attacks, skills and dodge, enemy behaviours, shots, damage and hit feel.
 #include "quest.h"
 #include "screen.h"
+#include "quest_sprites_1.h"
 #include <math.h>
 #include <string.h>
 #include <string>
@@ -8,7 +9,7 @@
 // Hero (spec §5, §6), dp x DP.
 const float ROLL_TIME = 0.35f, ROLL_SPEED = 140 * DP, ROLL_IFRAMES = 0.25f, ROLL_COOLDOWN = 0.6f;
 const float BLINK_DISTANCE = 48 * DP, BLINK_IFRAMES = 0.2f, BLINK_COOLDOWN = 0.8f;
-const float HURT_VX = 90 * DP, HURT_VY = 140 * DP, HURT_TIME = 0.25f, HURT_IFRAMES = 1.0f;
+const float HURT_VX = 90 * DP, HURT_TIME = 0.25f, HURT_IFRAMES = 1.0f;
 const float BASIC_SLOW = 0.5f;                      // Archer and Magician walk at x0.5 while the basic attack plays
 const float BASIC_MULT_BY_JOB[4] = {1.0f, 1.15f, 1.3f, 1.5f};
 // The basic attack per class: cycle, multiplier, melee window and box, or the shot's speed, range and size.
@@ -27,6 +28,7 @@ const float SKILL_CAST[CLASS_COUNT][4] = {{0.6f, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 
 const float PARTNER_TIME = 12, PARTNER_BEHIND = 10 * DP, PARTNER_MULT = 0.5f;
 const float SHADOW_DASH_SPEED = 72 * DP / 0.15f;
 // Hit feel (spec §7).
+const float BOSS_FLASH = 0.2f;   // a boss is white for its first 0.08 s, then shows its hurt frame
 const float FLASH_TIME = 0.08f, KNOCK_TIME = 0.1f, KNOCK_SPEED = 40 * DP, HIT_STOP = 0.04f, HURT_STOP = 0.08f, HURT_TRAUMA = 0.3f;
 const float NUMBER_TIME = 0.6f;
 const int MAX_NUMBERS = 24, KILL_PARTICLES = 8;
@@ -86,38 +88,40 @@ static const Sprite PLACEHOLDER_ENEMY_B = {12, 12,
     "...ss..ss..."};
 #define PLACEHOLDER_ENEMY {&PLACEHOLDER_ENEMY_A, &PLACEHOLDER_ENEMY_B}
 
-// Rosters of worlds 1-6 (spec §8), with the 1x shooter sprites each is redrawn from; rosterType doubles them.
+// Rosters of worlds 1-6 (spec §8). World 1's are redrawn side-view (quest_sprites_1); worlds 2-6 still hold the 1x
+// shooter sprites each will be redrawn from, which rosterType doubles.
+#define ENEMY_ROW(N) {&ENEMY_##N##_WALK_1, &ENEMY_##N##_WALK_2, &ENEMY_##N##_WALK_3, &ENEMY_##N##_WALK_4}
 static EnemyType ROSTERS[6][ROSTER_SLOTS] = {
-    {{"CRAWLER", BEH_WALKER, KIND_FODDER, TRAIT_NONE, {&GREEN_ALIEN_A, &GREEN_ALIEN_B}, 1, SOUND_Q_STEP_METAL},
-     {"FLOATER", BEH_FLYER, KIND_FODDER, TRAIT_NONE, {&BLUE_ALIEN_A, &BLUE_ALIEN_B}, 1, SOUND_SCREECH},
-     {"GUNNER", BEH_SHOOTER, KIND_SOLDIER, TRAIT_NONE, {&RED_ALIEN_A, &RED_ALIEN_B}, 1, SOUND_Q_ZAP},
-     {"HOPPER DRONE", BEH_JUMPER, KIND_SOLDIER, TRAIT_NONE, PLACEHOLDER_ENEMY, 1, SOUND_Q_JUMP},
-     {"SENTINEL", BEH_ARMORED, KIND_ELITE, TRAIT_NONE, PLACEHOLDER_ENEMY, 1, SOUND_Q_SWING}},
-    {{"LEAFHOPPER", BEH_JUMPER, KIND_FODDER, TRAIT_NONE, {&LEAFHOPPER_A, &LEAFHOPPER_B}, 1, SOUND_Q_JUMP},
-     {"BEETLE", BEH_WALKER, KIND_FODDER, TRAIT_NONE, {&BEETLE_A, &BEETLE_B}, 1, SOUND_Q_STEP_LEAVES},
-     {"STAG", BEH_CHARGER, KIND_SOLDIER, TRAIT_NONE, {&STAG_A, &STAG_B}, 1, SOUND_Q_ROAR},
-     {"TREE MONKEY", BEH_DROPPER, KIND_SOLDIER, TRAIT_BANANA_ON_LAND, PLACEHOLDER_ENEMY, 1, SOUND_BANANA_THROW},
-     {"RHINO", BEH_ARMORED, KIND_ELITE, TRAIT_NONE, {&RHINO_A, &RHINO_B}, 1, SOUND_Q_SWING}},
-    {{"SNOWFLAKE", BEH_FLYER, KIND_FODDER, TRAIT_NONE, {&FLAKE_A, &FLAKE_B}, 1, SOUND_FREEZE},
-     {"ICE BAT", BEH_DROPPER, KIND_FODDER, TRAIT_NONE, {&ICEBAT_A, &ICEBAT_B}, 1, SOUND_SCREECH},
-     {"FROST SKULL", BEH_SHOOTER, KIND_SOLDIER, TRAIT_NONE, {&FROSTSKULL_A, &FROSTSKULL_B}, 1, SOUND_FREEZE},
-     {"YETI CUB", BEH_CHARGER, KIND_SOLDIER, TRAIT_NONE, PLACEHOLDER_ENEMY, 1, SOUND_Q_ROAR},
-     {"ICE KNIGHT", BEH_ARMORED, KIND_ELITE, TRAIT_NONE, PLACEHOLDER_ENEMY, 1, SOUND_Q_SWING}},
-    {{"EMBER", BEH_FLYER, KIND_FODDER, TRAIT_NONE, {&EMBER_A, &EMBER_B}, 1, SOUND_SIZZLE},
-     {"FIRE BAT", BEH_DROPPER, KIND_FODDER, TRAIT_NONE, {&FIREBAT_A, &FIREBAT_B}, 1, SOUND_SCREECH},
-     {"MAGMA SKULL", BEH_SHOOTER, KIND_SOLDIER, TRAIT_NONE, {&MAGMASKULL_A, &MAGMASKULL_B}, 1, SOUND_SIZZLE},
-     {"MAGMA CRAB", BEH_CHARGER, KIND_SOLDIER, TRAIT_NONE, PLACEHOLDER_ENEMY, 1, SOUND_Q_ROAR},
-     {"PHOENIX", BEH_FLYER, KIND_ELITE, TRAIT_REVIVE, {&PHOENIX_A, &PHOENIX_B}, 1, SOUND_SCREECH}},
-    {{"PIRANHA", BEH_FLYER, KIND_FODDER, TRAIT_NONE, {&PIRANHA_A, &PIRANHA_B}, 1, SOUND_BUBBLE},
-     {"PUFFER", BEH_WALKER, KIND_FODDER, TRAIT_INFLATE, {&PUFFER_A, &PUFFER_B}, 1, SOUND_BUBBLE},
-     {"LIONFISH", BEH_SHOOTER, KIND_SOLDIER, TRAIT_NONE, {&LIONFISH_A, &LIONFISH_B}, 1, SOUND_BUBBLE},
-     {"SHARK", BEH_CHARGER, KIND_SOLDIER, TRAIT_NONE, {&SHARK_A, &SHARK_B}, 1, SOUND_Q_ROAR},
-     {"IRON CRAB", BEH_ARMORED, KIND_ELITE, TRAIT_NONE, PLACEHOLDER_ENEMY, 1, SOUND_Q_SWING}},
-    {{"NAME WRAITH", BEH_FLYER, KIND_FODDER, TRAIT_STEAL_NAMES, PLACEHOLDER_ENEMY, 1, SOUND_SCREECH},
-     {"GARGOYLE", BEH_DROPPER, KIND_FODDER, TRAIT_NONE, PLACEHOLDER_ENEMY, 1, SOUND_POUND},
-     {"STATUE ARCHER", BEH_SHOOTER, KIND_SOLDIER, TRAIT_NONE, PLACEHOLDER_ENEMY, 1, SOUND_Q_ARROW},
-     {"SHADE HOUND", BEH_CHARGER, KIND_SOLDIER, TRAIT_NONE, PLACEHOLDER_ENEMY, 1, SOUND_Q_ROAR},
-     {"CITADEL KNIGHT", BEH_ARMORED, KIND_ELITE, TRAIT_NONE, PLACEHOLDER_ENEMY, 1, SOUND_Q_SWING}},
+    {{"CRAWLER", BEH_WALKER, KIND_FODDER, TRAIT_NONE, ENEMY_ROW(CRAWLER), 1, SOUND_Q_STEP_METAL, &ENEMY_CRAWLER_TELL, &ENEMY_CRAWLER_ATTACK},
+     {"FLOATER", BEH_FLYER, KIND_FODDER, TRAIT_NONE, ENEMY_ROW(FLOATER), 1, SOUND_SCREECH, &ENEMY_FLOATER_TELL, &ENEMY_FLOATER_ATTACK},
+     {"GUNNER", BEH_SHOOTER, KIND_SOLDIER, TRAIT_NONE, ENEMY_ROW(GUNNER), 1, SOUND_Q_ZAP, &ENEMY_GUNNER_TELL, &ENEMY_GUNNER_ATTACK},
+     {"HOPPER DRONE", BEH_JUMPER, KIND_SOLDIER, TRAIT_NONE, ENEMY_ROW(HOPPER), 1, SOUND_Q_JUMP, &ENEMY_HOPPER_TELL, &ENEMY_HOPPER_ATTACK},
+     {"SENTINEL", BEH_ARMORED, KIND_ELITE, TRAIT_NONE, ENEMY_ROW(SENTINEL), 1, SOUND_Q_SWING, &ENEMY_SENTINEL_TELL, &ENEMY_SENTINEL_ATTACK}},
+    {{"LEAFHOPPER", BEH_JUMPER, KIND_FODDER, TRAIT_NONE, {&LEAFHOPPER_A, &LEAFHOPPER_B}, 1, SOUND_Q_JUMP, nullptr, nullptr},
+     {"BEETLE", BEH_WALKER, KIND_FODDER, TRAIT_NONE, {&BEETLE_A, &BEETLE_B}, 1, SOUND_Q_STEP_LEAVES, nullptr, nullptr},
+     {"STAG", BEH_CHARGER, KIND_SOLDIER, TRAIT_NONE, {&STAG_A, &STAG_B}, 1, SOUND_Q_ROAR, nullptr, nullptr},
+     {"TREE MONKEY", BEH_DROPPER, KIND_SOLDIER, TRAIT_BANANA_ON_LAND, PLACEHOLDER_ENEMY, 1, SOUND_BANANA_THROW, nullptr, nullptr},
+     {"RHINO", BEH_ARMORED, KIND_ELITE, TRAIT_NONE, {&RHINO_A, &RHINO_B}, 1, SOUND_Q_SWING, nullptr, nullptr}},
+    {{"SNOWFLAKE", BEH_FLYER, KIND_FODDER, TRAIT_NONE, {&FLAKE_A, &FLAKE_B}, 1, SOUND_FREEZE, nullptr, nullptr},
+     {"ICE BAT", BEH_DROPPER, KIND_FODDER, TRAIT_NONE, {&ICEBAT_A, &ICEBAT_B}, 1, SOUND_SCREECH, nullptr, nullptr},
+     {"FROST SKULL", BEH_SHOOTER, KIND_SOLDIER, TRAIT_NONE, {&FROSTSKULL_A, &FROSTSKULL_B}, 1, SOUND_FREEZE, nullptr, nullptr},
+     {"YETI CUB", BEH_CHARGER, KIND_SOLDIER, TRAIT_NONE, PLACEHOLDER_ENEMY, 1, SOUND_Q_ROAR, nullptr, nullptr},
+     {"ICE KNIGHT", BEH_ARMORED, KIND_ELITE, TRAIT_NONE, PLACEHOLDER_ENEMY, 1, SOUND_Q_SWING, nullptr, nullptr}},
+    {{"EMBER", BEH_FLYER, KIND_FODDER, TRAIT_NONE, {&EMBER_A, &EMBER_B}, 1, SOUND_SIZZLE, nullptr, nullptr},
+     {"FIRE BAT", BEH_DROPPER, KIND_FODDER, TRAIT_NONE, {&FIREBAT_A, &FIREBAT_B}, 1, SOUND_SCREECH, nullptr, nullptr},
+     {"MAGMA SKULL", BEH_SHOOTER, KIND_SOLDIER, TRAIT_NONE, {&MAGMASKULL_A, &MAGMASKULL_B}, 1, SOUND_SIZZLE, nullptr, nullptr},
+     {"MAGMA CRAB", BEH_CHARGER, KIND_SOLDIER, TRAIT_NONE, PLACEHOLDER_ENEMY, 1, SOUND_Q_ROAR, nullptr, nullptr},
+     {"PHOENIX", BEH_FLYER, KIND_ELITE, TRAIT_REVIVE, {&PHOENIX_A, &PHOENIX_B}, 1, SOUND_SCREECH, nullptr, nullptr}},
+    {{"PIRANHA", BEH_FLYER, KIND_FODDER, TRAIT_NONE, {&PIRANHA_A, &PIRANHA_B}, 1, SOUND_BUBBLE, nullptr, nullptr},
+     {"PUFFER", BEH_WALKER, KIND_FODDER, TRAIT_INFLATE, {&PUFFER_A, &PUFFER_B}, 1, SOUND_BUBBLE, nullptr, nullptr},
+     {"LIONFISH", BEH_SHOOTER, KIND_SOLDIER, TRAIT_NONE, {&LIONFISH_A, &LIONFISH_B}, 1, SOUND_BUBBLE, nullptr, nullptr},
+     {"SHARK", BEH_CHARGER, KIND_SOLDIER, TRAIT_NONE, {&SHARK_A, &SHARK_B}, 1, SOUND_Q_ROAR, nullptr, nullptr},
+     {"IRON CRAB", BEH_ARMORED, KIND_ELITE, TRAIT_NONE, PLACEHOLDER_ENEMY, 1, SOUND_Q_SWING, nullptr, nullptr}},
+    {{"NAME WRAITH", BEH_FLYER, KIND_FODDER, TRAIT_STEAL_NAMES, PLACEHOLDER_ENEMY, 1, SOUND_SCREECH, nullptr, nullptr},
+     {"GARGOYLE", BEH_DROPPER, KIND_FODDER, TRAIT_NONE, PLACEHOLDER_ENEMY, 1, SOUND_POUND, nullptr, nullptr},
+     {"STATUE ARCHER", BEH_SHOOTER, KIND_SOLDIER, TRAIT_NONE, PLACEHOLDER_ENEMY, 1, SOUND_Q_ARROW, nullptr, nullptr},
+     {"SHADE HOUND", BEH_CHARGER, KIND_SOLDIER, TRAIT_NONE, PLACEHOLDER_ENEMY, 1, SOUND_Q_ROAR, nullptr, nullptr},
+     {"CITADEL KNIGHT", BEH_ARMORED, KIND_ELITE, TRAIT_NONE, PLACEHOLDER_ENEMY, 1, SOUND_Q_SWING, nullptr, nullptr}},
 };
 
 // A 1x shooter sprite drawn as chunky 2x2 blocks, like the old-school heroes (kept for the program's life).
@@ -145,8 +149,8 @@ int statsWorld(int world) {
 const EnemyType& rosterType(int world, int slot) {
     static bool ready = false;
     if (!ready) {
-        for (auto& roster : ROSTERS)
-            for (EnemyType& t : roster) t.frames[0] = doubled(t.frames[0]), t.frames[1] = doubled(t.frames[1]);
+        for (int w = 2; w <= 6; w++)
+            for (EnemyType& t : ROSTERS[w - 1]) t.frames[0] = doubled(t.frames[0]), t.frames[1] = doubled(t.frames[1]);
         ready = true;
     }
     slot = slot < 0 ? 0 : slot % ROSTER_SLOTS;
@@ -158,7 +162,7 @@ const EnemyType& rosterType(int world, int slot) {
     return ROSTERS[(world < 1 || world > 6 ? 1 : world) - 1][slot];
 }
 
-static float random01(Quest& q) {
+float random01(Quest& q) {
     q.seed = q.seed * 1664525u + 1013904223u;
     return (q.seed >> 8) / 16777216.0f;
 }
@@ -243,6 +247,26 @@ void spawnEnemies(Quest& q) {
         e.lastSwing = e.lastPartnerSwing = -1;
         q.enemies.push_back(e);
     }
+}
+
+void spawnSummon(Quest& q, int slot, float x, float y) {
+    const EnemyType& type = rosterType(q.area.world, slot);
+    int world = statsWorld(q.area.world);
+    Enemy e = {};
+    e.type = slot;
+    e.world = q.area.world;
+    e.spawn = 64;   // no killed bit: summons don't stay dead
+    e.w = type.frames[0]->w - 4 * DP;
+    e.h = type.frames[0]->h - 4 * DP;
+    e.x = e.homeX = x - e.w / 2;
+    e.y = e.homeY = y - e.h;
+    e.atk = enemyAttack(world, HIT_FRACTION[type.kind], q.save.ngPlus);
+    e.hp = e.maxHp = enemyHealth(world, HITS_TO_KILL[type.kind], q.save.ngPlus);
+    e.names = 0;
+    e.alive = true;
+    e.facingLeft = q.hero.x < e.x;
+    e.lastSwing = e.lastPartnerSwing = -1;
+    q.enemies.push_back(e);
 }
 
 // Moves a walking enemy against the tiles (one-way tops hold it); true when a wall, a ledge or the area's edge stopped it.
@@ -521,7 +545,7 @@ static void updateEnemy(Quest& q, Enemy& e, float dt) {
 }
 
 // The hero takes a hit (spec §7): i-frames, knockback away from sourceX (up at bounceVy), hit-stop, trauma, a red number.
-static void hurtHero(Quest& q, int damage, float sourceX, float bounceVy = HURT_VY) {
+void hurtHero(Quest& q, int damage, float sourceX, float bounceVy) {
     Hero& h = q.hero;
     if (h.iframes > 0 || q.godMode || h.hp <= 0) return;
     if (h.buffTimers[1] > 0) damage = (int)fmaxf(1, lroundf(damage * TONIC_DAMAGE));   // Iron Tonic
@@ -597,6 +621,20 @@ static void hitEnemy(Quest& q, int index, float mult, bool strong, float sourceX
     if (e.spawn < 64 && q.area.index < (int)killed.size()) killed[q.area.index] |= 1ull << e.spawn;
 }
 
+// One hit of the hero's on boss `index` (spec §7): no knockback; updateBosses handles phases and the death.
+static void hitBoss(Quest& q, int index, float mult, bool strong) {
+    QuestBoss& b = q.bosses[index];
+    if (!bossHittable(b)) return;
+    bool crit = random01(q) < q.stats.crit;
+    float atk = q.stats.atk * (q.hero.buffTimers[0] > 0 ? WHETSTONE_ATK : 1);
+    int damage = damageToEnemy(atk, mult, 0.9f + 0.2f * random01(q), crit, q.stats.critMult, 1);
+    b.hp -= damage;
+    b.flash = BOSS_FLASH;
+    addNumber(q, b.x + b.w / 2, b.y, damage, crit ? 'o' : 'w');
+    q.soundRequested[crit ? SOUND_Q_CRIT : SOUND_Q_HIT] = true;
+    if (strong) q.hitStop = fmaxf(q.hitStop, HIT_STOP);
+}
+
 // Any hero attack box touching the area's lever K opens its shortcut doors (spec §11).
 static void touchLever(Quest& q, float x, float y, float w, float h) {
     const AreaDef& def = *q.area.def;
@@ -621,6 +659,14 @@ static int hitBox(Quest& q, float x, float y, float w, float h, float mult, bool
         if (stun > 0 && e.alive) e.stunTimer = stun;
         hits++;
     }
+    for (int i = 0; i < (int)q.bosses.size(); i++) {   // bosses take the hit but never the stun
+        QuestBoss& b = q.bosses[i];
+        int& last = partner ? b.lastPartnerSwing : b.lastSwing;
+        if (!bossHittable(b) || last == swing || !overlaps(x, y, w, h, b.x, b.y, (float)b.w, (float)b.h)) continue;
+        last = swing;
+        hitBoss(q, i, mult, strong);
+        hits++;
+    }
     return hits;
 }
 
@@ -631,6 +677,11 @@ static void hitCircle(Quest& q, float cx, float cy, float radius, float mult) {
         Enemy& e = q.enemies[i];
         float nx = fmaxf(e.x, fminf(cx, e.x + e.w)), ny = fmaxf(e.y, fminf(cy, e.y + e.h));
         if (e.alive && e.state != ES_EMBER && (nx - cx) * (nx - cx) + (ny - cy) * (ny - cy) <= radius * radius) hitEnemy(q, i, mult, true, cx);
+    }
+    for (int i = 0; i < (int)q.bosses.size(); i++) {
+        const QuestBoss& b = q.bosses[i];
+        float nx = fmaxf(b.x, fminf(cx, b.x + b.w)), ny = fmaxf(b.y, fminf(cy, b.y + b.h));
+        if ((nx - cx) * (nx - cx) + (ny - cy) * (ny - cy) <= radius * radius) hitBoss(q, i, mult, true);
     }
 }
 
@@ -738,21 +789,28 @@ static void castSkill(Quest& q, int cls, int job) {
         q.soundRequested[SOUND_FREEZE] = true;
         break;
     case CLASS_MAGICIAN * 4 + 2: {   // Chain Lightning: the nearest within 140, then 3 more each within 64 of the last
+        // Candidates: enemies 0-59, then bosses as 60 + their index.
         float fromX = handX, fromY = handY, reach = 140 * DP;
         uint64_t used = 0;
         for (int link = 0; link < 4; link++) {
             int best = -1;
-            float bestDistance = reach;
-            for (int i = 0; i < (int)q.enemies.size() && i < 64; i++) {
-                const Enemy& e = q.enemies[i];
-                float d = hypotf(e.x + e.w / 2 - fromX, e.y + e.h / 2 - fromY);
-                if (e.alive && e.state != ES_EMBER && !(used >> i & 1) && d <= bestDistance) best = i, bestDistance = d;
+            float bestDistance = reach, toX = 0, toY = 0;
+            for (int i = 0; i < 64; i++) {
+                bool boss = i >= 60;
+                int k = boss ? i - 60 : i;
+                if (boss ? k >= (int)q.bosses.size() || !bossHittable(q.bosses[k])
+                         : k >= (int)q.enemies.size() || !q.enemies[k].alive || q.enemies[k].state == ES_EMBER)
+                    continue;
+                float x = boss ? q.bosses[k].x + q.bosses[k].w / 2 : q.enemies[k].x + q.enemies[k].w / 2;
+                float y = boss ? q.bosses[k].y + q.bosses[k].h / 2 : q.enemies[k].y + q.enemies[k].h / 2;
+                float d = hypotf(x - fromX, y - fromY);
+                if (!(used >> i & 1) && d <= bestDistance) best = i, bestDistance = d, toX = x, toY = y;
             }
             if (best < 0) break;
             used |= 1ull << best;
-            float toX = q.enemies[best].x + q.enemies[best].w / 2, toY = q.enemies[best].y + q.enemies[best].h / 2;
             addEffect(q, FX_CHAIN, fromX, fromY, 0, 0, 0.2f, 'c', toX, toY);
-            hitEnemy(q, best, 3.0f, true, fromX);
+            if (best >= 60) hitBoss(q, best - 60, 3.0f, true);
+            else hitEnemy(q, best, 3.0f, true, fromX);
             fromX = toX;
             fromY = toY;
             reach = 64 * DP;
@@ -1006,6 +1064,14 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
                 if (!p.strong) h.mp = h.mp < s.maxMp ? h.mp + 1 : s.maxMp;
                 if (p.pierce-- <= 0) gone = true;
             }
+            for (int k = 0; k < (int)q.bosses.size() && k < 8 && !gone; k++) {
+                QuestBoss& b = q.bosses[k];
+                if (!bossHittable(b) || (p.bossMask >> k & 1) || !overlaps(p.x, p.y, (float)p.w, (float)p.h, b.x, b.y, (float)b.w, (float)b.h)) continue;
+                p.bossMask |= 1 << k;
+                hitBoss(q, k, p.mult, p.strong);
+                if (!p.strong) h.mp = h.mp < s.maxMp ? h.mp + 1 : s.maxMp;
+                if (p.pierce-- <= 0) gone = true;
+            }
         } else if (!gone && overlaps(p.x, p.y, (float)p.w, (float)p.h, h.x, h.y, HERO_W, HERO_H)) {
             hurtHero(q, damageToHero(p.damage, s.def), p.x + p.w / 2);
             gone = true;
@@ -1041,8 +1107,20 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
         for (int r = r0; r <= r1 + 1; r++) {
             char t = tileAt(q.area, c, r);
             if (r <= r1 && t == '^') hurtHero(q, (int)fmaxf(1, lroundf(s.maxHp * SPIKE_DAMAGE)), away, SPIKE_BOUNCE);
-            if (t == 'z' && panelOn(q)) hurtHero(q, (int)fmaxf(1, lroundf(s.maxHp * PANEL_DAMAGE)), away);
+            if (r <= r1 && t == 'z' && panelOn(q)) hurtHero(q, (int)fmaxf(1, lroundf(s.maxHp * PANEL_DAMAGE)), away);
             for (int k = 1; k <= JET_TILES && r <= r1; k++)
                 if (tileAt(q.area, c, r + k) == 'f' && jetBurning(q)) hurtHero(q, (int)fmaxf(1, lroundf(s.maxHp * JET_DAMAGE)), away);
         }
+    // Panels turning on buzz when one is on screen (spec §9).
+    float panelCycle = PANEL_ON + (q.area.def->band >= 2 ? 1.0f : 1.5f);
+    if (panelOn(q) && fmodf(q.time - dt, panelCycle) >= PANEL_ON) {
+        const AreaDef& def = *q.area.def;
+        for (int t = 0; t < def.cols * def.rows; t++) {
+            float px = (t % def.cols) * TILE - q.camX, py = (t / def.cols) * TILE - q.camY;
+            if (q.area.tiles[t] == 'z' && px > -TILE && px < QUEST_W && py > -TILE && py < QUEST_H) {
+                q.soundRequested[SOUND_Q_ZAP] = true;
+                break;
+            }
+        }
+    }
 }

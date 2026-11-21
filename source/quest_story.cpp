@@ -46,6 +46,10 @@ static const char* const ILSA_INTRO[3][2] = {
     {"I USED TO REMEMBER WHO LIT THIS FIRE.\nNOW I ONLY REMEMBER TO KEEP IT. IS THAT SAD? IT FEELS LIKE WORK.",
      "BRING ME WHAT YOU CARRY. THE HEARTH WILL TURN IT INTO YOU."},
 };
+// Ilsa's first line once the Great Name of world n is taken (spec §14: author 5); worlds 2-5 come with their phases.
+static const char* const ILSA_GREAT_NAME[5] = {
+    "YOU CAME BACK WITH A GREAT NAME. THE FIRE SAT UP WHEN YOU WALKED IN.\nIT HAS NOT DONE THAT IN A LONG TIME.",
+    nullptr, nullptr, nullptr, nullptr};
 // Lio's song, one per highest world 1..7 (spec §14).
 static const char* const LIO_SONGS[7] = {
     "SING WITH ME: THE STATION DRIFTS, THE STATION SLEEPS,\nAND NO ONE WAKES THE THING IT KEEPS...",
@@ -106,12 +110,17 @@ void talkTo(Quest& q, int id) {
     int cls = s.heroClass >= 0 && s.heroClass < CLASS_COUNT ? s.heroClass : 0;
     char line[96];
     switch (id) {
-    case NPC_ILSA:   // phase 7: her first line changes after each Great Name
+    case NPC_ILSA:   // after a Great Name her first line changes (spec §14)
         s.ilsaTalks++;
         if (s.ilsaTalks <= 3) {
             p = {ILSA_INTRO[s.ilsaTalks - 1][0], ILSA_INTRO[s.ilsaTalks - 1][1]};
         } else {
             p = {"GIVE THE FIRE WHAT YOU CARRY, AND IT WILL GIVE YOU MORE OF YOURSELF."};
+            for (int w = 5; w >= 1; w--)   // the latest Great Name's line comes first
+                if ((s.bosses >> w & 1) && ILSA_GREAT_NAME[w - 1]) {
+                    p.insert(p.begin(), ILSA_GREAT_NAME[w - 1]);
+                    break;
+                }
             d.after = AFTER_LEVEL_UP;
         }
         break;

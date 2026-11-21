@@ -1,7 +1,7 @@
 # Handoff: state of the work and how Claude and Codex share it
 
 **Read this first, update it before you stop.** Rules and commands are in `AGENTS.md`; conventions, questions between agents and the small-change lane are in `docs/COLLAB.md`; this file holds what changes between sessions.
-Updated: 2026-11-21 (Classic menu and NAME QUEST phase 3).
+Updated: 2026-11-21 (NAME QUEST phase 4: everything but the PS3 check and the user's playtest).
 
 ## Classic shooter
 
@@ -15,17 +15,19 @@ Updated: 2026-11-21 (Classic menu and NAME QUEST phase 3).
 | 1 engine, 1b art | `docs/work-plan/name-quest/phase-1-engine.md`, `phase-1b-art.md` | done, committed (`ab92b67`) |
 | 2 combat | `phase-2-combat.md` | done, committed (`f871aac`); PS3 checks open |
 | 3 RPG systems | `phase-3-rpg-systems.md` | done, merged into `main` (`1456d78`), Mac-checked, `make ps3` builds; PS3 check (step 12) open |
-| 4 world 1 | `phase-4-world-1.md` | **next** |
+| 4 world 1 | `phase-4-world-1.md` | **built on `claude/work`**: steps 0-9 done (Mac); step 10 (PS3 check, the user's playtest) open |
 | 5-9 | `phase-5` .. `phase-9` | planned, not started |
 
 - Master plan and rules for working through a phase: `docs/work-plan/name-quest-plan.md`. Rules, numbers and strings: `docs/work-plan/name-quest/spec.md`.
 - Feature docs (keep them true to the code): `docs/features/name-quest/{design,implementation,testing}.md`. Implementation lists the code map and every deviation from the plan.
 - PS3 acceptance checks for phases 1 and 2 are still unticked in `testing.md`; they need the user's PS3 (HEN) and are not blocking Mac work.
 
-## Next step: phase 4
-1. Run the phase 3 PS3 check when requested (`phase-3-rpg-systems.md` step 12 includes listening for the hearth's crackle in Namula).
-2. Then phase 4: read `name-quest-plan.md`, `phase-4-world-1.md` and its spec sections. Phase 3 left hooks for it: `openGate(q, world)` for the mini-boss, `resetHazards` in `quest.cpp` for crumbles, and world 1's entry checkpoint still needs lighting from the start (spec §11).
-3. Unused `AreaDef::npcs` entries must be written as eight -1s (0 is Ilsa); the area test checks it.
+## Next step: phase 4, step 10 (when the user asks for the PS3)
+1. PS3 check per `phase-4-world-1.md` step 10 (ask the user first): travel to world 1 from slot 1; then the Star Mage from a dev save (`NAMEGAME_QUEST='slot=3 class=0 world=1 area=19 level=8 gear=1'` writes `build/mac/quest3.txt`; copy it to `pkgfiles/USRDIR/quest3.txt` (gitignored), `make ps3`, and delete the copy after).
+2. The user's world 1 playtest: record their notes in `docs/features/name-quest/testing.md`; don't retune before phase 9 unless something is broken.
+3. For the user to confirm: the Overseer's hover height is read as its centre 50 dp above the floor (see `implementation.md` › Deviations).
+4. Then phase 5 (worlds 2-3). It replaces world 2's placeholder room (`WORLD2_AREAS` in `quest_areas.cpp`); its rosters must be drawn at least 12 dp tall (extend `arrowsHitEveryGroundEnemy`).
+5. Unused `AreaDef::npcs` entries must be written as eight -1s (0 is Ilsa); the area test checks it.
 
 ## Working split (suggestion, the user decides)
 - **Claude** (stronger at long-range design and review): writes plans with `/name-plan`, reviews a phase's diff before the user commits, settles design questions, art direction critique.
@@ -37,11 +39,16 @@ Updated: 2026-11-21 (Classic menu and NAME QUEST phase 3).
 - `make test`: 53 checks in `tests/game_tests.cpp` fail (e.g. line 1668 `lob.toX ...`, lines 1820-1844 alien hp and beam checks). They fail identically on the committed HEAD, so they predate phase 2. They look like stale shooter tests; investigate before trusting the shooter's behaviour, and don't "fix" them by loosening checks without understanding why.
 - Crumbling blocks are solid until phase 4.
 - Phase 3 numbers to look at in phase 9 (not changed): the NPC talk reach (14 dp) needs the hero almost touching the NPC; Mac scripts missed Marra from 18 dp. World 6's chest 5 (WHETSTONE + IRON TONIC) gives only the WHETSTONE: one `ChestContent` holds one item.
-- For phase 4: electric panels `z` hurt when the hero overlaps the tile or the tile below its feet row, so a hero up to one tile above a lit panel is hurt. Fine if panels sit in the floor row; decide when world 1 places them (`quest_combat.cpp`, the trap loop at the end of `updateCombat`).
+- Ground enemies must be drawn at least 12 dp tall with their outline (spec §22), or an Archer's basic arrows fly over them; phases 5-9: extend `arrowsHitEveryGroundEnemy` to each redrawn roster.
+- Phase 4 decided: electric panels sit in the air row on a floor and hurt only while the hero overlaps the tile.
+- `check_docs.py docs` reports 7 broken links in old shooter work plans (`boss-lineup-plan.md`, `level-1-ending-plan.md`, `level-buffs-plan.md`); the NAME QUEST docs are clean.
+- A wide boss arena is two screens: the Overseer sweeps the half the camera isn't showing for a while. Fine by the spec; worth watching in the step 8 playtest.
 - Art for the user to judge: TEST GROUNDS area 3 borrows world 2's STAG, whose dark sprite almost disappears on the dark test background; Lion's Roar's arc (72 x 40 dp, centred on the hero) dips into the floor.
 - Spec examples that disagree with the spec formula `round(100 * 1.2^(L-1))`: 39→40 is 102,067 (spec 102,064), 29→30 is 16,484 (spec 10,646). The code follows the formula; the user decides.
 
 ## Session log (newest first; add a line per session: date, agent, what changed, what is next)
+- 2026-11-21, Claude: the user approved world 1's look. World 1's 20 areas built (`quest_world1.cpp`), world 1 in the reachability test plus gate, layout-rule and chest checks; all 40 map screens read; the Overseer now hovers with its centre at 50 dp (was unreachable); a locked arena's ladder down no longer kills; boss fights measured with scratch bots. Next: step 10 on the PS3 when the user asks.
+- 2026-11-21, Claude: phase 4 steps 0-4 and 7: world 1 art (generator `world1.py`, layers, 13 props, 6 landmarks, space pits), redrawn world 1 enemies (4 movement frames + tell + attack), the boss framework with the Overseer and the Star Mage (tested in new TEST GROUNDS arenas 4-5), panels and vents drawn, `make quest-maps`, world 1's entry lit from the start, Ilsa's world 1 Great Name line, world 2's placeholder room. 5 boss checks; `make ps3` builds. Next: the user's OK on the style frame, then step 5.
 - 2026-11-21, Codex — Resolved the merge conflict in this handoff and combined the Classic menu and NAME QUEST phase 3 changes on `codex/work`.
 - 2026-11-21, Codex — Moved Level Picker into Classic and removed the shooter stress test. Mac scripts and screenshots checked the new menus, both full-run options, Jungle from the picker, and the NAME QUEST Triangle actions. NAME QUEST tests passed and the shooter suite reported its 53 known failures. Next for Classic is a PS3 playtest when requested.
 - 2026-11-21, Claude: phase 3 RPG systems built (checkpoints, travel, Namula's NPCs and sprites, levels, shops, items and buffs, jobs, chests, gate, lever, map, ambience), 17 quest checks, Mac screenshots, `make ps3` builds. Next: the user commits and runs the step-12 PS3 check, then phase 4.

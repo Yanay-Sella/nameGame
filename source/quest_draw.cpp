@@ -3,6 +3,7 @@
 #include "quest.h"
 #include "quest_art.h"
 #include "quest_sprites.h"
+#include "quest_sprites_1.h"
 #include "screen.h"
 #include <algorithm>
 #include <math.h>
@@ -29,6 +30,10 @@ const int MAP_CELL_W = 12 * DP, MAP_CELL_H = 8 * DP;
 static const Sprite* const NPC_FRAMES[NPC_SURVEYOR_FIRST + 1][2] = {
     NPC_ROW(ILSA), NPC_ROW(MARRA), NPC_ROW(BRANN), NPC_ROW(LIO), NPC_ROW(PELL), NPC_ROW(SELA), NPC_ROW(ODO), NPC_ROW(WREN),
     NPC_ROW(YSOLDE), NPC_ROW(KIT), NPC_ROW(GATEKEEPER), NPC_ROW(TOBIN), {}, {}, {}, {}, NPC_ROW(SURVEYOR)};
+// Boss frames: idle 1-2, tell, attack, hurt, phase 2 (spec §22); bosses of later phases have none yet.
+#define BOSS_ROW(N) {&BOSS_##N##_IDLE_1, &BOSS_##N##_IDLE_2, &BOSS_##N##_TELL, &BOSS_##N##_ATTACK, &BOSS_##N##_HURT, &BOSS_##N##_PHASE2}
+static const Sprite* const BOSS_FRAMES[2][6] = {BOSS_ROW(OVERSEER), BOSS_ROW(STAR_MAGE)};
+const float BOSS_WHITE = 0.12f, MARKER_BLINK = 4, MARKER_BLINK_LAST = 12, MARKER_LAST = 0.3f, EDGE_WALL = 4 * DP;
 static const Sprite* const ITEM_ICONS[ITEM_COUNT] = {&ICON_RED, &ICON_BIG, &ICON_MANA, &ICON_WHETSTONE, &ICON_TONIC, &ICON_FEATHER};
 enum HeroFrame { FRAME_IDLE_1, FRAME_IDLE_2, FRAME_WALK_1, FRAME_WALK_2, FRAME_WALK_3, FRAME_WALK_4, FRAME_JUMP, FRAME_FALL,
                  FRAME_ATTACK_1, FRAME_ATTACK_2, FRAME_ATTACK_3, FRAME_CLIMB_1, FRAME_CLIMB_2, FRAME_ROLL_1, FRAME_ROLL_2,
@@ -114,11 +119,20 @@ static void drawTileFlat(const Quest& q, char t, int tx, int ty, int sx, int sy)
         fillRect(sx, sy, TILE, TILE, paletteColor('&'));
         fillRect(sx + DP, sy + DP, TILE - 2 * DP, TILE - 2 * DP, paletteColor('h'));
         break;
-    case 'z': {   // bright while on, flickering 0.4 s before (spec §9)
+    case 'z': {   // a floor plate (spec §9): dark while off, flickering 0.4 s before on, arcs up the tile while on
         float cycle = q.area.def->band >= 2 ? 3.0f : 3.5f, t = fmodf(q.time, cycle);
-        bool flicker = t > cycle - 0.4f && (int)(q.time * 20) % 2;
-        fillRect(sx, sy, TILE, TILE, paletteColor('n'));
-        for (int i = 0; i < 8; i++) fillRect(sx + i * DP, sy + (3 + i % 2) * DP, DP, DP, paletteColor(panelOn(q) || flicker ? 'c' : 'd'));
+        bool flicker = t > cycle - 0.4f && (int)(q.time * 20) % 2, on = panelOn(q);
+        fillRect(sx, sy + 6 * DP, TILE, 2 * DP, paletteColor('d'));
+        fillRect(sx + DP, sy + 6 * DP, TILE - 2 * DP, DP, paletteColor(on || flicker ? 'c' : 'n'));
+        fillRect(sx, sy + 7 * DP, TILE, DP, paletteColor('k'));
+        if (flicker) fillRect(sx + ((tx * 3) % 6) * DP, sy + 4 * DP, DP, 2 * DP, paletteColor('c'));
+        if (on) {   // two jagged arcs, re-drawn 15 times a second
+            int beat = (int)(q.time * 15) + tx * 7;
+            for (int k = 0; k < 2; k++) {
+                int x = sx + ((beat * (k + 3) + k * 4) % 7) * DP;
+                for (int y = 0; y < 6; y++) fillRect(x + ((beat + y * (k + 1)) % 3 - 1) * DP, sy + y * DP, DP, DP, paletteColor(y % 2 ? 'c' : 'w'));
+            }
+        }
         break;
     }
     case 'f':   // sparks while warning, then a flame 3 tiles tall
@@ -137,10 +151,15 @@ static void drawTileFlat(const Quest& q, char t, int tx, int ty, int sx, int sy)
         fillRect(sx + std::min(x, 5) * DP, sy + (2 + (tx + ty) % 4) * DP, 3 * DP, DP, paletteColor('n'));
         break;
     }
-    case 'v':
+    case 'v': {   // a floor grille and pale streaks rising through the 6 tiles it lifts (spec §4)
         fillRect(sx, sy + 4 * DP, TILE, 4 * DP, paletteColor('d'));
         for (int k = 0; k < 3; k++) fillRect(sx + (1 + 3 * k) * DP, sy + 5 * DP, DP, 3 * DP, paletteColor('k'));
+        for (int k = 0; k < 3; k++) {
+            float rise = fmodf(q.time * 90 * DP + k * 37 * DP + tx * 11 * DP, 6 * TILE);
+            fillRect(sx + (1 + 3 * k) * DP, sy - (int)rise, DP, 3 * DP, paletteColor('s'));
+        }
         break;
+    }
     case 'u':
         fillRect(sx, sy, TILE, DP, paletteColor('w'));
         fillRect(sx, sy + TILE - DP, TILE, DP, paletteColor('w'));
@@ -232,8 +251,12 @@ static void drawTile(const Quest& q, const WorldArt& art, int tx, int ty, int sx
             }
         drawSpritePal(*art.liquid[(int)(q.time / LIQUID_FRAME) % 3], sx, sy, false, pal);
         break;
-    case '.':
+    case '.': {   // a pit's last 2 rows open to space (world 1): black with stars, so it never reads as floor
+        bool pit = art.pit && ty >= area.def->rows - 2;
+        for (int r = ty; r < area.def->rows && pit; r++) pit = !tileSolid(tileAt(area, tx, r)) && tileAt(area, tx, r) != '-';
+        if (pit) drawSpritePal(*art.pit, sx, sy, (tx + ty) % 2, pal);
         break;
+    }
     default:
         drawTileFlat(q, t, tx, ty, sx, sy);
         break;
@@ -336,7 +359,14 @@ static void drawCombat(const Quest& q, int camX, int camY) {
     for (const Enemy& e : q.enemies) {
         if (!e.alive) continue;
         const EnemyType& type = rosterType(e.world, e.type);
-        const Sprite& sprite = *type.frames[(int)(q.time / ENEMY_FRAME) % 2];
+        // The tell and attack poses (§22) where the type has them, else the 4 (or 2) movement frames.
+        const Sprite* pose = type.frames[(int)(q.time / ENEMY_FRAME) % (type.frames[2] ? 4 : 2)];
+        bool telling = e.state == ES_TELL || (type.behaviour == BEH_JUMPER && e.onGround && e.stateTimer >= 1.0f);
+        bool attacking = e.state == ES_ACT || (type.behaviour == BEH_SHOOTER && e.state == ES_PATROL && e.stateTimer < 0.2f) ||
+                         (type.behaviour == BEH_JUMPER && !e.onGround);
+        if (telling && type.tell) pose = type.tell;
+        else if (attacking && type.attack) pose = type.attack;
+        const Sprite& sprite = *pose;
         int x = (int)floorf(e.x - 2 * DP) - camX, y = (int)floorf(e.y - 2 * DP) - camY;
         if (x + sprite.w < 0 || x >= QUEST_W || y + sprite.h < 0 || y >= QUEST_H) continue;
         if (e.state == ES_EMBER) {   // the phoenix's ember pulses before it revives
@@ -353,6 +383,45 @@ static void drawCombat(const Quest& q, int camX, int camY) {
         if (type.behaviour == BEH_ARMORED && e.state == ES_ACT)   // the swing, 28 x 16 in front
             drawArc((int)(e.facingLeft ? e.x - 28 * DP : e.x + e.w) - camX, (int)(e.y + e.h - 16 * DP) - camY, (int)(28 * DP), (int)(16 * DP),
                     e.facingLeft, paletteColor('m'));
+    }
+    // Bosses: white on a hit, then the hurt frame; the phase-2 look while shifting and after; the Star Mage fades by dither.
+    for (const QuestBoss& b : q.bosses) {
+        if (!b.alive || b.id > QBOSS_STAR_MAGE) continue;
+        int pose = bossPose(b), frame = b.phase >= 2 ? 5 : (int)(q.time / 0.4f) % 2;
+        if (pose == POSE_TELL) frame = 2;
+        else if (pose == POSE_ATTACK) frame = 3;
+        if (b.shift > 0) frame = 5;
+        if (b.flash > 0) frame = 4;
+        const Sprite& sprite = *BOSS_FRAMES[b.id][frame];
+        int x = (int)floorf(b.x - 2 * DP) - camX, y = (int)floorf(b.y - 2 * DP) - camY;
+        float shown = bossVisibility(b);
+        if (b.flash > BOSS_WHITE) {
+            drawSpriteSolid(sprite, x, y, paletteColor('w'), b.facingLeft);
+        } else if (shown < 1) {
+            for (int row = 0; row < sprite.h; row++)
+                for (int col = 0; col < sprite.w; col++) {
+                    char c = sprite.pixels[row * sprite.w + col];
+                    int px = x + (b.facingLeft ? sprite.w - 1 - col : col), py = y + row;
+                    if (c != '.' && px >= 0 && px < QUEST_W && py >= 0 && py < QUEST_H && bayer4(px, py) < shown * 16)
+                        screenTarget[py * QUEST_W + px] = paletteColor(c);
+                }
+        } else {
+            drawSpriteEx(sprite, x, y, b.facingLeft);
+        }
+    }
+    // Telegraph markers: dashed outlines in their colour, blinking faster in their last 0.3 s.
+    for (const Marker& m : q.markers) {
+        if ((int)(m.timer * (m.timer < MARKER_LAST ? MARKER_BLINK_LAST : MARKER_BLINK)) % 2) continue;
+        int x = (int)m.x - camX, y = (int)m.y - camY, w = (int)m.w, h = (int)m.h;
+        uint32_t color = paletteColor(m.color);
+        for (int k = 0; k < w; k += 4 * DP) {
+            fillRect(x + k, y, std::min(2 * (int)DP, w - k), DP, color);
+            fillRect(x + k, y + h - DP, std::min(2 * (int)DP, w - k), DP, color);
+        }
+        for (int k = 0; k < h; k += 4 * DP) {
+            fillRect(x, y + k, DP, std::min(2 * (int)DP, h - k), color);
+            fillRect(x + w - DP, y + k, DP, std::min(2 * (int)DP, h - k), color);
+        }
     }
     for (const Projectile& p : q.projectiles) {
         int x = (int)p.x - camX, y = (int)p.y - camY;
@@ -389,6 +458,18 @@ static void drawCombat(const Quest& q, int camX, int camY) {
             int x2 = (int)f.x2 - camX, y2 = (int)f.y2 - camY;
             for (int k = 0; k <= 12; k++)
                 fillRect(x + (x2 - x) * k / 12, y + (y2 - y) * k / 12 + (k % 2 ? DP : -DP) * (k % 3), DP, DP, color);
+            break;
+        }
+        case FX_BEAM: {   // a boss's beam: magenta with a flickering white core
+            fillRect(x, y, (int)f.w, (int)f.h, color);
+            int core = (int)f.w / 3 + ((int)(q.time * 30) % 2) * (int)DP;
+            fillRect(x + ((int)f.w - core) / 2, y, core, (int)f.h, paletteColor('w'));
+            break;
+        }
+        case FX_BALL: {   // a growing ball of power at a wand's star
+            int r = (int)(2 * DP + (f.w - 2 * DP) * f.age / f.life);
+            fillCircle(x, y, r + (int)DP, color);
+            fillCircle(x, y, r / 2 + (int)DP, paletteColor('w'));
             break;
         }
         case FX_METEOR: {   // the marker on the floor and the rock falling onto it
@@ -463,6 +544,17 @@ static void drawPlay(const Quest& q) {
             drawTileFlat(q, 'g', tx, ty, tx * TILE - camX + shake, ty * TILE - camY);
         }
     }
+    int floorCol0, floorRow, floorState = electricFloor(q, &floorCol0, &floorRow);
+    for (int k = 0; k < 6 && floorState > 0; k++) {   // the Star Mage's electrified floor: panels on its top, arcs when on
+        int sx = (floorCol0 + k) * TILE - camX, sy = floorRow * TILE - camY;
+        bool lit = floorState == 2 || (int)(q.time * 20) % 2;
+        fillRect(sx, sy, TILE, 2 * DP, paletteColor('d'));
+        fillRect(sx + DP, sy, TILE - 2 * DP, DP, paletteColor(lit ? 'c' : 'n'));
+        for (int a = 0; a < 2 && floorState == 2; a++) {
+            int beat = (int)(q.time * 15) + k * 5 + a * 3;
+            for (int y = 1; y <= 6; y++) fillRect(sx + (2 + (beat + y * (a + 1)) % 5) * DP, sy - y * DP, DP, DP, paletteColor(y % 2 ? 'c' : 'w'));
+        }
+    }
     if (art) {
         static std::vector<PlacedProp> props;   // the current area's props, placed once per area
         static const AreaDef* propsArea = nullptr;
@@ -522,6 +614,14 @@ static void drawPlay(const Quest& q) {
         int y = (int)(q.popupY - POPUP_RISE * (1 - q.popupTimer / POPUP_SHOWN)) - camY;
         drawText((int)q.popupX - camX - textWidth(q.popup.c_str(), DP) / 2, y, q.popup.c_str(), paletteColor('w'), DP);
     }
+    if (q.arenaLocked) {   // closed exits: a grey shimmering wall 4 dp thick at every edge that has a link
+        uint32_t color = paletteColor((int)(q.time * 8) % 2 ? 's' : 'b');
+        int w = def.cols * TILE, h = def.rows * TILE;
+        if (def.left.area >= 0) fillRect(-camX, -camY, (int)EDGE_WALL, h, color);
+        if (def.right.area >= 0) fillRect(w - (int)EDGE_WALL - camX, -camY, (int)EDGE_WALL, h, color);
+        if (def.up.area >= 0) fillRect(-camX, -camY, w, (int)EDGE_WALL, color);
+        if (def.down.area >= 0) fillRect(-camX, h - (int)EDGE_WALL - camY, w, (int)EDGE_WALL, color);
+    }
     shakePicture(q);
     if (q.area.world != WORLD_SECRET) applyVignette();
     if (questClock) {
@@ -560,6 +660,13 @@ static void drawPlay(const Quest& q) {
         snprintf(text, sizeof text, "%s %d", buffNames[k], (int)ceilf(h.buffTimers[k]));
         drawText(buffX, 170 * DP, text, paletteColor('o'), DP);
         buffX += textWidth(text, DP) + 6 * DP;
+    }
+    for (const QuestBoss& b : q.bosses) {   // the boss bar (spec §15): name, then 160 x 4 at (80, 170)
+        if (!b.alive) continue;
+        drawCentred(162 * DP, bossName(b.id), paletteColor('w'));
+        fillRect(80 * DP, 170 * DP, 160 * DP, 4 * DP, paletteColor('R'));
+        fillRect(80 * DP, 170 * DP, (int)(160 * DP) * std::max(0, b.hp) / std::max(1, b.maxHp), 4 * DP, paletteColor('r'));
+        break;
     }
     if (q.bannerTimer > 0 && q.banner) {
         char color = q.bannerColor ? q.bannerColor : q.bannerScale == 2 ? 'w' : 'b';

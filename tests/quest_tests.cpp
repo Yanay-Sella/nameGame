@@ -25,7 +25,7 @@ static int failures = 0;
 const float DT = 1.0f / 60;
 const char* const LEGEND = ".#-|^~icgkzf<>vuSCMNPTKABDEFQWRYXLO";
 const char* const OBJECTS_TO_REACH = "CMNTKQW";
-const int REACH_WORLDS[] = {WORLD_NAMULA, WORLD_TEST};   // phases 4-9 add their worlds
+const int REACH_WORLDS[] = {WORLD_NAMULA, 1, WORLD_TEST};   // phases 5-9 add their worlds
 
 static const Sprite* const ALL_QUEST_SPRITES[] = {
     &HERO_KNIGHT_IDLE_1, &HERO_KNIGHT_IDLE_2, &HERO_KNIGHT_WALK_1, &HERO_KNIGHT_WALK_2, &HERO_KNIGHT_WALK_3,
@@ -79,15 +79,18 @@ static void palSpritesUseOnlyPaletteChars() {
 }
 
 static void everyGroundShapeHasArt() {
-    const WorldArt& art = *worldArt(WORLD_NAMULA);
-    for (int shape = 0; shape < TILE_SHAPE_COUNT; shape++) CHECK(art.ground[shape][0] != nullptr);
-    CHECK(art.propCount >= 12 && art.landmarkCount >= 6);
+    for (int w : {WORLD_NAMULA, 1}) {
+        const WorldArt& art = *worldArt(w);
+        for (int shape = 0; shape < TILE_SHAPE_COUNT; shape++) CHECK(art.ground[shape][0] != nullptr);
+        CHECK(art.propCount >= (w == WORLD_NAMULA ? 12 : 10) && art.landmarkCount >= 6);   // spec §22, §13
+    }
 }
 
 static void propsNeverBlockSpots() {
-    for (int i = 0; i < worldDef(WORLD_NAMULA).count; i++) {
+    for (int w : {WORLD_NAMULA, 1})
+    for (int i = 0; i < worldDef(w).count; i++) {
         AreaState area;
-        loadArea(area, WORLD_NAMULA, i, 0, 0);
+        loadArea(area, w, i, 0, 0);
         std::vector<PlacedProp> props;
         placeProps(area, props);
         CHECK(!props.empty());
@@ -114,8 +117,8 @@ static float luminance(uint32_t c) {
 }
 
 // Spec §22: L0-L1 at most 30 % luminance, L2 40 %, L3 50 % and at most 25 % of the view; never m or y.
-static void layersObeyTheValueRules() {
-    prepareWorldArt(WORLD_NAMULA);
+static void layersObeyTheValueRulesIn(int world) {
+    prepareWorldArt(world);
     const float caps[4] = {0.30f, 0.30f, 0.40f, 0.50f};
     for (int l = 0; l < 4; l++) {
         const uint32_t* pixels = layerPixels(l);
@@ -129,10 +132,14 @@ static void layersObeyTheValueRules() {
             CHECK(pixels[i] != paletteColor('m') && pixels[i] != paletteColor('y'));
             opaque += i / LAYER_W < QUEST_H;
         }
-        if (brightest > caps[l]) printf("  layer %d is %.0f %% bright (cap %.0f %%)\n", l, brightest * 100, caps[l] * 100);
+        if (brightest > caps[l]) printf("  world %d layer %d is %.0f %% bright (cap %.0f %%)\n", world, l, brightest * 100, caps[l] * 100);
         CHECK(brightest <= caps[l]);
         if (l == 3) CHECK(opaque <= LAYER_W * QUEST_H / 4);
     }
+}
+
+static void layersObeyTheValueRules() {
+    for (int w : {WORLD_NAMULA, 1}) layersObeyTheValueRulesIn(w);
 }
 
 static void outlineSurroundsTheSprite() {
@@ -418,6 +425,163 @@ static void everythingIsReachable() {
     printf("reachability: slowest area %d.%d took %.2f s\n", slowestWorld, slowestArea, slowest);
 }
 
+// --- World layout (spec §4 layout rules, §8 counts, §10 chests), phase 4 on. ---
+// A world's spot graph with the given gates (shortcut doors closed), for the rules below.
+static Reach worldReach(int world, uint32_t gates) {
+    Reach reach;
+    reach.world = world;
+    reach.areaSeconds.assign(worldDef(world).count, 0);
+    for (int i = 0; i < worldDef(world).count; i++) {
+        AreaState area;
+        loadArea(area, world, i, gates, 0);
+        reach.areas.push_back(area);
+    }
+    return reach;
+}
+
+static int firstSpotOf(int world, int area, char letter) {
+    const AreaDef& def = worldDef(world).areas[area];
+    for (int t = 0; t < def.cols * def.rows; t++)
+        if (def.tiles[t] == letter) return spotKey(area, t % def.cols, t / def.cols);
+    return -1;
+}
+
+// The areas a hero walking from area 0's checkpoint can move between, as directed area-to-area steps.
+static std::map<int, std::set<int>> areaSteps(Reach& reach) {
+    std::map<int, std::set<int>> steps;
+    for (int spot : reachableFrom(reach, firstSpotOf(reach.world, 0, 'C')))
+        for (int to : neighbours(reach, spot))
+            if (keyArea(to) != keyArea(spot)) steps[keyArea(spot)].insert(keyArea(to));
+    return steps;
+}
+
+// Fewest areas from 0 to `last` (both included), by breadth-first search over the area steps.
+static std::vector<int> mainPath(const std::map<int, std::set<int>>& steps, int last) {
+    std::map<int, int> from = {{0, -1}};
+    std::vector<int> queue = {0};
+    for (size_t i = 0; i < queue.size(); i++) {
+        auto found = steps.find(queue[i]);
+        if (found == steps.end()) continue;
+        for (int to : found->second)
+            if (!from.count(to)) from[to] = queue[i], queue.push_back(to);
+    }
+    std::vector<int> path;
+    for (int a = from.count(last) ? last : -1; a >= 0; a = from[a]) path.insert(path.begin(), a);
+    return path;
+}
+
+// Every area joined to `area` by an edge link or a portal, either way.
+static std::set<int> linkedAreas(int world, int area) {
+    std::set<int> out;
+    const WorldDef& w = worldDef(world);
+    for (int i = 0; i < w.count; i++) {
+        const AreaDef& d = w.areas[i];
+        const AreaLink links[8] = {d.left, d.right, d.up, d.down, d.portals[0], d.portals[1], d.portals[2], d.portals[3]};
+        for (const AreaLink& l : links) {
+            if (l.area < 0) continue;
+            if (i == area && l.area != area) out.insert(l.area);
+            if (l.area == area && i != area) out.insert(i);
+        }
+    }
+    return out;
+}
+
+static int areaWithLetter(int world, char letter, int skip = 0) {
+    for (int i = 0; i < worldDef(world).count; i++)
+        if (countOf(worldDef(world).areas[i], letter) > 0 && skip-- == 0) return i;
+    return -1;
+}
+
+// With the gate closed, the boss arena and the second checkpoint can't be reached from area 0; the mini-boss can.
+static void gateGuardsTheSecondHalf() {
+    Reach reach = worldReach(1, 0);
+    std::set<int> reached = reachableFrom(reach, firstSpotOf(1, 0, 'C'));
+    std::set<int> areas;
+    for (int spot : reached) areas.insert(keyArea(spot));
+    int miniBoss = areaWithLetter(1, 'Q'), depths = areaWithLetter(1, 'C', 1);
+    CHECK(miniBoss >= 0 && reached.count(firstSpotOf(1, miniBoss, 'Q')));
+    CHECK(!areas.count(19));
+    CHECK(depths > 0 && !reached.count(firstSpotOf(1, depths, 'C')));
+}
+
+// Spec §4 rules 1-6 and 9, and §8's enemy counts per band.
+static void worldLayoutRulesHold(int world) {
+    const WorldDef& w = worldDef(world);
+    CHECK(w.count == 20);
+    if (w.count != 20) return;
+    Reach reach = worldReach(world, ~0u);
+    std::vector<int> path = mainPath(areaSteps(reach), 19);
+    printf("world %d main path:", world);
+    for (int a : path) printf(" %d", a);
+    printf("\n");
+    // 1, 2: the entry, the boss arena last, the mini-boss arena 6th to 8th of 12-14.
+    CHECK(countOf(w.areas[0], 'C') == 1 && countOf(w.areas[19], 'W') == 1 && (w.areas[19].flags & AREA_BOSS));
+    CHECK(path.size() >= 12 && path.size() <= 14);
+    int mini = -1, gate = -1, depths = -1;
+    for (int k = 0; k < (int)path.size(); k++) {
+        const AreaDef& d = w.areas[path[k]];
+        if (d.flags & AREA_MINIBOSS) mini = k;
+        if (countOf(d, 'g') > 0 && gate < 0) gate = k;
+        if (countOf(d, 'C') > 0 && path[k] != 0) depths = k;
+    }
+    CHECK(mini >= 5 && mini <= 7 && countOf(w.areas[path[mini]], 'Q') == 1);
+    // 3: the gate is the area right after the mini-boss arena; 4: the second C 2+ after it and 3+ before the boss.
+    CHECK(gate == mini + 1);
+    CHECK(depths >= gate + 2 && (int)path.size() - 1 - depths >= 3);
+    // 5: 3 dead ends with a chest or NPC, a loop, a shortcut, 2 portals, 2-4 tall areas.
+    int deadEnds = 0, edges = 0, portals = 0, tall = 0, levers = 0, doors = 0;
+    for (int i = 0; i < w.count; i++) {
+        const AreaDef& d = w.areas[i];
+        std::set<int> linked = linkedAreas(world, i);
+        edges += (int)linked.size();
+        if (linked.size() == 1 && countOf(d, 'T') + countOf(d, 'N') > 0) deadEnds++;
+        for (int k = 0; k < 4; k++) portals += d.portals[k].area >= 0;
+        tall += isTall(d);
+        levers += countOf(d, 'K') > 0 && d.shortcut >= 0;
+        doors += countOf(d, 'k') > 0;
+    }
+    CHECK(deadEnds >= 3);
+    CHECK(edges / 2 >= w.count);   // a connected graph with as many links as areas has a cycle
+    CHECK(levers >= 1 && doors >= 1);
+    CHECK(portals >= 2);
+    CHECK(tall >= 2 && tall <= 4);
+    // 6: a surveyor in the first 4 main-path areas and one after the gate.
+    bool early = false, late = false;
+    for (int k = 0; k < (int)path.size(); k++) {
+        early |= k < 4 && countOf(w.areas[path[k]], 'M') > 0;
+        late |= k > gate && countOf(w.areas[path[k]], 'M') > 0;
+    }
+    CHECK(early && late);
+    // §8 counts by band; arenas have only their boss; 9: area 18 is quiet.
+    for (int i = 0; i < w.count; i++) {
+        const AreaDef& d = w.areas[i];
+        int a = countOf(d, 'A') + countOf(d, 'B'), soldiers = countOf(d, 'D') + countOf(d, 'E'), elites = countOf(d, 'F');
+        int all = a + soldiers + elites;
+        bool ok = (d.flags & (AREA_MINIBOSS | AREA_BOSS)) || i == 18 ? all == 0
+                : d.band == 0 ? all >= 3 && all <= 5 && soldiers + elites == 0
+                : d.band == 1 ? all >= 5 && all <= 7 && elites <= 1
+                              : all >= 7 && all <= 10 && elites <= 3;
+        if (!ok) printf("  %d.%d (band %d) has %d enemies (%d soldiers, %d elites)\n", world, i, d.band, all, soldiers, elites);
+        CHECK(ok);
+    }
+}
+
+// Spec §10: every chest of the world's list appears once; shards and map pages in dead ends.
+static void chestsMatchTheWorldList() {
+    int seen[6] = {};
+    for (int i = 0; i < worldDef(1).count; i++) {
+        const AreaDef& d = worldDef(1).areas[i];
+        for (int c : d.chests) {
+            if (c < 0) continue;
+            CHECK(c < 6);
+            if (c >= 6) continue;
+            seen[c]++;
+            if (c <= 2) CHECK(linkedAreas(1, i).size() == 1);   // VIAL SHARD, MAP PAGE 1, STAR IRON: dead ends
+        }
+    }
+    for (int c = 0; c < 6; c++) CHECK(seen[c] == 1);
+}
+
 // --- Movement feel (spec §5), in small hand-made areas. ---
 struct TestArea {
     std::string tiles;
@@ -647,7 +811,7 @@ static void missingSaveIsUnused() {
     SaveData s;
     s.level = 9;
     CHECK(!saveRead(SAVE_FOLDER, 1, s));
-    CHECK(!s.used && s.level == 1 && s.items[ITEM_RED] == 5 && s.lit == 1);
+    CHECK(!s.used && s.level == 1 && s.items[ITEM_RED] == 5 && s.lit == (1 | 1u << 2));   // the hearth and world 1's entry
 }
 
 static void deleteRemovesTheSlot() {
@@ -755,6 +919,29 @@ static void basicAttackKillsFodderInThreeHits() {
     CHECK(!q.enemies[0].alive && hits == 3);
     CHECK(q.save.names == enemyNames(1, 1, 0, false) && q.save.kills == 1);
     CHECK(q.killed[WORLD_TEST][0] & 1);
+}
+
+// Every world 1 ground enemy stands tall enough for a basic arrow, flying at the bow's height, to hit it (spec §6, §22).
+static void arrowsHitEveryGroundEnemy() {
+    for (int slot = 0; slot < ROSTER_SLOTS; slot++) {
+        if (rosterType(1, slot).behaviour == BEH_FLYER) continue;
+        TestArea t;
+        makeArea(t, {{19, withLetter(24, ROSTER_LETTERS[slot])}});
+        Quest q;
+        startQuest(q, t, CLASS_ARCHER, 4, 0, 14, 1);
+        q.godMode = true;
+        Actions a = {};
+        a.fire = true;
+        int hits = 0, last = q.enemies[0].hp;
+        for (int i = 0; i < 120; i++) {
+            q.hero.facingLeft = q.enemies[0].x < q.hero.x;
+            play(q, a, 1);
+            if (q.enemies[0].hp < last) hits++;
+            last = q.enemies[0].hp;
+        }
+        if (hits == 0) printf("  the archer's arrows never hit %s\n", rosterType(1, slot).name);
+        CHECK(hits > 0);
+    }
 }
 
 static void knightSwingHitsOnlyInItsWindow() {
@@ -1158,17 +1345,17 @@ static void restHealsAndRespawnsEnemies() {
 
 static void travelListsLitCheckpoints() {
     SaveData s;
-    CHECK(travelCheckpoints(s) == std::vector<int>({0}));
+    CHECK(travelCheckpoints(s) == std::vector<int>({0, 2}));   // world 1's entry is lit from the start (spec §11)
     s.lit |= 1u << 17 | 1u << 16;
-    CHECK(travelCheckpoints(s) == std::vector<int>({0, 16, 17}));
+    CHECK(travelCheckpoints(s) == std::vector<int>({0, 2, 16, 17}));
     Quest q;
     startDev(q, "slot=3 class=0 world=8 area=0");
     standAt(q, 3, 19);
     pressUp(q);
     pressDown(q);
     pressX(q);   // TRAVEL
-    CHECK(q.mode == QMODE_MENU && q.menu.kind == MENU_TRAVEL && q.menu.items.size() == 2 && q.menu.items[0] == "NAMULA");
-    CHECK(q.menu.items[1] == "TEST GROUNDS ENTRY");
+    CHECK(q.mode == QMODE_MENU && q.menu.kind == MENU_TRAVEL && q.menu.items.size() == 3 && q.menu.items[0] == "NAMULA");
+    CHECK(q.menu.items[1] == "THE DRIFTING STATION ENTRY" && q.menu.items[2] == "TEST GROUNDS ENTRY");
     pressX(q);
     CHECK(q.mode == QMODE_PLAY && q.area.world == WORLD_NAMULA && q.area.index == 0 && logged(q, "quest: travel to 0.0"));
     CHECK(q.save.checkpointWorld == 0 && q.save.checkpointId == 0);
@@ -1356,7 +1543,205 @@ static void dialogueFitsTheBox() {
             }
 }
 
-int main() {
+// --- Bosses (spec §12). TEST GROUNDS area 4 holds the Overseer (mini-boss), area 5 the Star Mage (big boss). ---
+static int bossShots(const Quest& q) {
+    int n = 0;
+    for (const Projectile& p : q.projectiles) n += !p.fromHero;
+    return n;
+}
+
+// Every shot, slam drop and summon comes at least 0.4 s after its attack began (0.8 s and a marker for the slam).
+static void overseerTellsBeforeEveryAttack() {
+    Quest q;
+    startDev(q, "slot=3 class=0 world=8 area=4 level=4");
+    q.godMode = true;
+    CHECK(q.bosses.size() == 1 && q.bosses[0].id == QBOSS_OVERSEER && q.arenaLocked);
+    if (q.bosses.empty()) return;
+    bool seen[4] = {};
+    float began = 0;
+    int last = -1, shots = 0, enemies = (int)q.enemies.size(), slamStep = 0;
+    for (int i = 0; i < 60 * 60; i++) {
+        if (i == 30 * 60) q.bosses[0].hp = q.bosses[0].maxHp / 2;   // phase 2 for the second half
+        play(q, Actions(), 1);
+        const QuestBoss& b = q.bosses[0];
+        if (b.attack >= 0 && last < 0) began = q.time, seen[b.attack] = true;
+        float since = q.time - began;
+        if (bossShots(q) > shots) CHECK(b.attack >= 0 && since >= 0.4f);
+        if ((int)q.enemies.size() > enemies) CHECK(b.attack == 3 && since >= 0.4f);
+        if (b.attack == 2 && b.step == 1 && slamStep == 0) CHECK(since >= 0.8f);
+        if (b.attack == 2 && b.step == 0) CHECK(!q.markers.empty() && q.markers[0].color == 'm');
+        last = b.attack;
+        slamStep = b.attack == 2 ? b.step : 0;
+        shots = bossShots(q);
+        enemies = (int)q.enemies.size();
+    }
+    CHECK(seen[0] && seen[1] && seen[2] && seen[3]);
+    CHECK(q.bosses[0].phase == 2 && logged(q, "quest: boss THE OVERSEER phase 2"));
+}
+
+// The beam's column is marked for the ball's whole 1.2 s, and the beam burns exactly there; in phase 2 two columns 64 apart.
+static void starMageBeamMarksItsColumn() {
+    Quest q;
+    startDev(q, "slot=3 class=0 world=8 area=5 level=4");
+    q.godMode = true;
+    CHECK(q.bosses.size() == 1 && q.bosses[0].id == QBOSS_STAR_MAGE);
+    if (q.bosses.empty()) return;
+    for (int round = 0; round < 2; round++) {
+        if (round == 1) {
+            q.bosses[0].hp = q.bosses[0].maxHp / 2;
+            play(q, Actions(), 2);
+            CHECK(q.bosses[0].phase == 2);
+        }
+        int columns = round + 1, beams = 0;
+        for (int i = 0; i < 60 * 60 && beams == 0; i++) {
+            play(q, Actions(), 1);
+            const QuestBoss& b = q.bosses[0];
+            if (b.attack != 0 || b.step < 2) continue;
+            if (b.step == 2) {
+                CHECK((int)q.markers.size() == columns);
+                for (int k = 0; k < (int)q.markers.size() && k < 2; k++)
+                    CHECK(fabsf(q.markers[k].x + q.markers[k].w / 2 - b.data[3 + k]) < 0.5f && q.markers[k].w == 24 * DP);
+                if (columns == 2) CHECK(fabsf(fabsf(b.data[4] - b.data[3]) - 64 * DP) < 0.5f);
+            }
+            if (b.step == 3)   // the first beam frame: its effects stand on the marked columns
+                for (const Effect& f : q.effects) {
+                    if (f.kind != FX_BEAM) continue;
+                    beams++;
+                    CHECK(fabsf(f.x + f.w / 2 - b.data[3]) < 0.5f || fabsf(f.x + f.w / 2 - b.data[4]) < 0.5f);
+                }
+        }
+        CHECK(beams == columns);
+    }
+}
+
+// A world 1 mini-boss arena with a right edge into world 1's area 0: closed while the boss lives, open after its death.
+static void bossFightLocksAndUnlocksExits() {
+    TestArea t;
+    makeArea(t, {{19, withLetter(40, 'Q')}});
+    t.def.right = {0, 2, 18};
+    t.def.flags = AREA_MINIBOSS;
+    Quest q;
+    startQuest(q, t, CLASS_KNIGHT, 4, 0, 70, 1);
+    q.godMode = true;
+    startArenaFight(q);
+    CHECK(q.arenaLocked && q.bosses.size() == 1 && logged(q, "quest: boss THE OVERSEER start"));
+    Actions right = {};
+    right.moveX = 1;
+    play(q, right, 120);
+    CHECK(q.area.world == 1 && q.area.def == &t.def && q.hero.x <= WIDE_COLS * TILE - HERO_W);
+    q.bosses[0].hp = 0;
+    play(q, Actions(), 1);
+    CHECK(!q.arenaLocked && q.save.gates >> 1 & 1 && logged(q, "quest: boss THE OVERSEER down after"));
+    play(q, right, 60);
+    CHECK(q.area.def != &t.def && q.area.world == 1 && q.area.index == 0);
+    // The hangar's ladder down to the bulkhead is closed too: climbing down it holds the hero at the bottom.
+    startDev(q, "slot=3 class=0 world=1 area=9 level=4");
+    CHECK(q.arenaLocked);
+    standAt(q, 76, 18);
+    Actions down = {};
+    down.moveY = 1;
+    play(q, down, 180);
+    CHECK(q.mode == QMODE_PLAY && q.area.world == 1 && q.area.index == 9 && q.arenaLocked);
+    // The hero's death also ends the fight (the boss is back at full HP next time).
+    startQuest(q, t, CLASS_KNIGHT, 4, 0, 70, 1);
+    startArenaFight(q);
+    CHECK(q.arenaLocked);
+    q.hero.hp = 0;
+    play(q, Actions(), 1);
+    CHECK(q.mode == QMODE_DEAD && !q.arenaLocked && q.bosses.empty());
+    saveDelete(SAVE_FOLDER, 2);
+}
+
+// Leaving and coming back: the mini-boss stays down until a rest or death, the big boss for good.
+static void bigBossStaysDeadMiniBossReturns() {
+    Quest q;
+    startDev(q, "slot=3 class=0 world=8 area=4 level=4");
+    q.bosses[0].hp = 0;
+    play(q, Actions(), 30);   // past the death's hit-stop
+    standAt(q, 75, 18);
+    pressUp(q);   // the portal to the dome
+    CHECK(q.area.index == 5 && q.bosses.size() == 1 && q.bosses[0].id == QBOSS_STAR_MAGE);
+    q.bosses[0].hp = 0;
+    play(q, Actions(), 30);
+    CHECK(q.save.bosses >> WORLD_TEST & 1);
+    standAt(q, 4, 18);
+    pressUp(q);   // back to the arena: the Overseer is still down
+    CHECK(q.area.index == 4 && q.bosses.empty() && !q.arenaLocked);
+    standAt(q, 75, 18);
+    pressUp(q);   // and the dome stays empty
+    CHECK(q.area.index == 5 && q.bosses.empty());
+    q.hero.hp = 0;   // a death clears the killed lists: the mini-boss is due again, the big boss is not
+    play(q, Actions(), 1);
+    play(q, Actions(), 160);
+    CHECK(q.mode == QMODE_PLAY);
+    loadArea(q.area, WORLD_TEST, 4, q.save.gates, 0);
+    spawnEnemies(q);
+    startArenaFight(q);
+    CHECK(q.bosses.size() == 1 && q.bosses[0].hp == q.bosses[0].maxHp);
+    q.bosses.clear();
+    loadArea(q.area, WORLD_TEST, 5, q.save.gates, 0);
+    spawnEnemies(q);
+    startArenaFight(q);
+    CHECK(q.bosses.empty());
+    saveDelete(SAVE_FOLDER, 2);
+}
+
+static void bossDeathLightsTheNextWorld() {
+    TestArea t;
+    makeArea(t, {{19, withLetter(40, 'W')}});
+    t.def.flags = AREA_BOSS;
+    Quest q;
+    startQuest(q, t, CLASS_ARCHER, 4, 0, 10, 1);
+    startArenaFight(q);
+    CHECK(q.bosses.size() == 1 && q.bosses[0].id == QBOSS_STAR_MAGE && q.bosses[0].big);
+    if (q.bosses.empty()) return;
+    CHECK(q.bosses[0].maxHp == enemyHealth(1, 200, 0));
+    int names = q.save.names;
+    q.bosses[0].hp = 0;
+    play(q, Actions(), 1);
+    CHECK(q.save.bosses >> 1 & 1);
+    CHECK(q.save.lit >> 4 & 1);   // world 2's entry
+    CHECK(q.save.names == names + enemyNames(1, 150, 0, false));
+    CHECK(q.banner && !strcmp(q.banner, "GREAT NAME TAKEN") && logged(q, "quest: boss THE STAR MAGE down after"));
+    startArenaFight(q);
+    CHECK(q.bosses.size() == 1 && !q.bosses[0].alive);   // the old one, dead: no new fight
+    saveDelete(SAVE_FOLDER, 2);
+}
+
+// make quest-maps (phase 4 step 2): every screen of every area, enemies and bosses at their spots, the hero hidden.
+static void renderMaps() {
+    screenSetTarget(questPixels, QUEST_W, QUEST_H);
+    int written = 0;
+    for (int w = 0; w < WORLD_COUNT; w++)
+        for (int i = 0; i < worldDef(w).count; i++) {
+            Quest q = Quest();
+            q.folder = SAVE_FOLDER;
+            q.save.used = true;
+            loadArea(q.area, w, i, 0, 0);
+            questRefreshStats(q, true);
+            q.hero.x = q.hero.y = -1000;
+            spawnEnemies(q);
+            startArenaFight(q);
+            q.bannerTimer = 0;
+            q.mode = QMODE_PLAY;
+            const AreaDef& def = *q.area.def;
+            for (int k = 0; k < 2; k++) {
+                q.camX = def.cols == WIDE_COLS ? (float)(k * (def.cols * TILE - QUEST_W)) : 0;
+                q.camY = def.cols == WIDE_COLS ? (float)(def.rows * TILE - QUEST_H) : (float)(k * (def.rows * TILE - QUEST_H));
+                questDraw(q);
+                char path[64];
+                snprintf(path, sizeof path, "build/maps/w%d_a%02d_%d.bmp", w, i, k);
+                written += screenSaveBmp(path);
+            }
+        }
+    printf("quest maps: %d screens in build/maps\n", written);
+}
+
+int main(int argc, char** argv) {
+    if (argc > 1 && !strcmp(argv[1], "--maps")) {
+        renderMaps();
+        return 0;
+    }
     questSpritesHaveTheirSize();
     palSpritesUseOnlyPaletteChars();
     everyGroundShapeHasArt();
@@ -1381,6 +1766,7 @@ int main() {
     referenceHitIsTwentyPercent();
     classesDifferAsDesigned();
     basicAttackKillsFodderInThreeHits();
+    arrowsHitEveryGroundEnemy();
     knightSwingHitsOnlyInItsWindow();
     skillCastMidSwingStillHits();
     spikesHurtAndBounce();
@@ -1414,7 +1800,15 @@ int main() {
     drinkHealsAfterHalfASecond();
     npcPresenceFollowsQuestStages();
     dialogueFitsTheBox();
+    overseerTellsBeforeEveryAttack();
+    starMageBeamMarksItsColumn();
+    bossFightLocksAndUnlocksExits();
+    bigBossStaysDeadMiniBossReturns();
+    bossDeathLightsTheNextWorld();
     everythingIsReachable();
+    gateGuardsTheSecondHalf();
+    worldLayoutRulesHold(1);
+    chestsMatchTheWorldList();
     printf(failures ? "%d quest check(s) failed\n" : "all quest tests passed\n", failures);
     return failures ? 1 : 0;
 }

@@ -1,6 +1,7 @@
 // NAME QUEST's art system (spec §22) and Namula's world art (spec §13 row 0): layers, props, lights, vignette.
 #include "quest_art.h"
 #include "quest_sprites_0.h"
+#include "quest_sprites_1.h"
 #include <algorithm>
 #include <math.h>
 #include <string.h>
@@ -306,10 +307,201 @@ static const WorldArt NAMULA_ART = {
     paintNamula, namulaDetails,
     0.45f, 0.25f, 0.10f,
     {0xFF6A3410, 32},
+    nullptr,
+};
+
+// --- World 1, The Drifting Station: deep space, a dim sun and a ringed planet, station spars, near pipes (spec §13 row 1) ---
+const int STATION_SPAR_Y[3] = {150, 236, 330};   // L2 rows of the long truss beams
+const int STATION_DISH_X = 820, STATION_DISH_Y = 132;   // L2: the radar dish's hub
+
+// A truss beam along L2 row y: two rails with cross-bracing.
+static void paintTruss(int x0, int x1, int y, const WorldPalette& p) {
+    paintRect(x0, y, x1 - x0, 3, p.c[1]);
+    paintRect(x0, y + 15, x1 - x0, 3, p.c[1]);
+    for (int x = x0; x < x1; x += 18) {
+        paintLine((float)x, (float)y + 2, (float)x + 18, (float)y + 15, 1.5f, p.c[9]);
+        paintRect(x, y, 2, 18, p.c[9]);
+    }
+}
+
+static void paintStation(uint32_t* out[4], int, int) {
+    const WorldPalette& p = STATION_PALETTE;
+    seed = 1977;
+    // L0: black space with a dithered violet-red nebula band and three depths of stars.
+    canvas = out[0];
+    for (int y = 0; y < LAYER_H; y++)
+        for (int x = 0; x < LAYER_W; x++) {
+            float band = 150 + 60 * sinf(TAU * x / LAYER_W * 2 + 0.6f) + 20 * sinf(TAU * x / LAYER_W * 5);
+            float v = fmaxf(0, 1 - fabsf(y - band) / 90) * 2.2f;
+            int step = (int)v + ((v - (int)v) * 16 > bayer4(x, y));
+            float red = 0.5f + 0.5f * sinf(TAU * x / LAYER_W * 3 + y * 0.02f);   // a slow red tint along the band
+            bool tint = step >= 2 && red * 16 > bayer4(x + 1, y + 2) + 9;
+            uint32_t c = tint ? p.c[4] : step >= 2 ? p.c[10] : step == 1 ? p.c[9] : p.c[8];
+            canvas[y * LAYER_W + x] = c;
+        }
+    for (int i = 0; i < 260; i++) {
+        int x = randomInt(LAYER_W), y = randomInt(LAYER_H), kind = randomInt(12);
+        plot(x, y, p.c[kind < 7 ? 10 : 11]);
+        if (kind == 11) {
+            plot(x - 1, y, p.c[10]);
+            plot(x + 1, y, p.c[10]);
+            plot(x, y - 1, p.c[10]);
+            plot(x, y + 1, p.c[10]);
+        }
+    }
+
+    // L1: a dim red sun with a dithered corona, a ringed planet; nothing else (space is empty).
+    canvas = out[1];
+    for (int y = 30; y < 170; y++)
+        for (int x = 160; x < 300; x++) {
+            float d = hypotf(x - 230.0f, y - 100.0f);
+            if (d <= 34) plot(x, y, d > 30 ? p.c[5] : p.c[4]);
+            else if (d <= 62 && (62 - d) / 28 * 16 > bayer4(x, y) + 4) plot(x, y, p.c[4]);
+        }
+    for (int y = 150; y < 330; y++)
+        for (int x = 700; x < 1060; x++) {
+            float dx = x - 880.0f, dy = y - 240.0f, d = hypotf(dx, dy);
+            float ring = hypotf(dx, dy * 3.6f + dx * 0.9f);   // a tilted ellipse
+            bool ringFront = ring > 120 && ring < 136 && (d > 58 || dy > -dx * 0.25f);
+            if (d <= 58) {
+                float lit = (-dx - dy) / 58;   // lit from the sun's side, upper left
+                int step = lit > 0.35f ? 2 : lit > -0.3f ? 1 : 0;
+                bool stripe = (int)(dy + 0.2f * dx + 60) % 17 < 4;
+                plot(x, y, p.c[9 + std::max(0, step - (stripe ? 1 : 0))]);
+            }
+            if (ringFront) plot(x, y, ring < 128 ? p.c[11] : p.c[10]);
+        }
+
+    // L2: three long truss beams with solar panel wings, a far docked ship, the radar dish's mast.
+    canvas = out[2];
+    for (int k = 0; k < 3; k++) {
+        int y = STATION_SPAR_Y[k], x0 = k * 300 + 40, x1 = x0 + 520 + k * 120;
+        paintTruss(x0, x1, y, p);
+        for (int x = x0 + 60; x < x1 - 80; x += 150) {   // solar wings above and below the beam
+            for (int side = -1; side <= 1; side += 2) {
+                int py = side < 0 ? y - 46 : y + 22;
+                paintRect(x + 18, side < 0 ? py + 40 : y + 18, 3, side < 0 ? 6 : 4, p.c[1]);
+                paintRect(x, py, 40, 24, p.c[9]);
+                for (int cy = py + 1; cy < py + 24; cy += 6)
+                    for (int cx = x + 1; cx < x + 40; cx += 8) {   // dark cells with a teal glint on their top edge
+                        paintRect(cx, cy, 7, 5, p.c[10]);
+                        paintRect(cx, cy, 7, 1, p.c[12]);
+                    }
+            }
+        }
+    }
+    // The docked ship: a long hull with an engine block and a few lit windows.
+    paintRect(1000, 268, 170, 26, p.c[1]);
+    paintRect(1010, 262, 60, 6, p.c[1]);
+    paintRect(1160, 260, 40, 42, p.c[2]);
+    for (int x = 1020; x < 1150; x += 14) paintRect(x, 276, 4, 3, x % 28 ? p.c[12] : p.c[5]);
+    paintLine(1000, 281, 940, 281, 3, p.c[1]);   // the docking arm
+    paintRect(STATION_DISH_X - 2, STATION_DISH_Y, 5, STATION_SPAR_Y[1] - STATION_DISH_Y, p.c[1]);
+
+    // L3: near and dark, under 25 % of the view: vertical pipes with clamps, a cable bundle, a broken window frame.
+    canvas = out[3];
+    const int pipes[4][2] = {{120, 14}, {150, 8}, {760, 18}, {1110, 10}};
+    for (const auto& pipe : pipes) {
+        paintRect(pipe[0], 0, pipe[1], LAYER_H, p.c[0]);
+        for (int y = 40; y < LAYER_H; y += 90) paintRect(pipe[0] - 3, y, pipe[1] + 6, 8, p.c[1]);
+    }
+    for (int x = 150; x <= 760; x++) {   // a sagging cable bundle between two pipes
+        float t = (x - 150) / 610.0f;
+        int y = 60 + (int)(70 * sinf(t * 3.14159f));
+        paintRect(x, y, 1, 5, p.c[0]);
+    }
+    paintRect(420, 0, 10, 300, p.c[0]);   // the broken window: two struts and a jagged sill
+    paintRect(560, 0, 10, 210, p.c[0]);
+    paintLine(430, 300, 470, 270, 6, p.c[0]);
+    paintLine(560, 210, 530, 240, 5, p.c[0]);
+}
+
+// Blinking lights on the spars, slow drifting debris, sparking cables near the pipes, the turning radar dish.
+static void stationDetails(const Quest& q, int camX, int camY) {
+    const WorldPalette& p = STATION_PALETTE;
+    float t = q.time;
+    auto put = [](int x, int y, uint32_t c) {
+        if (x >= 0 && x < screenW && y >= 0 && y < screenH) screenTarget[y * screenW + x] = c;
+    };
+    auto wrapX = [](int x) { return ((x % LAYER_W) + LAYER_W) % LAYER_W; };
+    int off2X = (int)(camX * LAYER_FACTOR_X[2]), off2Y = (int)(camY * LAYER_FACTOR_Y[2]);
+    for (int k = 0; k < 3; k++)   // red and teal beacons along the beams, each on its own beat
+        for (int i = 0; i < 6; i++) {
+            if (fmodf(t * 0.8f + i * 0.37f + k * 0.21f, 1) > 0.25f) continue;
+            int lx = wrapX(k * 300 + 70 + i * 96 - off2X), ly = STATION_SPAR_Y[k] - 3 - off2Y;
+            uint32_t c = p.c[i % 2 ? 5 : 13];
+            for (int d = 0; d < 4; d++) put(lx + d % 2, ly + d / 2, c);
+        }
+    // The radar dish: a short arc turning on its mast (0.6 rad/s).
+    float a = t * 0.6f;
+    int hx = wrapX(STATION_DISH_X - off2X), hy = STATION_DISH_Y - off2Y;
+    for (int k = -14; k <= 14; k++) {
+        float u = k / 14.0f;
+        int x = hx + (int)(cosf(a) * k), y = hy - 6 + (int)(u * u * 8 * fabsf(sinf(a)) - 2);
+        put(x, y, p.c[2]);
+        put(x, y + 1, p.c[1]);
+    }
+    // Debris: small dark shards drifting across L1 at 4-9 px/s.
+    int off1X = (int)(camX * LAYER_FACTOR_X[1]), off1Y = (int)(camY * LAYER_FACTOR_Y[1]);
+    for (int i = 0; i < 9; i++) {
+        int x = wrapX((int)(i * 151 + t * (4 + i % 5)) - off1X), y = 40 + (i * 89) % 300 + (int)(6 * sinf(t * 0.2f + i)) - off1Y;
+        for (int d = 0; d < 3 + i % 3; d++) put(x + d, y + (d * (i % 2)) / 2, p.c[i % 3 ? 10 : 2]);
+    }
+    // Sparks where the cable bundle meets the near pipes: a few pixels flashing now and then.
+    int off3X = (int)(camX * LAYER_FACTOR_X[3]), off3Y = (int)(camY * LAYER_FACTOR_Y[3]);
+    const int sparks[2][2] = {{156, 62}, {754, 62}};
+    for (int s = 0; s < 2; s++) {
+        if (fmodf(t * 1.3f + s * 0.5f, 2.1f) > 0.18f) continue;
+        for (int d = 0; d < 5; d++)
+            put(wrapX(sparks[s][0] + (d * 7 + (int)(t * 50)) % 9 - 4 - off3X), sparks[s][1] + (d * 5) % 7 - 3 - off3Y, p.c[d % 2 ? 7 : 14]);
+    }
+}
+
+static const PropDef STATION_PROPS[] = {
+    {{&STATION_CABLE_COIL}, 1, 1, PROP_TOP, false, 5},
+    {{&STATION_BOLTS}, 1, 1, PROP_TOP, false, 6},
+    {{&STATION_SCREEN_1, &STATION_SCREEN_2}, 2, 0.4f, PROP_TOP, false, 2},
+    {{&STATION_CRATE}, 1, 1, PROP_TOP, false, 3},
+    {{&STATION_SIGN}, 1, 1, PROP_TOP, false, 1},
+    {{&STATION_TANK}, 1, 1, PROP_TOP, false, 2},
+    {{&STATION_HELMET}, 1, 1, PROP_TOP, false, 1},
+    {{&STATION_ANTENNA_1, &STATION_ANTENNA_2}, 2, 0.8f, PROP_TOP, false, 2},
+    {{&STATION_CONSOLE_1, &STATION_CONSOLE_2}, 2, 0.5f, PROP_TOP, true, 2},
+    {{&STATION_HANGING_1, &STATION_HANGING_2}, 2, 1.1f, PROP_CEILING, false, 3},
+    {{&STATION_LAMP_1, &STATION_LAMP_2}, 2, 0.7f, PROP_CEILING, true, 1},
+    {{&STATION_WALL_PIPE}, 1, 1, PROP_WALL, false, 2},
+    {{&STATION_WALL_SCREEN_1, &STATION_WALL_SCREEN_2}, 2, 0.5f, PROP_WALL, true, 1},
+};
+// Ids 1-6 for AreaDef::landmarks: airlock, reactor, observation window, wrecked shuttle, server racks, crew mural.
+static const LandmarkDef STATION_LANDMARKS[] = {
+    {{&STATION_AIRLOCK}, 1, 1, 64, 8, 32, 0xFF501010},
+    {{&STATION_REACTOR_1, &STATION_REACTOR_2}, 2, 0.6f, 48, 80, 80, 0xFF104850},
+    {{&STATION_WINDOW}, 1, 1, 0, 0, 0, 0},
+    {{&STATION_SHUTTLE}, 1, 1, 0, 0, 0, 0},
+    {{&STATION_RACKS_1, &STATION_RACKS_2}, 2, 0.4f, 40, 56, 40, 0xFF0C3438},
+    {{&STATION_MURAL}, 1, 1, 0, 0, 0, 0},
+};
+static const WorldArt STATION_ART = {
+    STATION_PALETTE,
+    {{&STATION_TOP_1, &STATION_TOP_2, &STATION_TOP_3}, {&STATION_TOP_LEFT}, {&STATION_TOP_RIGHT}, {&STATION_LEFT}, {&STATION_RIGHT},
+     {&STATION_FILL_1, &STATION_FILL_2, &STATION_FILL_3}, {&STATION_BOTTOM}, {&STATION_BOTTOM_LEFT}, {&STATION_BOTTOM_RIGHT},
+     {&STATION_COLUMN_TOP}, {&STATION_COLUMN}, {&STATION_SINGLE}},
+    {&STATION_FRINGE_1, &STATION_FRINGE_2, &STATION_FRINGE_3},
+    &STATION_DRAPE_LEFT, &STATION_DRAPE_RIGHT,
+    &STATION_CATWALK_LEFT, &STATION_CATWALK_MID, &STATION_CATWALK_RIGHT,
+    &STATION_BRACKET, &STATION_CABLE, &STATION_STRUT,
+    {&STATION_LADDER, &STATION_LADDER_TOP},
+    {&STATION_COOLANT_1, &STATION_COOLANT_2, &STATION_COOLANT_3},
+    STATION_PROPS, (int)(sizeof STATION_PROPS / sizeof STATION_PROPS[0]),
+    STATION_LANDMARKS, (int)(sizeof STATION_LANDMARKS / sizeof STATION_LANDMARKS[0]),
+    paintStation, stationDetails,
+    0.35f, 0.25f, 0.10f,
+    {0xFF0C3438, 24},
+    &STATION_PIT,
 };
 
 const WorldArt* worldArt(int world) {
-    return world == WORLD_NAMULA ? &NAMULA_ART : nullptr;
+    return world == WORLD_NAMULA ? &NAMULA_ART : world == 1 ? &STATION_ART : nullptr;
 }
 
 // --- Props (spec §22: deterministic, never near spots, objects or hazards) ---

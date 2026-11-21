@@ -16,7 +16,7 @@ SHOT_SIZE  := 172854
 EXPANDED_SHOT_SIZE := 248886
 QUEST_SHOT_SIZE := 691254
 
-.PHONY: ps3 image deploy install release log clean music test launch quit pad shot mac mac-run
+.PHONY: ps3 image deploy install release log clean music test launch quit pad shot mac mac-run quest-maps
 
 # Compile and package build/nameGame.pkg inside the container (always a full rebuild so LOG_HOST/LOG_PORT changes apply).
 # SOURCES=prototypes/<idea> builds a prototype instead of the game.
@@ -60,6 +60,14 @@ test:
 	c++ -std=c++14 -O2 -Wall -Wextra -Isource tests/quest_tests.cpp $(wildcard source/quest*.cpp) source/screen.cpp -o build/tests/quest_tests
 	# Both suites always run (a shooter failure must not hide the quest results); either failing fails the target.
 	build/tests/game_tests; shooter=$$?; build/tests/quest_tests && exit $$shooter
+
+# Draw every screen of every NAME QUEST area (2 per area, enemies at their spots) into shots/maps/ for checking levels by eye.
+quest-maps:
+	mkdir -p build/tests build/maps shots/maps
+	c++ -std=c++14 -O2 -Wall -Wextra -Isource tests/quest_tests.cpp $(wildcard source/quest*.cpp) source/screen.cpp -o build/tests/quest_tests
+	build/tests/quest_tests --maps
+	for f in build/maps/*.bmp; do sips -s format png "$$f" --out "shots/maps/$$(basename "$$f" .bmp).png" >/dev/null; done
+	@ls shots/maps | wc -l | xargs echo "PNG files in shots/maps:"
 
 # Native Mac build for fast testing (SDL2 from Homebrew, silent, keyboard pads): game logic and drawing are the real code,
 # but not the PS3's SDL port, audio or controller, so confirm anything final on the PS3.

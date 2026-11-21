@@ -41,6 +41,16 @@ Rules and numbers: see the work-plan spec [`spec.md`](../../work-plan/name-quest
 28. A surveyor says one line, then shows the world map: visited areas filled, the rest outlined, the current one blinking, lit checkpoints, closed gates, edge links as gaps.
 29. Each world plays a quiet 4 s ambience loop (Namula: the hearth's crackle; TEST GROUNDS: none), also in the pause menu over the quest.
 
+## Rules (phase 4: world 1 and the bosses; numbers in spec §9, §12, §13)
+30. THE DRIFTING STATION has its own look (spec §22): deep space with a dim red sun and a ringed planet behind station spars, riveted plating with hazard stripes on every ledge, grated catwalks, cables, consoles and red lamps. Pits show open space. Its entry checkpoint is lit from the start.
+31. Electric panels sit on the floor: dark, then flickering 0.4 s, then arcing for 2 s (off 1.5 s; 1 s in intense areas); touching a lit one costs 15 % of max HP. Vents show pale streaks rising through the 6 tiles they lift.
+32. World 1's five enemies are redrawn side-view with 4 movement frames, a tell pose and an attack pose.
+33. Entering a mini-boss or boss area whose boss is due starts the fight: the boss's name as a banner, its bar at the bottom, every exit closed (a grey shimmering wall at linked edges; portals do nothing). The fight ends when the boss dies or the hero dies (the boss is back at full HP next time).
+34. Every boss attack is telegraphed (a tell pose for 0.5 s; slams and beams mark their area with magenta dashes for 0.8 s and 1.2 s, blinking faster at the end) and followed by at least 0.6 s open. Attacks are random, never the same twice in a row. At half HP the boss roars, shakes the screen, holds an invulnerable pose for 0.8 s and switches to its phase-2 set.
+35. THE OVERSEER hovers and sweeps (BURST, FAN, SLAM; phase 2 faster, plus 2 FLOATERS). THE STAR MAGE teleports between 4 anchors before each attack (BEAM, STAR FAN, 2 CRAWLERS; phase 2 two beams and an electric floor every 8 s). Summons give no names.
+36. A mini-boss's death gives its names and opens the world's gate; it is back after a rest or death. A big boss's death gives its names, `GREAT NAME TAKEN`, lights the next world's entry and saves; it stays dead. Ilsa greets the hero differently after world 1's Great Name.
+37. World 1 has 20 areas: the main path runs DOCKING RING, CARGO HOLD, CREW DECK, the maintenance shaft down, REACTOR RING, the coolant conduit up, the HANGAR (the Overseer), THE BULKHEAD (the gate), SIGNAL ROOM, MED BAY (the second checkpoint), COMMAND RING, THE LAST CORRIDOR (no enemies) and the OBSERVATORY DOME (the Star Mage). Off it: three dead ends with the VIAL SHARD, MAP PAGE 1 and STAR IRON, a side room, a loop through the server farm and cold storage, and a vent shaft. The hangar's lever opens a ladder straight up to the entry. Two surveyors: in the crew deck and the signal room.
+
 ## Edge cases
 - Start does nothing on the slot, class and intro screens; it pauses in play and while `YOU FADED` shows.
 - A controller unplugged in play opens the pause menu, which waits for it (D-014).
@@ -51,3 +61,5 @@ Rules and numbers: see the work-plan spec [`spec.md`](../../work-plan/name-quest
 - 2026-11-20: phase 2 combat built (rules 10-18).
 - 2026-11-21: phase 2 reviewed: R2 cancels a basic swing, spikes bounce.
 - 2026-11-21: phase 3 RPG systems built (rules 19-29).
+- 2026-11-21: phase 4 started: world 1's art and style frame, the boss framework, both world 1 bosses (rules 30-36).
+- 2026-11-21: the user approved world 1's style frame; world 1's 20 areas built (rule 37). PS3 check and the user's playtest open.

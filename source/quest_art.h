@@ -29,6 +29,7 @@ struct WorldArt {
     void (*addDetails)(const Quest& q, int camX, int camY);   // the animated details over the layers
     float propDensityTop, propDensityCeiling, propDensityWall;      // spec §22: 0.35, 0.25, 0.10 (Namula top 0.45)
     LightTint propLight;                    // the glow of props marked light
+    const Sprite* pit;                      // drawn on air in the bottom 2 rows over a pit (world 1's space), nullptr: none
 };
 const WorldArt* worldArt(int world);   // nullptr: no art yet (worlds 1-8 until their phase)
 

@@ -47,7 +47,7 @@ struct SaveData {
     float playtime = 0;
     int hp = 0, mp = 0;
     int checkpointWorld = 0, checkpointId = 0;
-    uint32_t lit = 1;                      // bit world*2 + id; bit 0: the hearth
+    uint32_t lit = 1 | 1u << 2;            // bit world*2 + id; bit 0: the hearth, bit 2: world 1's entry (lit from the start, §11)
     int echoNames = 0, echoWorld = 0, echoArea = 0;
     float echoX = 0, echoY = 0;
     uint32_t visited[SAVED_WORLDS] = {}, chests[SAVED_WORLDS] = {}, shortcuts[SAVED_WORLDS] = {};
@@ -85,9 +85,10 @@ const int MAX_NAMES = 99999999;
 struct Sprite;
 enum Behaviour { BEH_WALKER, BEH_CHARGER, BEH_FLYER, BEH_SHOOTER, BEH_JUMPER, BEH_ARMORED, BEH_DROPPER };
 enum EnemyTrait { TRAIT_NONE, TRAIT_BANANA_ON_LAND, TRAIT_REVIVE, TRAIT_INFLATE, TRAIT_STEAL_NAMES };
-// One roster slot of a world (spec §8 rosters).
+// One roster slot of a world (spec §8 rosters): 4 movement frames (2 for the doubled shooter sprites), a tell and an
+// attack pose (§22; nullptr: the movement frames are used).
 struct EnemyType { const char* name; Behaviour behaviour; EnemyKind kind; EnemyTrait trait;
-                   const Sprite* frames[2]; float speedScale; Sound attackSound; };
+                   const Sprite* frames[4]; float speedScale; Sound attackSound; const Sprite* tell; const Sprite* attack; };
 const int ROSTER_SLOTS = 5;
 extern const char ROSTER_LETTERS[ROSTER_SLOTS + 1];       // "ABDEF"
 const EnemyType& rosterType(int world, int slot);          // slot 0..4 = A, B, D, E, F
@@ -111,10 +112,10 @@ struct Enemy {
 };
 const int PROJ_ENEMY = 0, PROJ_ARROW = 1, PROJ_BOLT = 2, PROJ_STAR = 3, PROJ_ORB = 4, PROJ_WAVE = 5, PROJ_RAIN = 6;
 struct Projectile { float x, y, vx, vy; int w, h; int damage; bool fromHero; int pierce; float range; int kind;
-                    float mult; bool strong; uint64_t hitMask; };   // hero shots: multiplier, skill or basic, enemies already hit
+                    float mult; bool strong; uint64_t hitMask; uint8_t bossMask; };   // hero shots: multiplier, skill or basic, enemies and bosses already hit
 struct DamageNumber { float x, y, age; int value; uint32_t color; float life; bool names; };   // names: "+n NAMES"
-// Short-lived skill shapes for drawing (arcs, bursts, chains, Meteor's marker); x2/y2: a chain link's end.
-enum EffectKind { FX_SWING, FX_ARC, FX_BURST, FX_CHAIN, FX_METEOR, FX_SPIN };
+// Short-lived skill shapes for drawing (arcs, bursts, chains, Meteor's marker, a boss's beam and growing ball); x2/y2: a chain link's end.
+enum EffectKind { FX_SWING, FX_ARC, FX_BURST, FX_CHAIN, FX_METEOR, FX_SPIN, FX_BEAM, FX_BALL };
 struct Effect { int kind; float x, y, w, h, x2, y2, age, life; bool flip; char color; };
 
 // The hero's body and combat state.
@@ -138,6 +139,36 @@ struct Hero {
     int volleys;                 // Storm Volley fans still to fire
     float dashDir, skillX, skillY;   // Shadow Dash's direction; Meteor's target
 };
+
+// --- Bosses (quest_bosses.cpp; spec §12). QuestBoss, since the shooter's game.h already has a QuestBoss. ---
+struct Quest;
+enum QBossId { QBOSS_OVERSEER, QBOSS_STAR_MAGE, QBOSS_MONKEY_KING, QBOSS_SILVERBACK, QBOSS_YETI, QBOSS_TITAN, QBOSS_IMP,
+               QBOSS_FIRE_LORD, QBOSS_ANGLER, QBOSS_FISHERMAN, QBOSS_TWIN_SWORD, QBOSS_TWIN_SPEAR, QBOSS_NAME_EATER,
+               QBOSS_CLAUDE, QBOSS_FIRST_NAME, QBOSS_COUNT };
+struct QuestBoss {
+    int id; float x, y, vx, vy; int w, h;   // top-left of the hitbox
+    int hp, maxHp, atk, bigAtk, contactAtk, names;
+    int phase;               // 1, 2 (Claude 3)
+    int attack, lastAttack;  // the attack running (-1 none), the one before
+    int step; float timer;   // the attack's own step machine: telegraph, act, recover
+    float gap;               // s until the next attack
+    float shift;             // s of the invulnerable phase-change pose
+    float flash; bool facingLeft, alive;
+    float started;           // q.time when the fight began (the log's duration)
+    float data[8];           // per-boss scratch (anchors chosen, wave counts...); each use named in quest_bosses.cpp
+    int lastSwing, lastPartnerSwing;   // the hero's swing ids that already hit it
+    bool big;                // the world's big boss (stays dead), else its mini-boss (back after a rest)
+};
+struct Marker { float x, y, w, h, timer; char color; };   // a telegraph drawn as dashes until timer runs out
+enum BossPose { POSE_IDLE, POSE_TELL, POSE_ATTACK, POSE_OPEN };
+const char* bossName(int id);
+void startBoss(Quest& q, int id, float x, float y);       // stats from §7, banner, bar, exits closed, log "start"
+void startArenaFight(Quest& q);                           // a mini-boss or boss area whose boss is due: spawn it at Q / W, lock the arena
+void updateBosses(Quest& q, float dt);                    // phases, gaps, the per-boss switch, deaths
+bool bossHittable(const QuestBoss& b);                         // alive, not shifting phase, not faded out
+int bossPose(const QuestBoss& b);                              // BossPose for drawing: idle, telegraph, attacking, open
+float bossVisibility(const QuestBoss& b);                      // 1 shown, 0 faded out (the Star Mage's teleport)
+int electricFloor(const Quest& q, int* col0, int* row);   // the Star Mage's phase-2 floor: 0 off, 1 flicker, 2 on; 6 tiles from col0
 
 // The current area's tiles as they are now (gates, crumbles, shortcut doors change them).
 struct AreaState { int world, index; const AreaDef* def; std::vector<char> tiles; };
@@ -195,6 +226,10 @@ struct Quest {
     float gateTimer;                    // s left of the gate shaking and vanishing (spec §11)
     float fadeTimer;                    // s left of the rest's white fade
     int ambient;                        // audioSetAmbient id: 0 off, 1 Namula, 2-8 worlds 1-7
+    // Bosses (phase 4)
+    std::vector<QuestBoss> bosses;
+    std::vector<Marker> markers;
+    bool arenaLocked;                   // a boss fight runs: every exit of the area is closed (spec §12)
 };
 
 void questOpen(Quest& q, const char* folder);             // reads the slot summaries, shows the slot screen
@@ -223,6 +258,10 @@ std::string checkpointName(int bit);                      // spec §11: <WORLD> 
 std::vector<int> travelCheckpoints(const SaveData& save); // world * 2 + id: the hearth, then every lit checkpoint in world order
 void openGate(Quest& q, int world);                       // spec §11: the mini-boss's death opens the world's gate
 void openShortcut(Quest& q);                              // a hero attack touched the area's lever K
+const float HURT_VY = 140 * DP;                           // the hurt hop (spec §5)
+void hurtHero(Quest& q, int damage, float sourceX, float bounceVy = HURT_VY);   // knockback, i-frames, number (not in i-frames or god mode)
+void spawnSummon(Quest& q, int slot, float x, float y);   // a roster enemy standing at (x, y) bottom-centre; gives no names (spec §12)
+float random01(Quest& q);                                 // the combat RNG, 0..1
 void logLine(Quest& q, const char* format, ...);          // one spec §18 line for main.cpp to print
 
 // --- NPCs, shops, levels and chests (quest_story.cpp; spec §10, §14). ---

@@ -272,6 +272,9 @@ static void enterArea(Quest& q, int world, int index, int tx, int ty) {
     q.hero.lastSafeX = q.hero.x;
     q.hero.lastSafeY = q.hero.y;
     updateCamera(q, 0, true);
+    q.bosses.clear();
+    q.markers.clear();
+    q.arenaLocked = false;
     spawnEnemies(q);
     if (index == 0 && world >= 1 && world <= 6 && world > q.save.highest) q.save.highest = world;   // spec §11 highestWorld
     q.ambient = world == WORLD_TEST ? 0 : world + 1;   // 1 Namula, 2-8 worlds 1-7 (spec §16)
@@ -284,6 +287,7 @@ static void enterArea(Quest& q, int world, int index, int tx, int ty) {
         q.bannerColor = newWorld ? 'w' : 'b';
     }
     logLine(q, "quest: area %d.%d %s", world, index, def.name);
+    startArenaFight(q);   // after the area's log line, so "boss ... start" follows it
 }
 
 // Starts play at the respawn checkpoint: id n is the n-th C of the world, areas in order, rows top to bottom.
@@ -331,6 +335,9 @@ static void die(Quest& q, const char* cause) {
         float angle = i * 6.2832f / DEATH_PARTICLES, speed = (40 + 20 * (i % 3)) * DP;
         q.particles.push_back({h.x + HERO_W / 2, h.y + HERO_H / 2, cosf(angle) * speed, sinf(angle) * speed, 0.8f, paletteColor('w'), 1});
     }
+    q.bosses.clear();   // the fight ends; the boss is back at full HP next time (spec §12)
+    q.markers.clear();
+    q.arenaLocked = false;
     q.mode = QMODE_DEAD;
     q.modeTimer = 0;
     q.soundRequested[SOUND_Q_DEATH] = true;
@@ -553,7 +560,7 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
             q.slot = q.cursor;
             saveRead(q.folder.c_str(), q.slot, q.save);
             q.save.heroClass = q.save.heroClass >= 0 && q.save.heroClass < CLASS_COUNT ? q.save.heroClass : 0;
-            q.save.lit |= 1;   // the hearth is always lit
+            q.save.lit |= 1 | 1u << 2;   // the hearth and world 1's entry are always lit (spec §11)
             logLine(q, "quest: slot %d loaded (class %s, level %d)", q.slot + 1, CLASS_NAMES[q.save.heroClass], q.save.level);
             q.area.def = nullptr;
             enterAtCheckpoint(q);
@@ -689,7 +696,7 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
                 openMenu(q, MENU_CHECKPOINT, {"REST", "TRAVEL", "LEAVE"});
             } else if (surveyor >= 0) {
                 talkTo(q, surveyor);
-            } else if (def.portals[portal].area >= 0) {
+            } else if (def.portals[portal].area >= 0 && !q.arenaLocked) {
                 AreaLink link = def.portals[portal];
                 q.soundRequested[SOUND_Q_PORTAL] = true;
                 h.vx = 0;
@@ -734,7 +741,9 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
 
         bool wasOnGround = h.onGround;
         float fallSpeed = h.vy;
+        bool frozen = q.hitStop > 0;
         updateCombat(q, move, dt);
+        if (!frozen) updateBosses(q, dt);
         if (h.jumped) q.soundRequested[SOUND_Q_JUMP] = true;
         if (!wasOnGround && h.onGround && fallSpeed > LAND_SOUND_SPEED) q.soundRequested[SOUND_Q_LAND] = true;
         if (h.onGround && fabsf(h.vx) > 10 * DP && move.moveX != 0) {
@@ -748,10 +757,16 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
         }
 
         // Edges: the hero's centre past an open edge goes through its link; below a closed bottom is a pit.
+        // A boss fight closes every exit: the side edges, the top and a linked bottom are walls (spec §12).
+        if (q.arenaLocked) {
+            h.x = fmaxf(0, fminf(h.x, def.cols * TILE - HERO_W));
+            if (h.y < 0) h.y = 0, h.vy = fmaxf(h.vy, 0);
+            if (def.down.area >= 0 && h.y > def.rows * TILE - HERO_H) h.y = def.rows * TILE - HERO_H, h.vy = fminf(h.vy, 0);
+        }
         float cx = h.x + HERO_W / 2, cy = h.y + HERO_H / 2;
         const AreaLink* exit = cx < 0 ? &def.left : cx > def.cols * TILE ? &def.right : cy < 0 ? &def.up
                              : cy > def.rows * TILE ? &def.down : nullptr;
-        if (exit && exit->area >= 0) {
+        if (exit && exit->area >= 0 && !q.arenaLocked) {
             bool sideways = exit == &def.left || exit == &def.right;
             if (sideways) {
                 h.vy = 0;
