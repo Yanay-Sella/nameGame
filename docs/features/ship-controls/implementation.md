@@ -3,9 +3,7 @@
 **Updated:** 2026-11-21 · [Design](design.md) · [Testing](testing.md)
 
 ## Approach
-`input.cpp` turns each controller into named `Actions` (move, fire, rocket, pause, confirm, stress); gameplay never reads button numbers. `main.cpp` runs the game in fixed 1/60 s steps and `updatePlayer` in `game.cpp` applies the actions. Players are a `std::vector<Player>` with one controller each (GDD D-007); player 2 is appended when they join ([co-op](../co-op/implementation.md)).
-
-In dev builds, Triangle triggers the shooter stress test during Level Picker runs only.
+`input.cpp` turns each controller into named `Actions` for movement, fire, rockets and menus. `main.cpp` runs the game in fixed 1/60 s steps and `updatePlayer` in `game.cpp` applies the actions. Players are a `std::vector<Player>` with one controller each (GDD D-007). Player 2 is appended when they join ([co-op](../co-op/implementation.md)).
 
 ## Code map
 | File / module | Role in this feature |
@@ -26,3 +24,4 @@ In dev builds, Triangle triggers the shooter stress test during Level Picker run
 ## History
 - 2026-11-17: implemented in M2.
 - 2026-11-21: PS3 port polling keeps each controller assigned to its ship during disconnects (D-055).
+- 2026-11-21 · Removed the shooter stress-test action (D-056).

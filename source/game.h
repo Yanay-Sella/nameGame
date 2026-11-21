@@ -10,7 +10,6 @@ struct Actions {
     bool rocket;          // R2 pressed
     bool pause;           // Start pressed
     bool confirm;         // X or Start pressed
-    bool stress;          // Triangle pressed: dev stress test (main.cpp)
     bool up, down, left, right;   // D-pad pressed or left stick flicked (menus)
     bool back;                    // Circle pressed
     bool autopilot;               // Select pressed: dev autopilot toggle (main.cpp)

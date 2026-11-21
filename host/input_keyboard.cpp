@@ -124,7 +124,6 @@ void inputRead(Actions* actions) {
             a.rocket = press[BTN_R2];
             a.pause = press[BTN_START];
             a.confirm = press[BTN_CROSS] || press[BTN_START];
-            a.stress = press[BTN_TRIANGLE];
             a.autopilot = press[BTN_SELECT];
             a.screenshot = press[BTN_L1];
             a.godMode = (press[BTN_L2] || press[BTN_L3]) && down(BTN_L2) && down(BTN_L3);

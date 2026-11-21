@@ -66,7 +66,7 @@ void inputRead(Actions* actions) {
         a.fire = down2(PAD_CTRL_R1);
         a.rocket = press2(PAD_CTRL_R2);
         a.pause = press(PAD_CTRL_START);
-        a.stress = a.item = press2(PAD_CTRL_TRIANGLE);
+        a.item = press2(PAD_CTRL_TRIANGLE);
         a.autopilot = press(PAD_CTRL_SELECT);
         a.screenshot = press2(PAD_CTRL_L1);
         a.godMode = (press2(PAD_CTRL_L2) || press(PAD_CTRL_L3)) && down2(PAD_CTRL_L2) && down(PAD_CTRL_L3);

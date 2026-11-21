@@ -3,7 +3,7 @@
 **Updated:** 2026-11-21 · [Design](design.md) · [Testing](testing.md)
 
 ## Approach
-`main.cpp` holds the `Scene` switch and combines menu actions from connected pads. The Classic submenu selects the variant, and `SCENE_CONTROLLERS` polls ready status before starting 1–4 Players. `drawMenu` draws the shared centred panel. `updateBackground` and `drawBackground` also serve the menus. The `Settings` struct (music, shake, flashing) is saved by stdio calls, so the Mac tests can build it.
+`main.cpp` holds the `Scene` switch and combines menu actions from connected pads. The Classic submenu opens either player-count option or Level Picker. `SCENE_CONTROLLERS` polls ready status before starting 1–4 Players. `drawMenu` draws the shared centred panel. `updateBackground` and `drawBackground` also serve the menus. The `Settings` struct (music, shake, flashing) is saved by stdio calls, so the Mac tests can build it.
 
 ## Code map
 | File / module | Role in this feature |

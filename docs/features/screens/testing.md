@@ -1,6 +1,6 @@
 # Screens: testing
 
-**Updated:** 2026-11-17 · [Design](design.md) · [Implementation](implementation.md)
+**Updated:** 2026-11-21 · [Design](design.md) · [Implementation](implementation.md)
 
 ## Acceptance criteria
 - [x] Without a settings file, music defaults to MIZRAHIT. *(`tests/game_tests.cpp` › settingsDefaultToMizrahit)*
@@ -16,6 +16,8 @@
 - [x] Losing a run, then Circle at game over, shows the main menu. *(PS3 log 2026-11-17: game over → button 10 → scene: main menu)*
 - [x] Circle is button 10 on the PS3. *(PS3 log 2026-11-17: "button 10" on every Circle press)*
 - [x] 60 fps in the menus and in play. *(PS3 log 2026-11-17: fps 59.7 in the main menu, 60.0 in play, slowest frame 6 ms)*
+- [x] The main menu shows Classic, NAME QUEST and Settings. Classic offers both player-count options and Level Picker. Circle in the picker returns to Classic with LEVEL PICKER selected. *(Mac controller scripts and screenshots, 2026-11-21)*
+- [x] Selecting Jungle in Level Picker starts a Jungle run. Reopening the picker after returning to the main menu selects Jungle again. *(Mac log on 2026-11-21 showed `picked level 2 starts` for both runs)*
 
 ## Playtest checks
 1. Menu up/down with the D-pad and the left stick.

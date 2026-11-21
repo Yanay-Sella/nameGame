@@ -3,7 +3,7 @@
 **Version:** 0.31 · **Updated:** 2026-11-21 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
 
 ## Summary
-You pilot a small ship at the bottom of the screen against waves of pixel-art aliens. Hold R1 to spray bullets, and save the scarce R2 rocket for the moment a wave gets out of hand. Waves get harder, and every 5th wave is a boss. The run goes through five levels of 20 waves each, every one harder than the last: level 1 (space), the jungle, the glacier, the volcano and the deep sea. It ends when you beat the deep sea's wave-20 bosses or lose your last life, and you chase the saved high score. Big bosses drop level buffs that stack until you die. Classic plays all five levels in one run, with a choice of 1–2 Players or an expanded 1–4 Players. The Level Picker plays any single level on its own. NAME QUEST, the third item on the main menu, is a separate RPG platformer set in the same worlds, with four classes, a hub village, checkpoints and three save slots.
+You pilot a small ship at the bottom of the screen against waves of pixel-art aliens. Hold R1 to spray bullets, and save the scarce R2 rocket for the moment a wave gets out of hand. Waves get harder, and every 5th wave is a boss. The run goes through five levels of 20 waves each, every one harder than the last: level 1 (space), the jungle, the glacier, the volcano and the deep sea. It ends when you beat the deep sea's wave-20 bosses or lose your last life, and you chase the saved high score. Big bosses drop level buffs that stack until you die. Classic offers a five-level run in 1–2 Players or expanded 1–4 Players, and its Level Picker plays any single level on its own. NAME QUEST is a separate RPG platformer on the main menu, set in the same worlds, with four classes, a hub village, checkpoints and three save slots.
 
 | | |
 |---|---|
@@ -63,18 +63,18 @@ The task-by-task plan for each milestone is in the [work plan](work-plan/nameGam
 
 ## Screens and flow
 ```
-MAIN MENU ─ CLASSIC ─┬ 1–2 PLAYERS ─────────────────→ five-world run
-          │         └ 1–4 PLAYERS ─ CONTROLLERS ─→ five-world run
-          ├ LEVEL PICKER ─→ wheel of SPACE / JUNGLE / GLACIER / VOLCANO / DEEP SEA ─→ that level only ─ <LEVEL> CLEAR ─→ end screen (win)
-          ├ NAME QUEST ─→ SLOTS ─ empty slot → CLASS SELECT → INTRO → PLAY in Namula; used slot → PLAY at the last checkpoint
-          │               PLAY ⇄ (Start) PAUSED ─ RETURN TO MENU (saves the slot) ─→ MAIN MENU; SLOTS: Circle → MAIN MENU
-          └ SETTINGS
+MAIN MENU ─┬ CLASSIC ─┬ 1–2 PLAYERS ─────────────────→ five-world run
+           │          ├ 1–4 PLAYERS ─ CONTROLLERS ─→ five-world run
+           │          └ LEVEL PICKER ─→ wheel of SPACE / JUNGLE / GLACIER / VOLCANO / DEEP SEA ─→ that level only ─ <LEVEL> CLEAR ─→ end screen (win)
+           ├ NAME QUEST ─→ SLOTS ─ empty slot → CLASS SELECT → INTRO → PLAY in Namula; used slot → PLAY at the last checkpoint
+           │               PLAY ⇄ (Start) PAUSED ─ RETURN TO MENU (saves the slot) ─→ MAIN MENU; SLOTS: Circle → MAIN MENU
+           └ SETTINGS
 Five-world run: level 1 → JUNGLE → GLACIER → VOLCANO → DEEP SEA → end screen (win).
 Between levels: "<LEVEL> CLEAR" for 3 s, then the next level's name banner and WAVE 1, with the same players.
 Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN MENU; game over / <LEVEL> CLEAR end screen: X/Start = play again (same mode and level), Circle = MAIN MENU
 ```
-- **Main menu:** title "NAME GAME", the items Classic, Level picker, NAME QUEST and Settings and the saved high score. Silent. Classic starts at level 1 and goes through every level.
-- **Level picker:** a wheel with the picked level big and yellow in the middle and two levels above and below it smaller; up/down spins it (wrapping), the background previews the picked level, X plays just that level, Circle goes back.
+- The **main menu** is silent and shows the title "NAME GAME", the items Classic, NAME QUEST and Settings, and the saved high score.
+- In **Classic**, either player-count option plays all five levels. Level Picker opens a wheel with the picked level big and yellow in the middle, two smaller rows above it and two below it. Up and Down spin the wheel, and the background previews the selection. X plays that level and Circle returns to Classic.
 - **Settings:** music Mizrahit / Dubstep / Off, screen shake 0–100 % and reduced flashing, saved to settings.txt. Circle or Back returns to the menu that opened it.
 - **Game:** the HUD shows score, wave, lives and rockets. Music loops if enabled.
 - **Pause:** Start opens it (Resume, Settings, Return to menu); the music keeps playing.
@@ -88,7 +88,7 @@ Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN ME
 - **Accessibility:** shake strength 0–100 % and reduce flashing in the settings screen; large flashes at most 3 per second.
 
 ## Game-level acceptance
-- 60 fps on the PS3 with 60 enemies, 100 bullets and 2 explosions on screen. *(PS3 stress test 2026-11-17 with Triangle: 60 fps held up to 60 aliens, 1,900 bullets and 8 explosions; slowest frame 11 ms of 16.7)*
+- 60 fps on the PS3 with 60 enemies, 100 bullets and 2 explosions on screen. *(In the historical PS3 stress run on 2026-11-17, the game held 60 fps with up to 60 aliens, 1,900 bullets and 8 explosions. The slowest frame took 11 ms of the 16.7 ms budget.)*
 
 - No frame drops or memory growth over 30 minutes. *(PS3 soak 2026-11-17, about 21 min not 30: autopilot to wave 50, fps ≥ 59.9, worst work 6 ms, heap 5,709 → 5,709 KB)*
 
@@ -123,7 +123,7 @@ Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN ME
 | D-025 | 2026-11-18 | Difficulty ladder: formation waves play level 1's numbers 5, 8, 11 and 14 waves ahead in levels 2-5, heavies every 8, 6, 5, 4 waves (at most 3), enemy shots +0, 5, 10, 15 px/s, boss HP and rewards rise per level | only the wave offset (it caps out by wave 20); more HP on formation aliens | the level-1 formulas cap at wave 20, so later levels needed their own knobs; heavier counts and faster shots keep each level distinct | [enemy waves](features/enemy-waves/design.md), [bosses](features/bosses/design.md) |
 | D-026 | 2026-11-18 | Non-lethal hazards: the ice block freezes 1.6 s (R1 mashing breaks out sooner), the lava drop scorches 3 s (0.6× speed, 2× bullet damage, checked when the bullet hits), the hook lifts 24 px and stuns 1.6 s and ignores blinking ships | lethal ice blocks; scorch from the moment of firing; hook on any ship | the PDF's rules; mashing gives the frozen player something to do; a respawning ship shouldn't be hooked straight away | [glacier](features/glacier/design.md), [volcano](features/volcano/design.md), [deep sea](features/deep-sea/design.md) |
 | D-027 | 2026-11-18 | Level-wide twists: the ship glides on the glacier's ice and the deep sea's current pushes it sideways; the volcano's twist is its lava drops | none; twists on every level | small rule changes make each world feel different without new controls | [glacier](features/glacier/design.md), [deep sea](features/deep-sea/design.md), [ship controls](features/ship-controls/design.md) |
-| D-028 | 2026-11-18 | Main menu splits into CLASSIC (levels 1-5 as one run) and LEVEL PICKER (a spinning wheel; the picked level is played alone and its clear is the win) | one menu item per level, each run continuing to the end | user's request: one full run plus a way to practise any level | [screens](features/screens/design.md) |
+| D-028 | 2026-11-18 | Main menu splits into CLASSIC (levels 1-5 as one run) and LEVEL PICKER (a spinning wheel; the picked level is played alone and its clear is the win) → picker location superseded by D-056 | one menu item per level, each run continuing to the end | user's request: one full run plus a way to practise any level | [screens](features/screens/design.md) |
 | D-029 | 2026-11-18 | Playtest fixes: gold player-2 ship; bigger mage hat and a wand whose star casts the power ball; brown, bulky gorilla; 24 px see-through ice blocks for both glacier bosses; the imp's lava drip is one big drop straight down; moving ships trail bubbles in the deep sea; the fisherman throws live fish (2 a throw, at most 3 out) that chase the nearest ship | ice blocks bigger for the yeti only; an aimed big drop; fish that flop and spit or hop | user's playtest notes and choices | [co-op](features/co-op/design.md), [bosses](features/bosses/design.md), [jungle](features/jungle/design.md), [glacier](features/glacier/design.md), [volcano](features/volcano/design.md), [deep sea](features/deep-sea/design.md) |
 | D-030 | 2026-11-18 | Level buffs: big bosses (waves 15, 20) drop a falling pickup; buffs stack, all lost on death; Square cycles the strong attack; beam 30 per enemy, frost 3 s (+25 % HP), bubbles 2 per hit, volcano fire rate only | wave 20 only; given automatically; all strong attacks at once or newest wins | user's PDF and choices; scarce rockets and the death loss keep pillar 2 | [level buffs](features/level-buffs/design.md), [rocket](features/rocket/design.md), [bosses](features/bosses/design.md), [ship controls](features/ship-controls/design.md) |
 | D-031 | 2026-11-18 | A ship skin per level on the same 16×14 body and hitbox; player 2 keeps a gold copy | recolour only | user's PDF; same hitbox keeps dodging fair | [pixel art](features/pixel-art/design.md), [co-op](features/co-op/design.md), [level buffs](features/level-buffs/design.md) |
@@ -148,11 +148,12 @@ Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN ME
 | D-050 | 2026-11-20 | Each world's mini-boss holds the key to the gate in front of the world's second half | no gates; keys found in chests | user's choice | [NAME QUEST](features/name-quest/design.md) |
 | D-051 | 2026-11-20 | Worlds 1–5 reuse the shooter's enemy and boss sprites where the theme matches (the RPG is set in the same worlds) | all-new sprites | user's choice | [NAME QUEST](features/name-quest/design.md) |
 | D-055 | 2026-11-21 | Classic has a 1–2 player variant and an expanded 1–4 player variant with a three-pad entry gate and its own high score | one scale and balance for every party | user requested more room and denser waves for larger parties | [Co-op](features/co-op/design.md), [Screens](features/screens/design.md) |
+| D-056 | 2026-11-21 | Put Level Picker under Classic and remove the shooter stress test | Level Picker on the main menu and a Triangle stress-test shortcut | the user grouped all shooter play under Classic and requested removal of the test | [Screens](features/screens/design.md), [Ship controls](features/ship-controls/implementation.md) |
 
 ## Open questions
 - **Assumptions to confirm:** sprites as text grids in code (D-006); every number marked `[ASSUMPTION]` in the feature notes.
 - **Risks:**
-  - Frame rate with real sprites and many objects → M1 used ~2 ms of the 16.7 ms frame with ~45 boxes; recheck in M2 with the stress test.
+  - Check frame rate during dense waves with real sprites on the PS3. M1 used about 2 ms of the 16.7 ms frame budget with about 45 boxes.
   - R2, Triangle and Start button numbers are from the SDL port's source, not yet seen in a PS3 log (left, right and R1 are confirmed).
 
 ## Change log

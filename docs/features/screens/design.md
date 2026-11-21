@@ -5,8 +5,8 @@
 The game opens on a main menu with room for more game modes, and a settings screen holds the music switch. It serves pillar 3 (arcade): only the menus the game needs.
 
 ## Rules
-1. Boot shows the main menu: title `NAME GAME`, `V1.0` in grey at the bottom right, the items CLASSIC, LEVEL PICKER, NAME QUEST and SETTINGS and the saved best as `HI 0012345` under the panel, with the starfield scrolling behind it. No music.
-2. CLASSIC opens a choice of 1-2 PLAYERS and 1-4 PLAYERS. Both begin at level 1 and end on the deep sea's clear. LEVEL PICKER opens the level wheel. The `HI` line sits at y 150. See [Co-op](../co-op/design.md) for the variant rules.
+1. Boot shows the main menu with the title `NAME GAME`, `V1.0` in grey at the bottom right, and the items CLASSIC, NAME QUEST and SETTINGS. The saved best appears as `HI 0012345` beneath the panel at y 150. The starfield scrolls in silence.
+2. CLASSIC opens a choice of 1-2 PLAYERS, 1-4 PLAYERS and LEVEL PICKER. Both player-count options begin at level 1 and end on the deep sea's clear. LEVEL PICKER opens the level wheel. See [Co-op](../co-op/design.md) for the variant rules.
 3. Settings has the items MUSIC: MIZRAHIT / DUBSTEP / OFF, SHAKE: 0–100 % in steps of 25, FLASHING: NORMAL / REDUCED and BACK. X or D-pad right changes the item (music steps MIZRAHIT → DUBSTEP → OFF and wraps, shake steps up and wraps; left steps either one back), and each change is saved to settings.txt and survives a reboot.
 4. Circle or BACK leaves settings and returns to whichever menu opened it.
 5. Start during a run opens the pause menu over the frozen game: RESUME, SETTINGS, RETURN TO MENU. Start or Circle also resume. RETURN TO MENU ends the run without confirmation and stops the music. A controller disconnect also opens it, with the hint CONNECT CONTROLLER n, and RESUME waits for that controller.
@@ -15,7 +15,7 @@ The game opens on a main menu with room for more game modes, and a settings scre
 8. Every connected controller drives the menus. Up/down is a D-pad press or a left-stick flick, and the cursor wraps around.
 9. X selects. Start selects too, except in the pause menu, where Start resumes.
 10. Circle goes back to the prior menu. In the pause menu it resumes once all joined controllers are connected.
-11. The level picker is a wheel titled `LEVEL`: SPACE, JUNGLE, GLACIER, VOLCANO, DEEP SEA. The picked level is in the middle at double size in yellow, the two above and below it at normal size (white, then grey). Up/down spins the wheel one row (wrapping), the background shows the picked level, X plays just that level (its clear is the win), Circle returns to the main menu. It opens on the last picked level.
+11. The level picker is a wheel titled `LEVEL` with SPACE, JUNGLE, GLACIER, VOLCANO and DEEP SEA. The picked level is in the middle at double size in yellow. The two levels above and the two below are at normal size, white nearest the selection and grey farthest away. Up and Down spin the wheel one row with wrapping, and the background previews the picked level. X plays just that level and its clear is the win. Circle returns to Classic with LEVEL PICKER selected. If the last run came from the picker, the wheel opens on that run's level.
 12. Classic 1–4 Players opens a lobby with the live count and the PS3 port available to each player. X or Start only starts play with at least three pads connected. The party defaults to the number of available pads, up to four. Left and right set the starting party size. Circle returns to the Classic menu.
 
 ## Numbers
@@ -43,3 +43,4 @@ The game opens on a main menu with room for more game modes, and a settings scre
 - 2026-11-18: levels 3-5 (D-024): GLACIER, VOLCANO and DEEP SEA items.
 - 2026-11-18: menu split into CLASSIC and a spinning LEVEL PICKER (D-028).
 - 2026-11-21: added the Classic variant menu and live controller lobby (D-055).
+- 2026-11-21 · Moved Level Picker from the main menu into Classic (D-056).

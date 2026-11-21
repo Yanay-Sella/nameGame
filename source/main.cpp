@@ -25,15 +25,16 @@
 
 const float STEP = 1.0f / 60;   // s per game update
 const int MAX_STEPS_PER_FRAME = 4;
-const bool DEV_AIDS = !RELEASE;   // Triangle stress test, Select autopilot, L2+L3 test mode and L1 screenshot; off in make release
+const bool DEV_AIDS = !RELEASE;
 
 enum Scene { SCENE_MAIN_MENU, SCENE_CLASSIC_MENU, SCENE_CONTROLLERS, SCENE_LEVEL_PICKER, SCENE_SETTINGS,
              SCENE_PLAYING, SCENE_PAUSED, SCENE_QUEST };
 const char* const SCENE_NAMES[] = {"main menu", "classic menu", "controllers", "level picker", "settings", "playing", "paused", "quest"};
-const char* const MAIN_ITEMS[] = {"CLASSIC", "LEVEL PICKER", "NAME QUEST", "SETTINGS"};   // classic plays every level in order
-const char* const CLASSIC_ITEMS[] = {"1-2 PLAYERS", "1-4 PLAYERS"};
+const char* const MAIN_ITEMS[] = {"CLASSIC", "NAME QUEST", "SETTINGS"};
+const int QUEST_ITEM = 1, SETTINGS_ITEM = 2;
+const char* const CLASSIC_ITEMS[] = {"1-2 PLAYERS", "1-4 PLAYERS", "LEVEL PICKER"};
+const int PICKER_ITEM = 2;
 const int EXPANDED_MIN_CONTROLLERS = 3;
-const int PICKER_ITEM = 1, QUEST_ITEM = 2, SETTINGS_ITEM = 3;
 const char* const PICKER_NAMES[LEVEL_COUNT] = {"SPACE", "JUNGLE", "GLACIER", "VOLCANO", "DEEP SEA"};
 const float PICKER_SPIN_TIME = 0.12f;   // s for the picker wheel to turn one row
 const char* const BOSS_NAMES[] = {"classic", "mage", "monkey", "gorilla", "yeti", "golem", "imp", "fire lord", "angler",
@@ -71,28 +72,6 @@ static void watchdog(void*) {
             sysProcessExit(1);
         }
     }
-}
-
-// Dev aid (Triangle in Level Picker): adds up to 60 aliens, 100 bullets and 2 explosions for a stress test.
-static void addStressLoad(Game& game) {
-    for (int i = 0; i < 100; i++) {
-        Shot bullet = {(float)(i * 3 % game.arenaWidth()), (float)(game.arenaHeight() - 20 - i % 60), -40, 0, 0};
-        game.bullets.push_back(bullet);
-    }
-    for (int i = (int)game.aliens.size(); i < 60; i++) {
-        Alien alien = {};
-        alien.type = (AlienType)(i % 3);
-        alien.state = ALIEN_IN_FORMATION;
-        alien.slotX = alien.x = 10.0f + (i % 20) * 15;
-        alien.slotY = alien.y = 88.0f - (i / 20) * 12;
-        alien.hp = 4;
-        alien.alive = true;
-        game.aliens.push_back(alien);
-    }
-    Explosion blasts[2] = {{100, 60, 0, 40}, {220, 60, 0, 40}};
-    game.explosions.insert(game.explosions.end(), blasts, blasts + 2);
-    debugNetPrintf(INFO, "stress: %d aliens, %d bullets, %d explosions\n", (int)game.aliens.size(),
-                   (int)game.bullets.size(), (int)game.explosions.size());
 }
 
 int main(int argc, char** argv) {
@@ -236,7 +215,7 @@ int main(int argc, char** argv) {
             if (connectedCount < MAX_PLAYERS) connectedPorts[connectedCount] = port;
             connectedCount++;
             menu.up |= a.up; menu.down |= a.down; menu.left |= a.left; menu.right |= a.right;
-            menu.confirm |= a.confirm; menu.stress |= a.stress; menu.back |= a.back; menu.pause |= a.pause; menu.screenshot |= a.screenshot;
+            menu.confirm |= a.confirm; menu.item |= a.item; menu.back |= a.back; menu.pause |= a.pause; menu.screenshot |= a.screenshot;
         }
         int available = SDL_min(connectedCount, MAX_PLAYERS);
         int lobbyPlayers = lobbyPlayerChoice == 0 ? available : SDL_min(lobbyPlayerChoice, available);
@@ -245,8 +224,9 @@ int main(int argc, char** argv) {
         for (int p = (int)game.players.size() - 1; p >= 0; p--)
             if (!pads[playerPorts[p]].connected) lostController = playerPorts[p];
         if (questPaused) lostController = pads[questPort].connected ? -1 : questPort;
-        int itemCount = scene == SCENE_SETTINGS || scene == SCENE_MAIN_MENU ? 4 : scene == SCENE_LEVEL_PICKER ? LEVEL_COUNT
-                      : scene == SCENE_CLASSIC_MENU ? 2 : scene == SCENE_PAUSED ? 3 : 0;
+        int itemCount = scene == SCENE_MAIN_MENU ? SDL_arraysize(MAIN_ITEMS)
+                      : scene == SCENE_CLASSIC_MENU ? SDL_arraysize(CLASSIC_ITEMS)
+                      : scene == SCENE_LEVEL_PICKER ? LEVEL_COUNT : scene == SCENE_SETTINGS ? 4 : scene == SCENE_PAUSED ? 3 : 0;
         if (itemCount > 0) {
             if (menu.up) selected = (selected + itemCount - 1) % itemCount;
             if (menu.down) selected = (selected + 1) % itemCount;
@@ -264,14 +244,10 @@ int main(int argc, char** argv) {
             if (menu.confirm && selected == 0) {
                 game.level = 1;
                 setScene(SCENE_CLASSIC_MENU);
-            } else if (menu.confirm && selected == PICKER_ITEM) {
-                selected = runSingleLevel ? runLevel - 1 : 0;   // back on the last picked level
-                pickerSpin = 0;
-                setScene(SCENE_LEVEL_PICKER);
             } else if (menu.confirm && selected == QUEST_ITEM) {
                 questPort = connectedPorts[0];
                 openQuest();
-            } else if (DEV_AIDS && menu.stress && selected == QUEST_ITEM) {   // dev: Triangle on NAME QUEST warps into the TEST GROUNDS (slot 3)
+            } else if (DEV_AIDS && menu.item && selected == QUEST_ITEM) {   // dev: Triangle on NAME QUEST warps into the TEST GROUNDS (slot 3)
                 questPort = connectedPorts[0];
                 openQuest();
                 questStartDev(quest, "slot=3 class=0 world=8 area=0");
@@ -290,6 +266,10 @@ int main(int argc, char** argv) {
                 runSingleLevel = false;
                 debugNetPrintf(INFO, "classic run starts\n");
                 startRun(1, CLASSIC_STANDARD);
+            } else if (menu.confirm && selected == PICKER_ITEM) {
+                selected = runSingleLevel ? runLevel - 1 : 0;   // back on the last picked level
+                pickerSpin = 0;
+                setScene(SCENE_LEVEL_PICKER);
             } else if (menu.confirm) {
                 lobbyPlayerChoice = 0;
                 lobbyPlayers = available;
@@ -326,7 +306,7 @@ int main(int argc, char** argv) {
             } else if (menu.back) {
                 game.level = 1;
                 selected = PICKER_ITEM;
-                setScene(SCENE_MAIN_MENU);
+                setScene(SCENE_CLASSIC_MENU);
             }
             break;
         case SCENE_SETTINGS:
@@ -394,7 +374,6 @@ int main(int argc, char** argv) {
                     setScene(SCENE_PAUSED);
                     break;   // a second Start in the same frame can't act
                 }
-                if (DEV_AIDS && game.singleLevel && a.stress) addStressLoad(game);
                 if (DEV_AIDS && a.godMode) {
                     godMode = !godMode;
                     if (!godMode) for (Player& player : game.players) player.invincibleTimer = 0;
@@ -627,14 +606,14 @@ int main(int argc, char** argv) {
         }
         if (scene == SCENE_MAIN_MENU) {
             drawBackground(game);
-            drawMenu("NAME GAME", MAIN_ITEMS, SETTINGS_ITEM + 1, selected, "X SELECT");
+            drawMenu("NAME GAME", MAIN_ITEMS, SDL_arraysize(MAIN_ITEMS), selected, "X SELECT");
             char best[24];
             snprintf(best, sizeof best, "HI %07d", highScores[CLASSIC_STANDARD]);
             drawText((SCREEN_W - textWidth(best)) / 2, 150, best, paletteColor('y'));
             drawText(SCREEN_W - 2 - textWidth("V" GAME_VERSION), SCREEN_H - 7, "V" GAME_VERSION, paletteColor('s'));
         } else if (scene == SCENE_CLASSIC_MENU) {
             drawBackground(game);
-            drawMenu("CLASSIC", CLASSIC_ITEMS, 2, selected, "X SELECT  O BACK");
+            drawMenu("CLASSIC", CLASSIC_ITEMS, SDL_arraysize(CLASSIC_ITEMS), selected, "X SELECT  O BACK");
         } else if (scene == SCENE_CONTROLLERS) {
             drawBackground(game);
             const int panelW = 174, panelH = 124, panelX = (SCREEN_W - panelW) / 2, panelY = (SCREEN_H - panelH) / 2;

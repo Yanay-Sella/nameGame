@@ -7,7 +7,7 @@ NAME QUEST is a second game on the main menu: a hard 2D side-scrolling action RP
 Rules and numbers: see the work-plan spec [`spec.md`](../../work-plan/name-quest/spec.md) until phase 9 folds the final numbers in here. The plan's phases are in [`name-quest-plan.md`](../../work-plan/name-quest-plan.md).
 
 ## Rules (phase 1: the engine)
-1. The main menu reads CLASSIC, LEVEL PICKER, NAME QUEST, SETTINGS. NAME QUEST opens the slot screen; there is no music in NAME QUEST (D-049).
+1. NAME QUEST on the [main menu](../screens/design.md) opens the slot screen. There is no music in NAME QUEST (D-049).
 2. The slot screen shows three slots. X on an empty slot opens class select; X on a used slot puts the hero at the last rested checkpoint. Triangle on a used slot asks `DELETE SLOT n?` (NO by default); YES deletes it. Circle goes back to the main menu.
 3. Class select shows KNIGHT, ARCHER, MAGICIAN and THIEF side by side with POWER, TOUGHNESS and REACH bars; left/right picks, X confirms, Circle goes back. The slot is written at once.
 4. Four intro pages are typed out; X completes a page, then turns it. After the last page the hero stands beside the hearth in Namula.

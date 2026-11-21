@@ -1,11 +1,11 @@
 # Handoff: state of the work and how Claude and Codex share it
 
 **Read this first, update it before you stop.** Rules and commands are in `AGENTS.md`; conventions, questions between agents and the small-change lane are in `docs/COLLAB.md`; this file holds what changes between sessions.
-Updated: 2026-11-21 (Codex, Classic controls).
+Updated: 2026-11-21 (Codex, Classic menu).
 
 ## Classic shooter
 
-- Classic offers 1–2 Players and 1–4 Players. The larger arena uses a live controller lobby and a three-pad entry gate. Tuning, source files and test status are in [Co-op](features/co-op/design.md).
+- The Classic menu offers 1–2 Players, 1–4 Players and Level Picker. The larger arena uses a live controller lobby and a three-pad entry gate. Tuning, source files and test status are in [Co-op](features/co-op/design.md).
 - The Mac scripts checked the gate, three- and four-player starts, drop-in, unplug and resume. The cached PS3 Docker toolchain built the package. Physical controller, TV and frame-rate checks remain open.
 - For a future 1–2 Players change, ask the user whether to carry it over to 1–4 Players, including when the code is shared. See `AGENTS.md`.
 
@@ -42,6 +42,7 @@ Updated: 2026-11-21 (Codex, Classic controls).
 - Spec examples that disagree with the spec formula `round(100 * 1.2^(L-1))`: 39→40 is 102,067 (spec 102,064), 29→30 is 16,484 (spec 10,646). The code follows the formula; the user decides.
 
 ## Session log (newest first; add a line per session: date, agent, what changed, what is next)
+- 2026-11-21, Codex — Moved Level Picker into Classic and removed the shooter stress test. Mac scripts and screenshots checked the new menus, both full-run options, Jungle from the picker, and the NAME QUEST Triangle actions. NAME QUEST tests passed and the shooter suite reported its 53 known failures. Next for Classic is a PS3 playtest when requested.
 - 2026-11-21, Codex — Removed the Triangle stress-test shortcut from both Classic variants. Mac scripts and screenshots confirmed normal waves in Classic and the stress load in Level Picker. NAME QUEST tests passed and the shooter suite reported its 53 known failures. Next for Classic is a PS3 playtest when requested.
 - 2026-11-21, Codex: reviewed Claude's completed phase 3 in a local copy. NAME QUEST tests passed, and the shooter failures matched the baseline. Checked levelling, shops, travel, chests, gate, shortcut and map on Mac. Critical findings are in the user review. PS3 play remains unchecked.
 - 2026-11-21, Codex: split Classic and verified the larger arena, all 100 waves, controller lobby, four ships and upgrade rates. `make test` matched the 53 baseline shooter failures and NAME QUEST passed. Next for Classic: a PS3 playtest when the user asks for it.
