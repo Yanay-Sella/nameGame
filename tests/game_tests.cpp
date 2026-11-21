@@ -47,6 +47,7 @@ static Alien parkedAlien(float x, float y) {
 }
 
 static const Sprite* const ALL_SPRITES[] = {&SHIP_A, &SHIP_B, &SHIP2_A, &SHIP2_B, &GREEN_ALIEN_A, &GREEN_ALIEN_B, &BLUE_ALIEN_A, &BLUE_ALIEN_B,
+                                            &TANK_SHIP, &ASSASSIN_SHIP, &PHASED_SHIP, &MAGE_SHIP, &HEAVY_ROCKET, &MAGE_ORB,
                                             &RED_ALIEN_A, &RED_ALIEN_B, &BOSS_A, &BOSS_B, &MAGE_A, &MAGE_B, &BULLET, &ENEMY_SHOT, &ROCKET, &ROCKET_PICKUP,
                                             &UPGRADE_PICKUP, &LIFE_ICON, &ROCKET_ICON, &LEAFHOPPER_A, &LEAFHOPPER_B, &BEETLE_A, &BEETLE_B,
                                             &STAG_A, &STAG_B, &RHINO_A, &RHINO_B, &MONKEY_A, &MONKEY_B, &GORILLA_A, &GORILLA_B,
@@ -1964,7 +1965,7 @@ static void bubbleShieldTakesAHitAndChains() {
     CHECK(p.alive && !p.shield && p.invincibleTimer > 0.9f && game.shieldBubbles.size() == 3 && game.trauma > 0.5f);
     p.invincibleTimer = 1e9f;
     run(game, NO_INPUT, 4);
-    if (game.aliens[0].hp != 200 - 78) printf("bubble chain left hp %d\n", game.aliens[0].hp);
+    if (game.aliens[0].hp != 200 - 78) printf("bubble chain left hp %g\n", game.aliens[0].hp);
     CHECK(game.aliens[0].hp == 200 - 78 && game.shieldBubbles.empty());
 }
 
@@ -2003,6 +2004,136 @@ static void classicVariantsCapThePartyAndReadPlayerFour() {
     updateGame(game, actions, DT);
     CHECK(game.players[0].x == firstX && fourth.x == EXPANDED_W - 16 && fourth.y == EXPANDED_H - 14);
     CHECK(game.bullets.size() == 1 && game.bullets[0].owner == 3);
+}
+
+static void rolesRequireThreeExpandedPlayers() {
+    Game game;
+    const ShipRole roles[] = {ROLE_TANK, ROLE_MAGE, ROLE_ASSASSIN, ROLE_TANK};
+    for (bool singleLevel : {false, true}) {
+        startGame(game, 4, 7, 1, singleLevel, singleLevel ? CLASSIC_EXPANDED : CLASSIC_STANDARD, roles);
+        CHECK(game.players.size() == 2 && game.players[0].role == ROLE_FIGHTER);
+    }
+    startGame(game, 2, 7, 1, false, CLASSIC_EXPANDED, roles);
+    CHECK(game.players[0].role == ROLE_FIGHTER && game.players[1].role == ROLE_FIGHTER);
+    game.players[0].score = 800;
+    CHECK(joinGame(game, roles));
+    CHECK(game.players[0].role == ROLE_TANK && game.players[1].role == ROLE_MAGE && game.players[2].role == ROLE_ASSASSIN);
+    CHECK(game.players[0].score == 800);
+    const ShipRole fourthPick[] = {ROLE_FIGHTER, ROLE_FIGHTER, ROLE_FIGHTER, ROLE_MAGE};
+    CHECK(joinGame(game, fourthPick));
+    CHECK(game.players[0].role == ROLE_TANK && game.players[3].role == ROLE_MAGE);
+}
+
+static void rolesApplyMovementFireCadenceAndDamage() {
+    Game game;
+    const ShipRole roles[] = {ROLE_FIGHTER, ROLE_TANK, ROLE_ASSASSIN, ROLE_MAGE};
+    startGame(game, 4, 7, 1, false, CLASSIC_EXPANDED, roles);
+    game.aliens.clear();
+    game.freezeTimer = 10;
+    Actions actions[MAX_PLAYERS] = {};
+    float starts[MAX_PLAYERS];
+    for (int p = 0; p < MAX_PLAYERS; p++) {
+        const Player& player = game.players[p];
+        starts[p] = player.x;
+        game.aliens.push_back(parkedAlien(player.x + 6, player.y - 14));
+        game.aliens.back().hp = 10;
+        actions[p].moveX = 1;
+        actions[p].fire = true;
+    }
+    updateGame(game, actions, DT);
+    const float expectedHp[] = {9, 8, 9.25f, 8.5f};
+    for (int p = 0; p < MAX_PLAYERS; p++) CHECK(game.aliens[p].hp == expectedHp[p]);
+    float fighterMove = game.players[0].x - starts[0];
+    float fighterFireTimer = game.players[0].fireTimer;
+    CHECK(game.players[1].x - starts[1] < fighterMove && game.players[1].fireTimer > fighterFireTimer);
+    CHECK(game.players[2].x - starts[2] > fighterMove && game.players[2].fireTimer < fighterFireTimer);
+    CHECK(game.players[3].x - starts[3] == fighterMove && game.players[3].fireTimer == fighterFireTimer);
+}
+
+static void tankArmorAndHeavyRocket() {
+    Game game;
+    const ShipRole roles[] = {ROLE_TANK, ROLE_FIGHTER, ROLE_ASSASSIN};
+    startGame(game, 3, 7, 1, false, CLASSIC_EXPANDED, roles);
+    Player& tank = game.players[0];
+    game.freezeTimer = 10;
+    Actions actions[MAX_PLAYERS] = {};
+    game.enemyShots.emplace_back(tank.x + 7, tank.y + 4, 0, -1, 0);
+    updateGame(game, actions, DT);
+    CHECK(tank.alive && tank.lives == 3 && tank.armorSpent && tank.invincibleTimer > 0);
+    game.enemyShots.emplace_back(tank.x + 7, tank.y + 4, 0, -1, 0);
+    updateGame(game, actions, DT);
+    CHECK(tank.alive && tank.lives == 3);
+    for (int step = 0; step < 48; step++) updateGame(game, actions, DT);
+    CHECK(!tank.alive && tank.lives == 2);
+    for (int step = 0; step < 120; step++) updateGame(game, actions, DT);
+    CHECK(tank.alive && !tank.armorSpent);
+
+    actions[0].rocket = actions[1].rocket = true;
+    updateGame(game, actions, DT);
+    CHECK(game.rockets.size() == 2 && game.rockets[0].heavy && !game.rockets[1].heavy);
+    if (game.rockets.size() != 2) return;
+    CHECK(game.rockets[0].speed > 260 && game.rockets[1].speed < 260);
+    float rocketX = game.rockets[0].x;
+    game.aliens.push_back(parkedAlien(rocketX - 57, 0));
+    game.aliens.back().hp = 24;
+    game.rockets[0].y = game.rockets[1].y = 0;
+    actions[0].rocket = actions[1].rocket = false;
+    updateGame(game, actions, DT);
+    CHECK(game.rockets.empty() && tank.rockets == 2);
+    CHECK(game.aliens.back().hp == 4);   // outside the ordinary blast radius
+    CHECK(std::any_of(game.explosions.begin(), game.explosions.end(), [rocketX](const Explosion& e) {
+        return e.x == rocketX + 3 && e.radius == 60;
+    }));
+}
+
+static void assassinPhasesThroughAttacksForFiveSeconds() {
+    Game game;
+    const ShipRole roles[] = {ROLE_ASSASSIN, ROLE_FIGHTER, ROLE_MAGE};
+    startGame(game, 3, 7, 1, false, CLASSIC_EXPANDED, roles);
+    Player& assassin = game.players[0];
+    game.freezeTimer = 10;
+    game.enemyShots.emplace_back(assassin.x + 7, assassin.y + 4, 0, -1, 0);
+    game.thrown.push_back({assassin.x + 4, assassin.y + 2, 0, 0, THROWN_ICE_BLOCK, 0, 0});
+    Actions actions[MAX_PLAYERS] = {};
+    actions[0].rocket = true;
+    updateGame(game, actions, DT);
+    CHECK(assassin.alive && assassin.phaseTimer == 5 && assassin.rockets == 2 && assassin.frozenTimer == 0);
+    CHECK(game.enemyShots.size() == 1 && game.thrown.size() == 1);
+    actions[0].rocket = false;
+    for (int step = 0; step < 60; step++) updateGame(game, actions, DT);
+    actions[0].rocket = true;
+    updateGame(game, actions, DT);
+    CHECK(assassin.rockets == 2 && assassin.phaseTimer < 4);
+    actions[0].rocket = false;
+    for (int step = 0; step < 237; step++) updateGame(game, actions, DT);
+    CHECK(assassin.alive && assassin.phaseTimer > 0);
+    for (int step = 0; step < 3; step++) updateGame(game, actions, DT);
+    CHECK(!assassin.alive && assassin.phaseTimer == 0 && assassin.lives == 2);
+}
+
+static void mageOrbsPierceEachEnemyOnceAndHalveDamage() {
+    Game game;
+    const ShipRole roles[] = {ROLE_MAGE, ROLE_TANK, ROLE_FIGHTER};
+    startGame(game, 3, 7, 1, false, CLASSIC_EXPANDED, roles);
+    game.aliens.clear();
+    game.freezeTimer = 10;
+    const Player& mage = game.players[0];
+    for (int y : {30, 65, 100, 135}) {
+        game.aliens.push_back(parkedAlien(mage.x + 2, (float)y));
+        game.aliens.back().hp = 10;
+    }
+    Actions actions[MAX_PLAYERS] = {};
+    actions[0].rocket = true;
+    updateGame(game, actions, DT);
+    CHECK(mage.rockets == 2 && game.rockets.empty() && game.bullets.size() == 7);
+    if (game.bullets.size() != 7) return;
+    CHECK(game.bullets.front().vx < 0 && game.bullets.back().vx > 0);
+    Shot center = game.bullets[3];
+    game.bullets.assign(1, center);
+    actions[0].rocket = false;
+    for (int step = 0; step < 48; step++) updateGame(game, actions, DT);
+    const float expectedHp[] = {9.5f, 9, 8, 6};
+    for (int i = 0; i < 4; i++) CHECK(game.aliens[i].hp == expectedHp[i]);
 }
 
 static void expandedClassicScalesEveryWave() {
@@ -2172,6 +2303,11 @@ int main() {
     bubbleShieldTakesAHitAndChains();
     classicKeepsBuffsIntoTheNextLevel();
     classicVariantsCapThePartyAndReadPlayerFour();
+    rolesRequireThreeExpandedPlayers();
+    rolesApplyMovementFireCadenceAndDamage();
+    tankArmorAndHeavyRocket();
+    assassinPhasesThroughAttacksForFiveSeconds();
+    mageOrbsPierceEachEnemyOnceAndHalveDamage();
     expandedClassicScalesEveryWave();
     printf(failures ? "%d check(s) failed\n" : "all tests passed\n", failures);
     return failures ? 1 : 0;

@@ -1,12 +1,13 @@
 # Handoff: state of the work and how Claude and Codex share it
 
 **Read this first, update it before you stop.** Rules and commands are in `AGENTS.md`; conventions, questions between agents and the small-change lane are in `docs/COLLAB.md`; this file holds what changes between sessions.
-Updated: 2026-11-21 (NAME QUEST phase 4: everything but the PS3 check and the user's playtest).
+Updated: 2026-11-21 (Classic ship roles and NAME QUEST phase 4).
 
 ## Classic shooter
 
 - The Classic menu offers 1–2 Players, 1–4 Players and Level Picker. The larger arena uses a live controller lobby and a three-pad entry gate. Tuning, source files and test status are in [Co-op](features/co-op/design.md).
 - The Mac scripts checked the gate, three- and four-player starts, drop-in, unplug and resume. The cached PS3 Docker toolchain built the package. Physical controller, TV and frame-rate checks remain open.
+- Expanded parties of three or four now choose Fighter, Tank, Assassin or Mage. The third drop-in opens choices for everyone and a fourth drop-in keeps the existing picks. The Mac scripts checked both starts and both drop-in paths, including cancel and reconnect. The [Co-op tuning and controls](features/co-op/design.md) are ready for the PS3 playtest.
 - For a future 1–2 Players change, ask the user whether to carry it over to 1–4 Players, including when the code is shared. See `AGENTS.md`.
 
 ## Where NAME QUEST stands
@@ -48,7 +49,11 @@ Updated: 2026-11-21 (NAME QUEST phase 4: everything but the PS3 check and the us
 - Spec examples that disagree with the spec formula `round(100 * 1.2^(L-1))`: 39→40 is 102,067 (spec 102,064), 29→30 is 16,484 (spec 10,646). The code follows the formula; the user decides.
 
 ## Session log (newest first; add a line per session: date, agent, what changed, what is next)
+<<<<<<< HEAD
 - 2026-11-21, Claude: removed the square-wave hums under Namula and world 1 (the user's PS3 white noise); NAME QUEST music from the user's songs per place plus a boss song (D-057, `audioSetQuestSound`). PS3 listening checks open. Then: quitting the app now saves the NAME QUEST slot (spec §17); `scripts/ps3-lock.sh` leaves a game that was already running alone (new `make ps3-state`).
+=======
+- 2026-11-21, Codex — Added Classic ship roles for three- and four-player parties, with a per-controller chooser, role HUD, new sprites, and R2 specials. The new combat checks and NAME QUEST suite passed, and the shooter failures matched the baseline. Checked selection, drop-in and effects on the Mac and built the PS3 package. Next: PS3 couch playtest when requested.
+>>>>>>> codex/work
 - 2026-11-21, Claude: the user approved world 1's look. World 1's 20 areas built (`quest_world1.cpp`), world 1 in the reachability test plus gate, layout-rule and chest checks; all 40 map screens read; the Overseer now hovers with its centre at 50 dp (was unreachable); a locked arena's ladder down no longer kills; boss fights measured with scratch bots. Next: step 10 on the PS3 when the user asks.
 - 2026-11-21, Claude: phase 4 steps 0-4 and 7: world 1 art (generator `world1.py`, layers, 13 props, 6 landmarks, space pits), redrawn world 1 enemies (4 movement frames + tell + attack), the boss framework with the Overseer and the Star Mage (tested in new TEST GROUNDS arenas 4-5), panels and vents drawn, `make quest-maps`, world 1's entry lit from the start, Ilsa's world 1 Great Name line, world 2's placeholder room. 5 boss checks; `make ps3` builds. Next: the user's OK on the style frame, then step 5.
 - 2026-11-21, Codex — Resolved the merge conflict in this handoff and combined the Classic menu and NAME QUEST phase 3 changes on `codex/work`.

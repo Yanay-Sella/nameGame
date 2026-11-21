@@ -31,6 +31,21 @@ Classic offers 1–2 Players and 1–4 Players. Both play the same five worlds a
 
 HP rounds up. A drop-in affects HP from the next wave. Each variant's boss types, rewards and guaranteed boss drops follow the world rules. Initial 1–4 player zoom and balance choices are subject to couch playtesting.
 
+## Roles for three or four players
+
+In Classic 1–4 Players, a party of three or four chooses roles before entering play. Each player chooses on their own controller and presses X to ready. Roles may repeat. If a smaller party grows to three mid-run, play pauses for everyone to choose. Once roles are active, a late fourth player chooses their own role and the existing players keep theirs. Roles persist through death and between worlds. Play Again offers another selection with the previous roles preselected.
+
+| Role | Movement | R1 fire interval | Damage per R1 shot | R2 |
+|---|---:|---:|---:|---|
+| Fighter | 100% | 100% | 1 HP | Standard rocket |
+| Tank | 75% | 150% | 2 HP | Heavy rocket at 350 px/s with a 60 px blast radius |
+| Assassin | 130% | 70% | 0.75 HP | Phase through enemy attacks for 5 s |
+| Mage | 100% | 100% | 1.5 HP | Seven piercing orbs in an upward fan aimed toward the nearest enemy above the ship |
+
+- [ASSUMPTION] The table gives initial tuning. Each Mage orb starts at 4 HP of damage and halves its remaining damage after each enemy it hits. The orbs travel at 215 px/s with 0.14 radians between them and up to 0.4 radians of aim from vertical.
+- [ASSUMPTION] The Tank's first lethal hit per life breaks its armor and gives 0.75 s of grace. The next lethal hit costs a life and armor returns on respawn. A level-buff shield absorbs the hit first when present.
+- [ASSUMPTION] Role specials use the existing rocket ammo and cooldown. Square cycles between the role special and any earned active level buffs. Assassin cannot spend a second charge to extend an active phase.
+
 ## Edge cases
 - Joining works during play, including the pause between waves and a teammate's respawn. The next wave starts once any ship is alive.
 - A player who is out can't rejoin until the next run (no continues).
@@ -41,3 +56,4 @@ HP rounds up. A drop-in affects HP from the next wave. Each variant's boss types
 - 2026-11-17: designed and built as drop-in join (D-009).
 - 2026-11-17: numbers confirmed in single-player and co-op playtests.
 - 2026-11-21: Classic split into two variants with a live pad check and a larger party arena (D-055).
+- 2026-11-21: added role selection and four ship roles for expanded parties of three or four (D-057).

@@ -44,7 +44,7 @@ dodge + shoot (R1) → kill aliens → score and pickups → stronger gun / more
 | Screens | implemented | MVP | Main menu, Classic variant selection and controller lobby, spinning level picker, pause, settings and game over | [design](features/screens/design.md) |
 | High score save | implemented | MVP | Best score saved on the PS3, shown on the title | [design](features/high-score/design.md) |
 | Game feel | implemented | MVP | Shake, hit-stop, flashes, particles by event tier; shake and flash options | [design](features/game-feel/design.md) |
-| Co-op | implemented | MVP | Two Classic variants with drop-in play and a larger, denser 1–4 player arena | [design](features/co-op/design.md) |
+| Co-op | implemented | MVP | Two Classic variants with drop-in play and ship roles for parties of three or four | [design](features/co-op/design.md) |
 | Level 1 | implemented | MVP | First world: waves 1-20 of today's game, ends when the wave-20 boss dies; template for later themed levels | [design](features/level-1/design.md) |
 | Jungle | implemented | MVP | Level 2: insects, roaming heavy beetles, monkeys and gorillas with bananas, peels and stink mist | [design](features/jungle/design.md) |
 | Glacier | implemented | MVP | Level 3: ice monsters, a gliding ship, a sneezing yeti and an ice golem whose ice blocks freeze you | [design](features/glacier/design.md) |
@@ -64,7 +64,7 @@ The task-by-task plan for each milestone is in the [work plan](work-plan/nameGam
 ## Screens and flow
 ```
 MAIN MENU ─┬ CLASSIC ─┬ 1–2 PLAYERS ─────────────────→ five-world run
-           │          ├ 1–4 PLAYERS ─ CONTROLLERS ─→ five-world run
+           │          ├ 1–4 PLAYERS ─ CONTROLLERS ─ role selection for 3–4 ships ─→ five-world run
            │          └ LEVEL PICKER ─→ wheel of SPACE / JUNGLE / GLACIER / VOLCANO / DEEP SEA ─→ that level only ─ <LEVEL> CLEAR ─→ end screen (win)
            ├ NAME QUEST ─→ SLOTS ─ empty slot → CLASS SELECT → INTRO → PLAY in Namula; used slot → PLAY at the last checkpoint
            │               PLAY ⇄ (Start) PAUSED ─ RETURN TO MENU (saves the slot) ─→ MAIN MENU; SLOTS: Circle → MAIN MENU
@@ -149,7 +149,11 @@ Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN ME
 | D-051 | 2026-11-20 | Worlds 1–5 reuse the shooter's enemy and boss sprites where the theme matches (the RPG is set in the same worlds) | all-new sprites | user's choice | [NAME QUEST](features/name-quest/design.md) |
 | D-055 | 2026-11-21 | Classic has a 1–2 player variant and an expanded 1–4 player variant with a three-pad entry gate and its own high score | one scale and balance for every party | user requested more room and denser waves for larger parties | [Co-op](features/co-op/design.md), [Screens](features/screens/design.md) |
 | D-056 | 2026-11-21 | Put Level Picker under Classic and remove the shooter stress test | Level Picker on the main menu and a Triangle stress-test shortcut | the user grouped all shooter play under Classic and requested removal of the test | [Screens](features/screens/design.md), [Ship controls](features/ship-controls/implementation.md) |
+<<<<<<< HEAD
 | D-057 | 2026-11-21 | NAME QUEST plays the user's own songs: one per place (Namula, worlds 1-7) instead of its ambience, and one boss song during boss fights; a missing song falls back to the ambience, Settings' music OFF too. Claude makes every other sound | no music (D-049); a song per world with the ambience under it; one song for the whole mode | the user heard the ambience's square-wave hums as white noise on the PS3 and prefers to provide music | [NAME QUEST](features/name-quest/design.md) |
+=======
+| D-057 | 2026-11-21 | Parties of three or four choose Fighter, Tank, Assassin or Mage before playing | the same ship mechanics for every player | the user requested roles for the larger party only | [Co-op](features/co-op/design.md), [Screens](features/screens/design.md) |
+>>>>>>> codex/work
 
 ## Open questions
 - **Assumptions to confirm:** sprites as text grids in code (D-006); every number marked `[ASSUMPTION]` in the feature notes.

@@ -41,6 +41,10 @@ enum Sound {
 const int BUFF_SPACE = 1, BUFF_JUNGLE = 2, BUFF_GLACIER = 4, BUFF_VOLCANO = 8, BUFF_SEA = 16, BUFF_ALL = 31;
 const int STANDARD_PLAYERS = 2, MAX_PLAYERS = 4, MAX_BOSSES = 3;
 enum ClassicVariant { CLASSIC_STANDARD, CLASSIC_EXPANDED };
+enum ShipRole { ROLE_FIGHTER, ROLE_TANK, ROLE_ASSASSIN, ROLE_MAGE, ROLE_COUNT };
+extern const char* const ROLE_NAMES[ROLE_COUNT];
+extern const char* const ROLE_SPECIALS[ROLE_COUNT];
+extern const char PLAYER_COLORS[MAX_PLAYERS];
 
 // One ship and its owner's run state; players are an array so co-op only adds entries (GDD D-007).
 struct Player {
@@ -53,6 +57,9 @@ struct Player {
     float respawnTimer;      // s until the ship returns after a death
     float invincibleTimer;   // s of blinking invincibility left
     int lives, rockets, score;
+    ShipRole role;
+    bool armorSpent;
+    float phaseTimer;       // s Assassin can pass through enemy attacks
     int weaponLevel;         // 1..4: single, double, spread, fast spread
     int upgradeParts;        // upgrade pickups collected toward the next level; it takes weaponLevel of them
     float upgradeTimer;      // s left of the pickup's pop-up text and HUD pulse
@@ -80,7 +87,10 @@ struct Player {
 // owner: player index for bullets, -1 for enemy shots. Jungle bullets pierce: pierced hits so far, damage owed, enemies already hit.
 struct Shot {
     float x, y, vy; int owner; float vx; int pierced = 0; float owed = 0; std::vector<const void*> hitList;
-    Shot(float x, float y, float vy, int owner, float vx) : x(x), y(y), vy(vy), owner(owner), vx(vx) {}
+    float rolePower;
+    bool magicBall;
+    Shot(float x, float y, float vy, int owner, float vx, float rolePower = 0, bool magicBall = false)
+        : x(x), y(y), vy(vy), owner(owner), vx(vx), rolePower(rolePower), magicBall(magicBall) {}
 };
 
 enum AlienType { ALIEN_GREEN, ALIEN_BLUE, ALIEN_RED, ALIEN_HEAVY };   // roles; each level draws them its own way
@@ -106,7 +116,8 @@ struct Alien {
     float vx;             // sideways speed while diving
     float vy;             // roaming heavy: vertical speed
     float entryDelay;     // s before it starts flying in from where it was placed
-    int hp, maxHp;
+    float hp;
+    int maxHp;
     float flash;          // s of white hit flash left
     bool alive;
 };
@@ -121,7 +132,8 @@ struct Boss {
     float minX, maxX;        // sway range within this boss's lane
     float attackTimer;       // s until the next attack
     float burstTimer;        // s until the next shot of a burst
-    int hp, maxHp;
+    float hp;
+    int maxHp;
     int burstShotsLeft;
     int nextAttack;          // small bosses: the next attack of their fixed cycle
     float flash;             // s of white hit flash left
@@ -140,7 +152,7 @@ struct Boss {
     bool alive;
 };
 
-struct Rocket { float x, y, speed; int owner; };
+struct Rocket { float x, y, speed; int owner; bool heavy = false; };
 struct Explosion { float x, y, age, radius; };
 enum PickupType { PICKUP_ROCKET, PICKUP_UPGRADE, PICKUP_BUFF };
 struct Pickup { float x, y; PickupType type; int level; };   // level: the buff's level, for PICKUP_BUFF
@@ -214,10 +226,11 @@ const int MAX_SCORE = 9999999;             // the score display and the saved hi
 const int LEVEL_COUNT = 5;                 // level 1, jungle, glacier, volcano, deep sea; a classic run goes through them in order
 
 void startGame(Game& game, int playerCount, uint32_t seed, int level = 1, bool singleLevel = false,
-               ClassicVariant variant = CLASSIC_STANDARD);
-bool joinGame(Game& game);   // adds the next player to a running game, arriving like a respawn
+               ClassicVariant variant = CLASSIC_STANDARD, const ShipRole* roles = nullptr);
+bool joinGame(Game& game, const ShipRole* roles = nullptr);
 void updateGame(Game& game, const Actions* actions, float dt);   // actions: one per player
 void drawGame(const Game& game);
+void drawShip(ShipRole role, int playerIndex, int level, int frame, int x, int y, bool phased = false);
 void updateBackground(Game& game, float dt);   // scrolls the starfield
 void drawBackground(const Game& game);         // navy fill and stars
 

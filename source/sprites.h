@@ -148,6 +148,67 @@ const Sprite SHIP2_B = {16, 14,
     "....yo....oy...."
     "................"};
 
+const Sprite TANK_SHIP = {16, 14,
+    ".......NN......."
+    "......NwwN......"
+    "..ss..NwwN..ss.."
+    ".sYYsYYYYYYsYYs."
+    ".sYYsYYssYYsYYs."
+    ".sYYYYYssYYYYYs."
+    "sYYYssYYYYssYYYs"
+    "sYYssYYYYYYssYYs"
+    "sYYYYYYYYYYYYYYs"
+    "sYYNYYYYYYYYNYYs"
+    ".sYYYYssssYYYYs."
+    "..ssss....ssss.."
+    "...Oo......oO..."
+    "....o......o...."};
+const Sprite ASSASSIN_SHIP = {16, 14,
+    ".......ii......."
+    ".......ii......."
+    "......YwwY......"
+    "......YiiY......"
+    "......YYYY......"
+    ".....qYYYYq....."
+    ".q...YYiiYY...q."
+    ".qq.YYYYYYYY.qq."
+    "..qYYYYYYYYYYq.."
+    "...qYYqYYqYYq..."
+    "....qqqYYqqq...."
+    "......qccq......"
+    ".......ic......."
+    ".......c........"};
+const Sprite PHASED_SHIP = {16, 14,
+    ".......~~......."
+    ".......~c......."
+    "......~~~~......"
+    "......~~~~......"
+    "......~~~~......"
+    ".....~~~~~~....."
+    ".c...~~~~~~...c."
+    ".~~.~~~~~~~~.~~."
+    "..~~~~~~~~~~~~.."
+    "...~~~~~~~~~~..."
+    "....~~~~~~~~...."
+    "......~~~~......"
+    ".......~~......."
+    ".......~........"};
+const Sprite MAGE_SHIP = {16, 14,
+    ".......pp......."
+    "......pwwp......"
+    ".....UicciU....."
+    ".....UYYYYU....."
+    "..i..YYYYYY..i.."
+    ".ipi.UYppYU.ipi."
+    ".pUp.YYYYYY.pUp."
+    "..UYYYYppYYYYU.."
+    "..UYYYpwwpYYYU.."
+    "...UYYYppYYYU..."
+    "....UYYYYYYU...."
+    ".....UYYYYU....."
+    "......pccp......"
+    ".......ii......."};
+
 const Sprite GREEN_ALIEN_A = {12, 10,
     "..g......g.."
     "...g....g..."
@@ -234,6 +295,23 @@ const Sprite ROCKET = {4, 8,
     "rbbr"
     "r..r"
     ".oo."};
+const Sprite HEAVY_ROCKET = {6, 10,
+    "..ww.."
+    ".wNNw."
+    ".NYNN."
+    ".YssY."
+    ".YssY."
+    "sYYYYs"
+    "sYooYs"
+    ".ONNO."
+    "..oo.."
+    "..O..."};
+const Sprite MAGE_ORB = {5, 5,
+    ".pcp."
+    "piwip"
+    "cwwwc"
+    "piwip"
+    ".pcp."};
 const Sprite ROCKET_PICKUP = {8, 8,
     ".pppppp."
     "pp.ww.pp"
