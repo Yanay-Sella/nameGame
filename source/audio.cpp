@@ -3,7 +3,6 @@
 #include <SDL.h>
 #include <SDL_mixer.h>
 #include <debugnet.h>
-#include <initializer_list>
 #include <math.h>
 #include <string>
 #include <vector>
@@ -11,17 +10,22 @@
 const int MUSIC_VOLUME = 96;        // of MIX_MAX_VOLUME (128)
 const int MIXER_CHANNELS = 8;
 const int SHOOT_CHANNEL = 0;        // reserved, so rapid fire never cuts off other sounds
+const int AMBIENT_CHANNEL = 1;      // reserved for NAME QUEST's ambience loops (spec §16)
+const int AMBIENT_COUNT = 9;        // 0 off, 1 Namula, 2-8 worlds 1-7
+const float AMBIENT_SECONDS = 4;
 
-// One part of an effect: a square wave or noise sweeping from startHz to endHz, fading out linearly.
-struct Tone { float start, seconds, startHz, endHz, volume; bool noise; };
+// One part of an effect: a square wave or noise sweeping from startHz to endHz; fade 1 fades out linearly, 0 stays flat.
+struct Tone { float start, seconds, startHz, endHz, volume; bool noise; float fade = 1; };
 
 static bool audioReady = false;
 const char* const SONG_FILES[MUSIC_CHOICES] = {NULL, "music.ogg", "dubstep.ogg"};   // indexed by Music
 static Mix_Music* songs[MUSIC_CHOICES] = {};   // songs[MUSIC_OFF] stays NULL
 static Mix_Chunk* sounds[SOUND_COUNT];
+static Mix_Chunk* ambients[AMBIENT_COUNT];   // ambients[0] stays NULL
+static int ambientPlaying = 0;
 
 // Mixes the tones into one chunk in the mixer's own sample format (16-bit or float, as the PS3 device reports).
-static Mix_Chunk* synthesize(std::initializer_list<Tone> tones) {
+static Mix_Chunk* synthesize(const std::vector<Tone>& tones) {
     int freq, channels;
     Uint16 format;
     Mix_QuerySpec(&freq, &format, &channels);
@@ -48,7 +52,7 @@ static Mix_Chunk* synthesize(std::initializer_list<Tone> tones) {
             } else {
                 sample = phase < 0.5f ? 1 : -1;
             }
-            mix[first + i] += sample * t.volume * (1 - progress);
+            mix[first + i] += sample * t.volume * (1 - progress * t.fade);
         }
     }
     int sampleBytes = format == AUDIO_F32SYS ? 4 : 2;
@@ -78,7 +82,7 @@ void audioOpen(const char* folder) {
     }
     audioReady = true;
     Mix_AllocateChannels(MIXER_CHANNELS);
-    Mix_ReserveChannels(1);   // channel 0 is SHOOT_CHANNEL
+    Mix_ReserveChannels(2);   // channel 0 is SHOOT_CHANNEL, 1 AMBIENT_CHANNEL
     Mix_VolumeMusic(MUSIC_VOLUME);
 
     // The song is read into memory once (~190 ms at boot): restarting it after a game over took ~350 ms when it
@@ -164,6 +168,36 @@ void audioOpen(const char* folder) {
     sounds[SOUND_Q_ROAR] = synthesize({{0, 0.6f, 300, 120, 0.5f, true}, {0, 0.6f, 110, 70, 0.3f, false}});
     sounds[SOUND_Q_GATE] = synthesize({{0, 0.5f, 200, 100, 0.4f, true}});
     sounds[SOUND_Q_CHEST] = synthesize({{0, 0.06f, 660, 660, 0.25f, false}, {0.06f, 0.06f, 990, 990, 0.25f, false}});
+    // NAME QUEST ambience (spec §16): 4 s loops, each under volume 0.12 in total. Flat tones span the whole loop with a
+    // whole number of cycles; short sounds sit inside it, so the loop is seamless.
+    std::vector<Tone> loop;
+    uint32_t seed = 777;
+    auto random01 = [&seed]() { seed = seed * 1664525u + 1013904223u; return (seed >> 8) / 16777216.0f; };
+    auto scatter = [&](int count, float seconds, float fromHz, float toHz, float volume, bool noise) {
+        for (int i = 0; i < count; i++) loop.push_back({random01() * (AMBIENT_SECONDS - seconds), seconds, fromHz, toHz, volume, noise});
+    };
+    const float S = AMBIENT_SECONDS, H = AMBIENT_SECONDS / 2;
+    loop = {{0, S, 70, 70, 0.02f, false, 0}};                       // Namula: the hearth's low hum and its crackle
+    scatter(36, 0.03f, 2500, 600, 0.06f, true);
+    ambients[1] = synthesize(loop);
+    loop = {{0, S, 55, 55, 0.03f, false, 0}};                       // world 1: a station's drone and clicks
+    for (int i = 0; i < 8; i++) loop.push_back({i * 0.5f + 0.13f, 0.01f, 4000, 3500, 0.04f, true});
+    ambients[2] = synthesize(loop);
+    loop = {};                                                     // world 2: chirps
+    scatter(10, 0.06f, 3000, 3600, 0.05f, false);
+    ambients[3] = synthesize(loop);
+    loop = {{0, H, 400, 900, 0.06f, true, 0}, {H, H, 900, 400, 0.06f, true, 0}};   // world 3: wind swells
+    ambients[4] = synthesize(loop);
+    loop = {{0, H, 80, 200, 0.08f, true, 0}, {H, H, 200, 80, 0.08f, true, 0}};     // world 4: rumble
+    ambients[5] = synthesize(loop);
+    loop = {{0, S, 300, 300, 0.04f, true, 0}};                      // world 5: water and bubbles
+    scatter(8, 0.08f, 300, 900, 0.05f, false);
+    ambients[6] = synthesize(loop);
+    loop = {{0, H, 500, 900, 0.05f, true, 0}, {H, H, 900, 500, 0.05f, true, 0}, {0, 1.5f, 660, 660, 0.05f, false}};   // world 6: wind, a bell
+    ambients[7] = synthesize(loop);
+    loop = {{0, S, 2000, 2000, 0.015f, true, 0}};                   // world 7: near silence and a pen's scratch
+    scatter(4, 0.15f, 5000, 3000, 0.03f, true);
+    ambients[8] = synthesize(loop);
     debugNetPrintf(INFO, "audio: %d Hz, format 0x%x, %d channels, mizrahit %s, dubstep %s\n", freq, format, channels,
                    songs[MUSIC_MIZRAHIT] ? "loaded" : "missing", songs[MUSIC_DUBSTEP] ? "loaded" : "missing");
 }
@@ -180,6 +214,13 @@ void audioStopMusic() {
 
 void audioPlay(Sound sound) {
     if (audioReady && sounds[sound]) Mix_PlayChannel(sound == SOUND_SHOOT ? SHOOT_CHANNEL : -1, sounds[sound], 0);
+}
+
+void audioSetAmbient(int id) {
+    if (!audioReady || id == ambientPlaying || id < 0 || id >= AMBIENT_COUNT) return;
+    ambientPlaying = id;
+    if (ambients[id]) Mix_PlayChannel(AMBIENT_CHANNEL, ambients[id], -1);
+    else Mix_HaltChannel(AMBIENT_CHANNEL);
 }
 
 void audioClose() {

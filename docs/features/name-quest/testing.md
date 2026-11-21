@@ -26,6 +26,17 @@
 - [x] On the Mac: each class's tier-3 skill shows at 640x360 (Lion's Roar arc, Storm Volley fan, Meteor marker and fall, Shadow Partner), numbers float, the MP bar drops; a level-1 Knight dies to the TEST GROUNDS enemies (`dropped 500 names`) and gets them back after warping in (`names recovered 500`). *(`make mac-run` and a scripted run of the real update, 2026-11-20)*
 - [ ] On the PS3: an Archer fights the TEST GROUNDS enemies at 60 fps, worst work under 10 ms. *(PS3 log: `quest: area 8.3`, `fps ... quest 8.3`)*
 - [ ] On the PS3: death drops names and touching the echo returns them. *(PS3 log: `quest: hero died in ...`, `quest: names recovered n`)*
+- [x] Levels spend their cost and raise the stats, the menu stays open, level 40 is the last. *(`tests/quest_tests.cpp` › levelUpSpendsAndRaisesStats, cannotLevelPastForty)*
+- [x] Prices scale with the highest world; carry limits stop buying (shards and the locket raise them); gear tiers wait for their world. *(`tests/quest_tests.cpp` › shopPricesScaleWithHighestWorld, carryLimitsStopBuying, gearTierNeedsTheWorld)*
+- [x] Touching a brazier lights it; REST heals and respawns enemies; TRAVEL lists NAMULA and the lit checkpoints and goes there. *(`tests/quest_tests.cpp` › restHealsAndRespawnsEnemies, travelListsLitCheckpoints)*
+- [x] A chest opens once and is saved; a full bag keeps it shut; the gate wall opens; a lever opens its doors for good. *(`tests/quest_tests.cpp` › chestOpensOnceAndSaves, fullBagKeepsChestShut, gateWallOpens, leverOpensDoorsForGood)*
+- [x] Jobs need the level and world 1's gate, then the level and the FROZEN FEATHER (taken). *(`tests/quest_tests.cpp` › jobNeedsLevelAndGate, secondJobNeedsTheFeather)*
+- [x] Buffs end on death; a potion heals after its 0.5 s drink. *(`tests/quest_tests.cpp` › buffsEndOnDeath, drinkHealsAfterHalfASecond)*
+- [x] NPC presence follows the quest stages; every line fits the dialogue box (4 lines of 72). *(`tests/quest_tests.cpp` › npcPresenceFollowsQuestStages, dialogueFitsTheBox)*
+- [x] On the Mac: Namula's NPCs stand at the stalls, the hearth and the stage facing the hero, Ilsa's lantern glows; four talks with Ilsa and two levels (`quest: level 3 (spent 120, names left 1780)`); two MANA POTION from Marra; the TEST GROUNDS brazier lights and rests (`checkpoint 8.0 lit`, `rest at 8.0`); the surveyor's line and the TEST GROUNDS map (current area blinking, the gate's red bar). *(`make mac-run` 2026-11-21)*
+- [ ] On the PS3: slot 1 → Select-hold into TEST GROUNDS → rest at its checkpoint → the map at the surveyor → travel to Namula → Ilsa. *(PS3 log: `quest: checkpoint 8.0 lit`, `quest: rest at 8.0`, `quest: travel to 0.0`; fps ≈ 60)*
+- [ ] On the PS3: the hearth's crackle plays in Namula and nothing in TEST GROUNDS. *(the user listens)*
+- [ ] On the PS3: level up, buy, open a chest, read the map. *(PS3 log: `quest: level`, `quest: bought`, `quest: chest`)*
 
 ## Playtest checks
 1. `NAMEGAME_QUEST='slot=3 class=3 world=0 area=0' make mac-run BUTTONS='2|right:1.5|cross|1|l1|1|quit'`: the Thief in Namula, HUD at the top left.
@@ -33,9 +44,12 @@
 3. `NAMEGAME_QUEST='slot=3 class=0 world=8 area=1' make mac-run BUTTONS='1|right:0.95|up:1|l1|1|quit'`: the Knight on the shaft's first ladder.
 4. `NAMEGAME_QUEST='slot=3 class=0 world=8 area=3 level=30 job=3' make mac-run BUTTONS='1|right:2.5|r2|0.15|l1|1|quit'`: the Lion's Roar arc in front of the Knight (class=1..3 for the other tier-3 skills).
 5. `NAMEGAME_QUEST='slot=3 class=1 world=0 area=2 names=500' make mac-run BUTTONS='1|left:1.5|4|select|1|select|0.5|l1|1|quit'`: dies in the sea (`dropped 500 names`), warps back to the shore and picks the echo up (`names recovered 500`, `+500 NAMES` on screen).
-6. On the PS3, walk Namula's three areas with every class: steps, ladders and the cliffs feel calm; the jump feels right.
+6. `NAMEGAME_QUEST='slot=3 class=1 world=0 area=0 names=2000' make mac-run BUTTONS='right:0.3|cross+right:0.5|right:0.4|cross+right:0.5|right:3.5|cross+right:0.5|right:0.5|0.3|up|0.3|cross|cross|0.3|down|down|cross|0.2|cross|0.3|l1|1|quit'`: Marra's shop after buying two MANA POTION.
+7. `NAMEGAME_QUEST='slot=3 class=0 world=8 area=1' make mac-run BUTTONS='l2+l3|right:1.5|0.3|up|0.3|cross|0.2|cross|0.3|l1|1|quit'`: the TEST GROUNDS map.
+8. On the PS3, walk Namula's three areas with every class: steps, ladders and the cliffs feel calm; the jump feels right.
 
 ## History
 - 2026-11-20: criteria written; Mac checks done.
 - 2026-11-20: phase 2 combat criteria; tests and Mac checks done.
+- 2026-11-21: phase 3 criteria; 17 checks and Mac checks done.
 - 2026-11-21: phase 2 review: two checks added; Mac screenshots of the four tier-3 skills and the death and echo loop; `make ps3` builds.

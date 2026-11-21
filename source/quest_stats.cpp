@@ -26,6 +26,12 @@ const int ARMOR_HP[6] = {10, 30, 60, 100, 150, 210};
 const int REF_LEVEL[8] = {0, 4, 11, 17, 23, 29, 35, 40};
 const int REF_GEAR[8] = {0, 0, 1, 2, 3, 4, 5, 6};
 const int WORLD_NAMES[8] = {0, 4, 12, 35, 100, 300, 900, 1500};
+// Shops (spec §10): item base prices, the price scale by highest world, gear prices by tier 1..6, item carry limits.
+const int ITEM_PRICE[ITEM_COUNT] = {15, 45, 20, 60, 60, 40};
+const int PRICE_SCALE[8] = {1, 1, 3, 9, 26, 75, 220, 360};   // index 0 unused (highest starts at 1)
+const int WEAPON_PRICE[6] = {150, 1400, 4500, 14000, 42000, 130000};
+const int ARMOR_PRICE[6] = {120, 1100, 3600, 11000, 34000, 105000};
+const int CARRY_START[ITEM_COUNT] = {5, 2, 3, 3, 3, 3};
 
 float jobMultiplier(int job) {
     return 1 + 0.1f * (job < 0 ? 0 : job > 3 ? 3 : job);
@@ -102,4 +108,23 @@ int damageToHero(int enemyAtk, int heroDef) {
 int damageToEnemy(float heroAtk, float mult, float roll, bool crit, float critMult, float enemyMod) {
     int d = (int)lroundf(heroAtk * mult * roll * (crit ? critMult : 1) * enemyMod);
     return d < 1 ? 1 : d;
+}
+
+int itemPrice(const SaveData& save, int item) {
+    int highest = save.highest < 1 ? 1 : save.highest > 7 ? 7 : save.highest;
+    return ITEM_PRICE[item] * PRICE_SCALE[highest];
+}
+
+int carryLimit(const SaveData& save, int item) {
+    bool locket = save.keys >> KEY_LOCKET & 1;
+    int limit = CARRY_START[item];
+    if (item == ITEM_RED) limit += save.shards + locket;
+    if (item == ITEM_BIG) limit += (int)(save.keys >> KEY_GARRICK_GIFT & 1) + locket;
+    if (item == ITEM_MANA) limit += locket;
+    return limit;
+}
+
+int gearPrice(int tier, bool weapon) {
+    tier = tier < 1 ? 1 : tier > 6 ? 6 : tier;
+    return weapon ? WEAPON_PRICE[tier - 1] : ARMOR_PRICE[tier - 1];
 }

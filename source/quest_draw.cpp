@@ -20,8 +20,16 @@ const float LIQUID_FRAME = 0.2f, FALL_SPEED = 40 * DP;
 const float ENEMY_FRAME = 0.25f, TELL_FLASH = 0.1f, IFRAME_BLINK = 0.1f, ATTACK_FRAME = 0.07f, ROLL_FRAME = 0.1f;
 const float NUMBER_RISE = 12 * DP, ECHO_BOB = 2 * DP, PARTNER_BEHIND = 10 * DP;
 const char TRIM_BY_JOB[4] = {'h', 'b', 'Y', 'N'};
-const uint32_t HEARTH_LIGHT = 0xFFA05018, BRAZIER_LIGHT = 0xFF804010;
-const int HEARTH_LIGHT_RADIUS = 48 * DP, BRAZIER_LIGHT_RADIUS = 28 * DP;
+const uint32_t HEARTH_LIGHT = 0xFFA05018, BRAZIER_LIGHT = 0xFF804010, LANTERN_LIGHT = 0xFF704018;
+const int HEARTH_LIGHT_RADIUS = 48 * DP, BRAZIER_LIGHT_RADIUS = 28 * DP, LANTERN_LIGHT_RADIUS = 24 * DP;
+const float NPC_FRAME = 0.7f, POPUP_SHOWN = 1.5f, POPUP_RISE = 6 * DP, REST_FADE = 0.3f, FADE_DEPTH = 60 * DP, GATE_SHAKE = 0.5f;
+const int MAP_CELL_W = 12 * DP, MAP_CELL_H = 8 * DP;
+// NPC idle frames by NpcId (Garrick, the Stranger, Calder and Claude are drawn in their phases); surveyors share one.
+#define NPC_ROW(N) {&NPC_##N##_A, &NPC_##N##_B}
+static const Sprite* const NPC_FRAMES[NPC_SURVEYOR_FIRST + 1][2] = {
+    NPC_ROW(ILSA), NPC_ROW(MARRA), NPC_ROW(BRANN), NPC_ROW(LIO), NPC_ROW(PELL), NPC_ROW(SELA), NPC_ROW(ODO), NPC_ROW(WREN),
+    NPC_ROW(YSOLDE), NPC_ROW(KIT), NPC_ROW(GATEKEEPER), NPC_ROW(TOBIN), {}, {}, {}, {}, NPC_ROW(SURVEYOR)};
+static const Sprite* const ITEM_ICONS[ITEM_COUNT] = {&ICON_RED, &ICON_BIG, &ICON_MANA, &ICON_WHETSTONE, &ICON_TONIC, &ICON_FEATHER};
 enum HeroFrame { FRAME_IDLE_1, FRAME_IDLE_2, FRAME_WALK_1, FRAME_WALK_2, FRAME_WALK_3, FRAME_WALK_4, FRAME_JUMP, FRAME_FALL,
                  FRAME_ATTACK_1, FRAME_ATTACK_2, FRAME_ATTACK_3, FRAME_CLIMB_1, FRAME_CLIMB_2, FRAME_ROLL_1, FRAME_ROLL_2,
                  FRAME_HURT, HERO_FRAME_COUNT };
@@ -232,18 +240,8 @@ static void drawTile(const Quest& q, const WorldArt& art, int tx, int ty, int sx
     }
 }
 
-// Checkpoint id n: the n-th C of the world, areas in order, rows top to bottom.
-static int checkpointId(int world, int index, int tile) {
-    int id = 0;
-    for (int i = 0; i <= index; i++) {
-        const AreaDef& def = worldDef(world).areas[i];
-        int end = i == index ? tile : def.cols * def.rows;
-        for (int t = 0; t < end; t++) id += def.tiles[t] == 'C';
-    }
-    return id;
-}
-
-// Checkpoints, portals and chests standing on the tile below their letter; the hearth and lit braziers add a light.
+// Checkpoints, portals, chests, levers, NPCs and surveyors standing on the tile below their letter; the hearth, lit
+// braziers and Ilsa's lantern add a light. NPCs face the hero.
 static void drawObject(const Quest& q, char letter, int tx, int ty, int camX, int camY, std::vector<Light>& lights) {
     const AreaDef& def = *q.area.def;
     int cx = tx * TILE + TILE / 2 - camX, bottom = (ty + 1) * TILE - camY;
@@ -254,7 +252,7 @@ static void drawObject(const Quest& q, char letter, int tx, int ty, int camX, in
         sprite = hearth[flame];
         lights.push_back({cx, bottom - (int)(24 * DP), HEARTH_LIGHT_RADIUS, HEARTH_LIGHT});
     } else if (letter == 'C') {
-        int bit = q.area.world * 2 + checkpointId(q.area.world, q.area.index, ty * def.cols + tx);
+        int bit = q.area.world * 2 + objectIndex(q.area.world, q.area.index, ty * def.cols + tx, 'C');
         const Sprite* lit[3] = {&CHECKPOINT_LIT_A, &CHECKPOINT_LIT_B, &CHECKPOINT_LIT_C};
         bool isLit = bit < 32 && (q.save.lit >> bit & 1);
         sprite = isLit ? lit[flame] : &CHECKPOINT_UNLIT;
@@ -265,7 +263,28 @@ static void drawObject(const Quest& q, char letter, int tx, int ty, int camX, in
         bool open = index < 4 && def.portals[index].area >= 0;
         sprite = !open ? &ARCH_CLOSED : (int)(q.time / SHIMMER_FRAME) % 2 ? &PORTAL_B : &PORTAL_A;
     } else if (letter == 'T') {
-        sprite = &CHEST_CLOSED;
+        int index = 0;
+        for (int t = 0; t < ty * def.cols + tx; t++) index += def.tiles[t] == 'T';
+        int id = index < 4 ? def.chests[index] : -1;
+        bool opened = id >= 0 && (q.save.chests[q.area.world] >> id & 1);
+        sprite = q.chestTimer > 0 && q.chestTile == ty * def.cols + tx ? &CHEST_AJAR : opened ? &CHEST_OPEN : &CHEST_CLOSED;
+    } else if (letter == 'K') {
+        bool pulled = def.shortcut >= 0 && (q.save.shortcuts[q.area.world] >> def.shortcut & 1);
+        sprite = pulled ? &LEVER_ON : &LEVER_OFF;
+    } else if (letter == 'N' || letter == 'M') {
+        int id = NPC_SURVEYOR_FIRST;
+        if (letter == 'N') {
+            int index = 0;
+            for (int t = 0; t < ty * def.cols + tx; t++) index += def.tiles[t] == 'N';
+            id = index < 8 ? def.npcs[index] : -1;
+            if (id < 0 || id > NPC_SURVEYOR_FIRST || !npcPresent(q.save, id, q.area.world, q.area.index)) return;
+        }
+        const Sprite* frame = NPC_FRAMES[id][(int)(q.time / NPC_FRAME + tx * 0.3f) % 2];
+        if (!frame) return;
+        bool flip = q.hero.x + HERO_W / 2 < tx * TILE + TILE / 2;
+        drawSpriteEx(*frame, cx - frame->w / 2, bottom - frame->h, flip);
+        if (id == NPC_ILSA) lights.push_back({cx + (flip ? -1 : 1) * (int)(11 * DP), bottom - (int)(14 * DP), LANTERN_LIGHT_RADIUS, LANTERN_LIGHT});
+        return;
     }
     if (sprite) drawSpriteOutlined(*sprite, cx - sprite->w / 2, bottom - sprite->h, false, paletteColor('x'));
 }
@@ -432,6 +451,18 @@ static void drawPlay(const Quest& q) {
             if (art) drawTile(q, *art, tx, ty, tx * TILE - camX, ty * TILE - camY);
             else drawTileFlat(q, tileAt(q.area, tx, ty), tx, ty, tx * TILE - camX, ty * TILE - camY);
         }
+    if (q.gateTimer > 0) {   // the opened gate's tiles shake, then vanish top to bottom (spec §11)
+        int top = def.rows, bottomRow = 0;
+        for (int t = 0; t < def.cols * def.rows; t++)
+            if (def.tiles[t] == 'g') top = std::min(top, t / def.cols), bottomRow = std::max(bottomRow, t / def.cols);
+        float vanished = q.gateTimer < GATE_SHAKE ? (GATE_SHAKE - q.gateTimer) / GATE_SHAKE : 0;
+        int shake = q.gateTimer >= GATE_SHAKE ? ((int)(q.time * 40) % 2 ? DP : -DP) : 0;
+        for (int t = 0; t < def.cols * def.rows; t++) {
+            int tx = t % def.cols, ty = t / def.cols;
+            if (def.tiles[t] != 'g' || ty < top + vanished * (bottomRow - top + 1)) continue;
+            drawTileFlat(q, 'g', tx, ty, tx * TILE - camX + shake, ty * TILE - camY);
+        }
+    }
     if (art) {
         static std::vector<PlacedProp> props;   // the current area's props, placed once per area
         static const AreaDef* propsArea = nullptr;
@@ -467,7 +498,7 @@ static void drawPlay(const Quest& q) {
     for (int ty = row0; ty <= row0 + QUEST_H / TILE + 4 && ty < def.rows; ty++)
         for (int tx = std::max(col0 - 2, 0); tx <= col0 + QUEST_W / TILE + 2 && tx < def.cols; tx++) {
             char letter = def.tiles[ty * def.cols + tx];
-            if (letter == 'C' || letter == 'P' || letter == 'T') drawObject(q, letter, tx, ty, camX, camY, lights);
+            if (strchr("CPTKNM", letter)) drawObject(q, letter, tx, ty, camX, camY, lights);
         }
 
     drawCombat(q, camX, camY);
@@ -487,6 +518,10 @@ static void drawPlay(const Quest& q) {
     double t3 = questClock ? questClock() : 0;
     if (art) applyLights(lights, (int)(q.hero.x + HERO_W / 2) - camX, (int)(q.hero.y + HERO_H / 2) - camY);
     drawNumbers(q, camX, camY);
+    if (q.popupTimer > 0 && q.popupTimer <= POPUP_SHOWN) {   // the chest's contents, once the lid is up
+        int y = (int)(q.popupY - POPUP_RISE * (1 - q.popupTimer / POPUP_SHOWN)) - camY;
+        drawText((int)q.popupX - camX - textWidth(q.popup.c_str(), DP) / 2, y, q.popup.c_str(), paletteColor('w'), DP);
+    }
     shakePicture(q);
     if (q.area.world != WORLD_SECRET) applyVignette();
     if (questClock) {
@@ -513,8 +548,30 @@ static void drawPlay(const Quest& q) {
     fillRect(namesX - 6 * DP + DP, 4 * DP, 3 * DP, 5 * DP, paletteColor('y'));   // the 5 x 5 wisp icon
     fillRect(namesX - 6 * DP, 6 * DP, 5 * DP, 3 * DP, paletteColor('y'));
     fillRect(namesX - 6 * DP + 2 * DP, 6 * DP, DP, 2 * DP, paletteColor('w'));
-    if (q.bannerTimer > 0 && q.banner)
-        drawCentred((q.bannerScale == 2 ? 40 : 30) * DP, q.banner, paletteColor(q.bannerScale == 2 ? 'w' : 'b'), q.bannerScale);
+    // The selected item and its count, then the running buffs' seconds (spec §15).
+    const Sprite& icon = *ITEM_ICONS[q.selectedItem % ITEM_COUNT];
+    drawSpriteOutlined(icon, 4 * DP, 168 * DP, false, paletteColor('x'));
+    snprintf(text, sizeof text, "X%d", q.save.items[q.selectedItem % ITEM_COUNT]);
+    drawText(14 * DP, 170 * DP, text, paletteColor('w'), DP);
+    int buffX = 30 * DP;
+    const char* const buffNames[3] = {"ATK", "DEF", "SPD"};
+    for (int k = 0; k < 3; k++) {
+        if (h.buffTimers[k] <= 0) continue;
+        snprintf(text, sizeof text, "%s %d", buffNames[k], (int)ceilf(h.buffTimers[k]));
+        drawText(buffX, 170 * DP, text, paletteColor('o'), DP);
+        buffX += textWidth(text, DP) + 6 * DP;
+    }
+    if (q.bannerTimer > 0 && q.banner) {
+        char color = q.bannerColor ? q.bannerColor : q.bannerScale == 2 ? 'w' : 'b';
+        drawCentred((q.bannerScale == 2 ? 40 : 30) * DP, q.banner, paletteColor(color), q.bannerScale);
+    }
+    if (q.fadeTimer > 0) {   // the rest's white frame, growing in from the edges
+        int depth = (int)(FADE_DEPTH * (1 - q.fadeTimer / REST_FADE));
+        fillRect(0, 0, QUEST_W, depth, paletteColor('w'));
+        fillRect(0, QUEST_H - depth, QUEST_W, depth, paletteColor('w'));
+        fillRect(0, 0, depth, QUEST_H, paletteColor('w'));
+        fillRect(QUEST_W - depth, 0, depth, QUEST_H, paletteColor('w'));
+    }
     if (q.mode == QMODE_DEAD) drawCentred(80 * DP, "YOU FADED", paletteColor('r'), 2);
 }
 
@@ -598,6 +655,164 @@ static void drawIntro(const Quest& q) {
     if (shown >= length) drawCentred(160 * DP, "X", paletteColor((int)(q.time * 2) % 2 ? 's' : 'n'));
 }
 
+// The dialogue box (spec §14, §15): name, up to 4 typed lines, a blinking > when the page is complete.
+static void drawDialogue(const Quest& q) {
+    const DialogueState& d = q.dialogue;
+    drawPanel(10 * DP, 124 * DP, 300 * DP, 52 * DP, 'n');
+    drawText(16 * DP, 128 * DP, d.speaker.c_str(), paletteColor('y'), DP);
+    const std::string& page = d.pages[d.page];
+    int shown = (int)d.typed, line = 0;
+    size_t from = 0;
+    while (from <= page.size() && line < 4 && (int)from < shown) {
+        size_t end = page.find('\n', from);
+        if (end == std::string::npos) end = page.size();
+        std::string text = page.substr(from, std::min(end, (size_t)shown) - from);
+        drawText(16 * DP, (138 + 9 * line) * DP, text.c_str(), paletteColor('w'), DP);
+        from = end + 1;
+        line++;
+    }
+    if (shown >= (int)page.size() && (int)(q.time * 2) % 2) drawText(300 * DP, 168 * DP, ">", paletteColor('w'), DP);
+}
+
+// Ilsa's level up panel (spec §15): the level, cost, names and the stats before and after.
+static void drawLevelUp(const Quest& q) {
+    const SaveData& s = q.save;
+    int x = 60 * DP, y = 30 * DP, w = 200 * DP;
+    drawPanel(x, y, w, 120 * DP, 'n');
+    char text[48];
+    bool atMax = s.level >= MAX_LEVEL;
+    int cost = levelCost(s.level);
+    if (atMax) snprintf(text, sizeof text, "LEVEL %d", s.level);
+    else snprintf(text, sizeof text, "LEVEL %d > %d", s.level, s.level + 1);
+    drawText(x + (w - textWidth(text, 2 * DP)) / 2, y + 6 * DP, text, paletteColor('w'), 2 * DP);
+    if (atMax) snprintf(text, sizeof text, "MAX LEVEL");
+    else snprintf(text, sizeof text, "COST %d", cost);
+    drawText(x + 12 * DP, y + 22 * DP, text, paletteColor(!atMax && s.names >= cost ? 'w' : 'r'), DP);
+    snprintf(text, sizeof text, "NAMES %d", s.names);
+    drawText(x + w - 12 * DP - textWidth(text, DP), y + 22 * DP, text, paletteColor('w'), DP);
+    SaveData next = s;
+    next.level = atMax ? s.level : s.level + 1;
+    HeroStats a = heroStats(s), b = heroStats(next);
+    const char* const names[4] = {"HP", "MP", "ATK", "DEF"};
+    int before[4] = {a.maxHp, a.maxMp, a.atk, a.def}, after[4] = {b.maxHp, b.maxMp, b.atk, b.def};
+    for (int k = 0; k < 4; k++) {
+        snprintf(text, sizeof text, "%s %d > %d", names[k], before[k], after[k]);
+        drawText(x + 12 * DP + (k % 2) * 92 * DP, y + (36 + 10 * (k / 2)) * DP, text, paletteColor('b'), DP);
+    }
+    const char* const items[2] = {"LEVEL UP", "LEAVE"};
+    for (int i = 0; i < 2; i++) {
+        bool grey = i == 0 && (atMax || s.names < cost);
+        uint32_t color = paletteColor(i == q.menu.cursor ? 'y' : grey ? 's' : 'w');
+        int ty = y + (66 + 12 * i) * DP, tx = x + (w - textWidth(items[i], DP)) / 2;
+        drawText(tx, ty, items[i], color, DP);
+        if (i == q.menu.cursor) drawText(tx - 8 * DP, ty, ">", color, DP);
+    }
+    drawText(x + (w - textWidth("X CHOOSE  O LEAVE", DP)) / 2, y + 106 * DP, "X CHOOSE  O LEAVE", paletteColor('s'), DP);
+}
+
+// A shop (spec §15): 240 x 130 panel, rows `RED POTION  15  2/5`, grey when they can't be bought.
+static void drawShop(const Quest& q) {
+    int x = 40 * DP, y = 24 * DP, w = 240 * DP;
+    drawPanel(x, y, w, 130 * DP, 'n');
+    const char* title = q.shopKind == AFTER_POTION_SHOP ? "POTIONS" : "THE FORGE";
+    drawText(x + (w - textWidth(title, 2 * DP)) / 2, y + 6 * DP, title, paletteColor('w'), 2 * DP);
+    char text[32];
+    snprintf(text, sizeof text, "NAMES %d", q.save.names);
+    drawText(x + w - 8 * DP - textWidth(text, DP), y + 22 * DP, text, paletteColor('w'), DP);
+    std::vector<ShopRow> rows = shopRows(q.save, q.shopKind);
+    if (rows.empty()) drawText(x + 16 * DP, y + 36 * DP, "NOTHING NEW TO FORGE YET.", paletteColor('s'), DP);
+    for (int i = 0; i < (int)rows.size(); i++) {
+        const ShopRow& r = rows[i];
+        bool selected = i == q.shopCursor;
+        uint32_t color = paletteColor(!r.canBuy ? 's' : selected ? 'y' : 'w');
+        int ry = y + (36 + 12 * i) * DP;
+        if (selected) drawText(x + 8 * DP, ry, ">", paletteColor(r.canBuy ? 'y' : 's'), DP);
+        drawText(x + 16 * DP, ry, r.name.c_str(), color, DP);
+        snprintf(text, sizeof text, "%d", r.price);
+        drawText(x + 150 * DP - textWidth(text, DP), ry, text, color, DP);
+        drawText(x + w - 8 * DP - textWidth(r.detail.c_str(), DP), ry, r.detail.c_str(), color, DP);
+    }
+    drawText(x + (w - textWidth("X BUY  O LEAVE", DP)) / 2, y + 118 * DP, "X BUY  O LEAVE", paletteColor('s'), DP);
+}
+
+// The quest menus: plain lists through drawMenu (8 rows, scrolling), Ilsa's panel for levels.
+static void drawQuestMenu(const Quest& q) {
+    const MenuState& m = q.menu;
+    if (m.kind == MENU_LEVEL_UP) {
+        drawLevelUp(q);
+        return;
+    }
+    std::string title = m.kind == MENU_CHECKPOINT ? checkpointName(q.atCheckpoint) : m.kind == MENU_TRAVEL ? "TRAVEL" : "ANOTHER ROUND?";
+    if (m.kind == MENU_JOB_CONFIRM) {
+        int cls = q.save.heroClass % CLASS_COUNT, tier = std::min(3, q.save.job + 1);
+        title = std::string("BECOME ") + JOB_NAMES[cls][tier] + "?";
+    }
+    std::vector<const char*> items;
+    for (int i = m.scroll; i < (int)m.items.size() && i < m.scroll + MENU_ROWS; i++) items.push_back(m.items[i].c_str());
+    drawMenu(title.c_str(), items.data(), (int)items.size(), m.cursor - m.scroll, "X CHOOSE  O BACK");
+}
+
+static uint32_t darker(uint32_t c) {
+    return 0xFF000000 | ((c >> 1) & 0x7F7F7F);
+}
+
+// The world map (spec §11): visited areas filled, the rest outlined, the current area blinking, lit checkpoints, closed gates.
+static void drawMap(const Quest& q) {
+    int world = q.area.world;
+    const WorldDef& w = worldDef(world);
+    fillRect(0, 0, QUEST_W, QUEST_H, paletteColor('n'));
+    fillRect(DP, DP, QUEST_W - 2 * DP, QUEST_H - 2 * DP, paletteColor('k'));
+    drawCentred(8 * DP, w.name, paletteColor('w'));
+    int cols = 1, rows = 1;
+    for (int i = 0; i < w.count; i++) {
+        bool wide = w.areas[i].cols == WIDE_COLS;
+        cols = std::max(cols, w.areas[i].mapX + (wide ? 2 : 1));
+        rows = std::max(rows, w.areas[i].mapY + (wide ? 1 : 2));
+    }
+    int ox = (QUEST_W - cols * MAP_CELL_W) / 2, oy = (QUEST_H - rows * MAP_CELL_H) / 2;
+    uint32_t fill = paletteColor(w.style.mapColor);
+    for (int i = 0; i < w.count; i++) {
+        const AreaDef& a = w.areas[i];
+        bool wide = a.cols == WIDE_COLS, visited = q.save.visited[world] >> i & 1;
+        int x = ox + a.mapX * MAP_CELL_W, y = oy + a.mapY * MAP_CELL_H;
+        int cw = (wide ? 2 : 1) * MAP_CELL_W, ch = (wide ? 1 : 2) * MAP_CELL_H;
+        bool blink = i == q.area.index && (int)(q.time * 4) % 2;   // 2 Hz
+        uint32_t inside = blink ? paletteColor('y') : visited ? fill : paletteColor('k');
+        fillRect(x, y, cw, ch, visited ? darker(fill) : paletteColor('d'));
+        fillRect(x + DP, y + DP, cw - 2 * DP, ch - 2 * DP, inside);
+        // Edge links: 2 px gaps in the border, in the middle of the side shared with the neighbour.
+        const AreaLink* sides[4] = {&a.left, &a.right, &a.up, &a.down};
+        for (int k = 0; k < 4; k++) {
+            if (sides[k]->area < 0) continue;
+            const AreaDef& b = w.areas[sides[k]->area];
+            bool bWide = b.cols == WIDE_COLS;
+            int bx = ox + b.mapX * MAP_CELL_W, by = oy + b.mapY * MAP_CELL_H;
+            int bw = (bWide ? 2 : 1) * MAP_CELL_W, bh = (bWide ? 1 : 2) * MAP_CELL_H;
+            if (k < 2) {
+                int mid = (std::max(y, by) + std::min(y + ch, by + bh)) / 2;
+                fillRect(k == 0 ? x : x + cw - DP, mid - DP, DP, 2 * DP, inside);
+            } else {
+                int mid = (std::max(x, bx) + std::min(x + cw, bx + bw)) / 2;
+                fillRect(mid - DP, k == 2 ? y : y + ch - DP, 2 * DP, DP, inside);
+            }
+        }
+        bool gateDrawn = false;
+        for (int t = 0; t < a.cols * a.rows; t++) {
+            int px = x + (t % a.cols) * cw / a.cols, py = y + (t / a.cols) * ch / a.rows;
+            if (a.tiles[t] == 'C') {
+                int bit = world == WORLD_NAMULA ? 0 : world * 2 + objectIndex(world, i, t, 'C');
+                if (bit < 32 && (q.save.lit >> bit & 1)) fillRect(px - DP, py - DP, 2 * DP, 2 * DP, paletteColor('o'));
+            }
+            if (a.tiles[t] == 'g' && !(q.save.gates >> world & 1) && !gateDrawn) {   // one bar per gate, on its nearer edge
+                gateDrawn = true;
+                int edge = t % a.cols < a.cols / 2 ? x : x + cw - DP;
+                fillRect(edge, y + ch / 2 - 3 * DP, DP, 6 * DP, paletteColor('r'));
+            }
+        }
+    }
+    drawCentred(172 * DP, "X / O CLOSE", paletteColor('s'));
+}
+
 void questDraw(const Quest& q) {
     switch (q.mode) {
     case QMODE_SLOTS:
@@ -606,5 +821,10 @@ void questDraw(const Quest& q) {
     case QMODE_INTRO: drawIntro(q); break;
     case QMODE_PLAY:
     case QMODE_DEAD: drawPlay(q); break;
+    case QMODE_DIALOGUE: drawPlay(q); drawDialogue(q); break;
+    case QMODE_MENU: drawPlay(q); drawQuestMenu(q); break;
+    case QMODE_SHOP: drawPlay(q); drawShop(q); break;
+    case QMODE_MAP: drawMap(q); break;
+    case QMODE_CREDITS: break;   // phase 8
     }
 }

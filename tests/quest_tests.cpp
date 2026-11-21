@@ -42,7 +42,11 @@ static const Sprite* const ALL_QUEST_SPRITES[] = {
     &HERO_THIEF_JUMP, &HERO_THIEF_FALL, &HERO_THIEF_ATTACK_1, &HERO_THIEF_ATTACK_2, &HERO_THIEF_ATTACK_3,
     &HERO_THIEF_CLIMB_1, &HERO_THIEF_CLIMB_2, &HERO_THIEF_ROLL_1, &HERO_THIEF_ROLL_2, &HERO_THIEF_HURT,
     &CHECKPOINT_UNLIT, &CHECKPOINT_LIT_A, &CHECKPOINT_LIT_B, &CHECKPOINT_LIT_C, &HEARTH_A, &HEARTH_B, &HEARTH_C,
-    &PORTAL_A, &PORTAL_B, &ARCH_CLOSED, &CHEST_CLOSED, &CHEST_OPEN};
+    &PORTAL_A, &PORTAL_B, &ARCH_CLOSED, &CHEST_CLOSED, &CHEST_OPEN, &CHEST_AJAR, &LEVER_OFF, &LEVER_ON, &NPC_ILSA_A,
+    &NPC_ILSA_B, &NPC_MARRA_A, &NPC_MARRA_B, &NPC_BRANN_A, &NPC_BRANN_B, &NPC_LIO_A, &NPC_LIO_B, &NPC_PELL_A, &NPC_PELL_B,
+    &NPC_SELA_A, &NPC_SELA_B, &NPC_ODO_A, &NPC_ODO_B, &NPC_WREN_A, &NPC_WREN_B, &NPC_YSOLDE_A, &NPC_YSOLDE_B, &NPC_KIT_A,
+    &NPC_KIT_B, &NPC_TOBIN_A, &NPC_TOBIN_B, &NPC_GATEKEEPER_A, &NPC_GATEKEEPER_B, &NPC_SURVEYOR_A, &NPC_SURVEYOR_B,
+    &ICON_RED, &ICON_BIG, &ICON_MANA, &ICON_WHETSTONE, &ICON_TONIC, &ICON_FEATHER};
 
 // Every palette sprite of a world's art, for the size and character checks.
 static std::vector<const Sprite*> artSprites(const WorldArt& art) {
@@ -187,7 +191,7 @@ static void areaSizesAndObjectsAreValid() {
             for (int c : def.chests) chests += c >= 0;
             for (int n : def.npcs) npcs += n >= 0;
             CHECK(countOf(def, 'T') == chests);
-            if (w != WORLD_NAMULA) CHECK(countOf(def, 'N') == npcs);   // Namula's NPCs outnumber npcs[2]; code places them (phase 3)
+            CHECK(countOf(def, 'N') == npcs);   // unused npcs[] entries are -1 (0 would be Ilsa)
         }
     }
 }
@@ -429,7 +433,7 @@ static void makeArea(TestArea& t, const std::map<int, std::string>& rows) {
         t.tiles += found != rows.end() ? found->second : std::string(WIDE_COLS, r >= 20 ? '#' : '.');
     }
     AreaLink none = {-1, 0, 0};
-    t.def = {"TEST", WIDE_COLS, WIDE_ROWS, t.tiles.c_str(), none, none, none, none, {none, none, none, none}, {-1, -1, -1, -1}, {-1, -1}, 0, 0, 0, 0, -1, {}};
+    t.def = {"TEST", WIDE_COLS, WIDE_ROWS, t.tiles.c_str(), none, none, none, none, {none, none, none, none}, {-1, -1, -1, -1}, {-1, -1, -1, -1, -1, -1, -1, -1}, 0, 0, 0, 0, -1, {}};
     t.state.world = WORLD_TEST;
     t.state.index = 0;
     t.state.def = &t.def;
@@ -1035,6 +1039,323 @@ static void deathRespawnsEnemies() {
     saveDelete(SAVE_FOLDER, 2);
 }
 
+// --- RPG systems (phase 3): levels, shops, checkpoints, chests, gates, levers, jobs, items, NPCs. ---
+// A dev start (NAMEGAME_QUEST's format) in slot 3 of the test folder.
+static void startDev(Quest& q, const char* spec) {
+    q = Quest();
+    q.folder = SAVE_FOLDER;
+    questStartDev(q, spec);
+}
+
+// Stands the hero on tile (tx, ty) and lets it settle.
+static void standAt(Quest& q, int tx, int ty) {
+    q.hero.x = (float)(tx * TILE);
+    q.hero.y = (float)((ty + 1) * TILE) - HERO_H;
+    q.hero.vx = q.hero.vy = 0;
+    play(q, Actions(), 1);
+}
+
+static void pressUp(Quest& q) { Actions a = {}; a.up = true; play(q, a, 1); }
+static void pressX(Quest& q) { Actions a = {}; a.jump = true; play(q, a, 1); }
+static void pressDown(Quest& q) { Actions a = {}; a.down = true; play(q, a, 1); }
+
+// X through every page of the open dialogue (completing each page first).
+static void readDialogue(Quest& q) {
+    for (int i = 0; i < 20 && q.mode == QMODE_DIALOGUE; i++) pressX(q);
+}
+
+static void levelUpSpendsAndRaisesStats() {
+    Quest q;
+    startDev(q, "slot=3 class=0 world=0 area=0 names=1000");
+    q.save.ilsaTalks = 3;
+    standAt(q, 45, 17);   // Ilsa, by the hearth
+    int hpBefore = q.stats.maxHp;
+    pressUp(q);
+    CHECK(q.mode == QMODE_DIALOGUE && q.dialogue.speaker == "ILSA, KEEPER OF NAMES" && q.dialogue.after == AFTER_LEVEL_UP);
+    readDialogue(q);
+    CHECK(q.mode == QMODE_MENU && q.menu.kind == MENU_LEVEL_UP);
+    pressX(q);
+    CHECK(q.save.level == 2 && q.save.names == 900 && q.stats.maxHp > hpBefore && q.hero.hp == q.stats.maxHp);
+    CHECK(logged(q, "quest: level 2 (spent 100, names left 900)") && q.soundRequested[SOUND_Q_LEVEL_UP]);
+    CHECK(q.mode == QMODE_MENU);   // stays open for the next level
+    pressX(q);
+    CHECK(q.save.level == 3 && q.save.names == 780);
+    SaveData saved;
+    CHECK(saveRead(SAVE_FOLDER, 2, saved) && saved.level == 3);
+    saveDelete(SAVE_FOLDER, 2);
+}
+
+static void cannotLevelPastForty() {
+    Quest q;
+    startDev(q, "slot=3 class=1 world=0 area=0 level=40 names=99999999");
+    CHECK(!levelUp(q) && q.save.level == 40 && q.save.names == 99999999 && q.soundRequested[SOUND_ROCKET_EMPTY]);
+    q.save.level = 39;
+    CHECK(levelUp(q) && q.save.level == 40 && q.save.names == 99999999 - levelCost(39));
+    saveDelete(SAVE_FOLDER, 2);
+}
+
+static void shopPricesScaleWithHighestWorld() {
+    SaveData s;
+    CHECK(itemPrice(s, ITEM_RED) == 15 && itemPrice(s, ITEM_WHETSTONE) == 60);
+    s.highest = 3;
+    CHECK(itemPrice(s, ITEM_RED) == 135 && shopRows(s, AFTER_POTION_SHOP)[ITEM_FEATHER].price == 360);
+    s.highest = 7;
+    CHECK(itemPrice(s, ITEM_BIG) == 45 * 360);
+}
+
+static void carryLimitsStopBuying() {
+    Quest q;
+    startDev(q, "slot=3 class=0 world=0 area=0 names=1000");
+    q.shopKind = AFTER_POTION_SHOP;
+    q.save.items[ITEM_RED] = 5;
+    shopBuy(q, ITEM_RED);
+    CHECK(q.save.items[ITEM_RED] == 5 && q.save.names == 1000 && q.soundRequested[SOUND_ROCKET_EMPTY]);
+    CHECK(!shopRows(q.save, AFTER_POTION_SHOP)[ITEM_RED].canBuy);
+    q.save.shards = 1;   // a Vial Shard carries one more
+    shopBuy(q, ITEM_RED);
+    CHECK(q.save.items[ITEM_RED] == 6 && q.save.names == 985 && logged(q, "quest: bought RED POTION for 15"));
+    q.save.keys |= 1u << KEY_LOCKET;
+    CHECK(carryLimit(q.save, ITEM_RED) == 7 && carryLimit(q.save, ITEM_BIG) == 3 && carryLimit(q.save, ITEM_MANA) == 4);
+    CHECK(carryLimit(q.save, ITEM_TONIC) == 3);
+    saveDelete(SAVE_FOLDER, 2);
+}
+
+static void gearTierNeedsTheWorld() {
+    SaveData s;
+    s.names = 1000000;
+    std::vector<ShopRow> rows = shopRows(s, AFTER_GEAR_SHOP);
+    CHECK(rows.size() == 2 && rows[0].goods == GOODS_WEAPON && rows[0].name == "IRON SWORD" && rows[0].price == 150);
+    CHECK(rows[0].detail == "ATK +3" && rows[1].goods == GOODS_ARMOR && rows[1].price == 120);
+    s.weapon = 1;
+    rows = shopRows(s, AFTER_GEAR_SHOP);
+    CHECK(rows.size() == 1 && rows[0].goods == GOODS_ARMOR);   // tier 2 waits for world 2
+    s.highest = 2;
+    rows = shopRows(s, AFTER_GEAR_SHOP);
+    CHECK(rows.size() == 2 && rows[0].price == 1400);
+    s.weapon = s.armor = 6;
+    s.highest = 6;
+    CHECK(shopRows(s, AFTER_GEAR_SHOP).empty());   // tier 7 is never sold
+}
+
+static void restHealsAndRespawnsEnemies() {
+    Quest q;
+    startDev(q, "slot=3 class=0 world=8 area=0");
+    q.godMode = true;
+    for (Enemy& e : q.enemies) e.alive = false;
+    q.killed[WORLD_TEST][0] = ~0ull;
+    q.hero.hp = 1;
+    standAt(q, 3, 19);   // touching the brazier lights it
+    CHECK(logged(q, "quest: checkpoint 8.0 lit") && (q.save.lit >> 16 & 1));
+    pressUp(q);
+    CHECK(q.mode == QMODE_MENU && q.menu.kind == MENU_CHECKPOINT && q.atCheckpoint == 16);
+    pressX(q);   // REST
+    CHECK(q.mode == QMODE_PLAY && q.hero.hp == q.stats.maxHp && q.killed[WORLD_TEST][0] == 0);
+    int alive = 0;
+    for (const Enemy& e : q.enemies) alive += e.alive;
+    CHECK(alive == 3 && q.save.checkpointWorld == WORLD_TEST && q.save.checkpointId == 0 && logged(q, "quest: rest at 8.0"));
+    saveDelete(SAVE_FOLDER, 2);
+}
+
+static void travelListsLitCheckpoints() {
+    SaveData s;
+    CHECK(travelCheckpoints(s) == std::vector<int>({0}));
+    s.lit |= 1u << 17 | 1u << 16;
+    CHECK(travelCheckpoints(s) == std::vector<int>({0, 16, 17}));
+    Quest q;
+    startDev(q, "slot=3 class=0 world=8 area=0");
+    standAt(q, 3, 19);
+    pressUp(q);
+    pressDown(q);
+    pressX(q);   // TRAVEL
+    CHECK(q.mode == QMODE_MENU && q.menu.kind == MENU_TRAVEL && q.menu.items.size() == 2 && q.menu.items[0] == "NAMULA");
+    CHECK(q.menu.items[1] == "TEST GROUNDS ENTRY");
+    pressX(q);
+    CHECK(q.mode == QMODE_PLAY && q.area.world == WORLD_NAMULA && q.area.index == 0 && logged(q, "quest: travel to 0.0"));
+    CHECK(q.save.checkpointWorld == 0 && q.save.checkpointId == 0);
+    saveDelete(SAVE_FOLDER, 2);
+}
+
+static void chestOpensOnceAndSaves() {
+    Quest q;
+    startDev(q, "slot=3 class=0 world=8 area=3 items=0,0,0,0,0,0");
+    q.godMode = true;
+    standAt(q, 42, 14);
+    pressUp(q);
+    CHECK(q.save.items[ITEM_RED] == 2 && (q.save.chests[WORLD_TEST] & 1) && logged(q, "quest: chest 8.0 2 RED POTION"));
+    CHECK(q.popup == "2 RED POTION" && q.soundRequested[SOUND_Q_CHEST]);
+    SaveData saved;
+    CHECK(saveRead(SAVE_FOLDER, 2, saved) && (saved.chests[WORLD_TEST] & 1) && saved.items[ITEM_RED] == 2);
+    pressUp(q);
+    CHECK(q.save.items[ITEM_RED] == 2);   // an open chest stays empty
+    standAt(q, 25, 18);
+    pressUp(q);
+    CHECK(q.save.names == 120 && logged(q, "quest: chest 8.1 +120 NAMES"));
+    saveDelete(SAVE_FOLDER, 2);
+}
+
+static void fullBagKeepsChestShut() {
+    Quest q;
+    startDev(q, "slot=3 class=0 world=8 area=3 items=5,0,0,0,0,0");
+    q.godMode = true;
+    standAt(q, 42, 14);
+    pressUp(q);
+    CHECK(q.save.items[ITEM_RED] == 5 && !(q.save.chests[WORLD_TEST] & 1) && q.popup == "YOUR BAG IS FULL");
+    saveDelete(SAVE_FOLDER, 2);
+}
+
+static void gateWallOpens() {
+    Quest q;
+    startDev(q, "slot=3 class=0 world=8 area=2");
+    CHECK(tileAt(q.area, 66, 10) == 'g' && tileSolid('g'));
+    openGate(q, WORLD_TEST);
+    CHECK(tileAt(q.area, 66, 10) == '.' && (q.save.gates >> WORLD_TEST & 1) && logged(q, "quest: gate 8 open"));
+    CHECK(q.soundRequested[SOUND_Q_GATE] && q.gateTimer > 0);
+    AreaState again;
+    loadArea(again, WORLD_TEST, 2, q.save.gates, 0);
+    CHECK(tileAt(again, 66, 10) == '.');
+    Quest open;
+    startDev(open, "slot=3 class=0 world=8 area=2 gate=1");
+    CHECK(tileAt(open.area, 66, 18) == '.');
+    saveDelete(SAVE_FOLDER, 2);
+}
+
+static void leverOpensDoorsForGood() {
+    Quest q;
+    startDev(q, "slot=3 class=0 world=8 area=3");
+    q.godMode = true;
+    for (Enemy& e : q.enemies) e.alive = false;
+    CHECK(tileAt(q.area, 77, 10) == 'k');
+    standAt(q, 74, 18);
+    q.hero.facingLeft = false;
+    Actions a = {};
+    a.fire = true;
+    play(q, a, 30);
+    CHECK(tileAt(q.area, 77, 10) == '.' && (q.save.shortcuts[WORLD_TEST] & 1) && logged(q, "quest: shortcut 8.0 open"));
+    AreaState again;
+    loadArea(again, WORLD_TEST, 3, 0, q.save.shortcuts[WORLD_TEST]);
+    CHECK(tileAt(again, 77, 18) == '.');
+    saveDelete(SAVE_FOLDER, 2);
+}
+
+static void jobNeedsLevelAndGate() {
+    Quest q;
+    startDev(q, "slot=3 class=0 world=0 area=1 level=4");
+    talkTo(q, NPC_ODO);
+    CHECK(q.dialogue.pages[0] == "COME BACK AT LEVEL 5." && q.dialogue.after == AFTER_NONE);
+    q.save.level = 5;
+    talkTo(q, NPC_ODO);
+    CHECK(q.dialogue.after == AFTER_NONE);   // world 1's gate still stands
+    talkTo(q, NPC_WREN);
+    CHECK(q.dialogue.after == AFTER_NONE && q.dialogue.pages.size() == 1);   // another class's mentor
+    q.save.gates |= 1u << 1;
+    talkTo(q, NPC_ODO);
+    CHECK(q.dialogue.after == AFTER_JOB);
+    readDialogue(q);
+    CHECK(q.mode == QMODE_MENU && q.menu.kind == MENU_JOB_CONFIRM);
+    pressX(q);
+    CHECK(q.save.job == 1 && q.save.quests[QUEST_JOB] == 1 && logged(q, "quest: job 1 VANGUARD"));
+    CHECK(q.hero.hp == q.stats.maxHp && q.banner && !strcmp(q.banner, "VANGUARD"));
+    saveDelete(SAVE_FOLDER, 2);
+}
+
+static void secondJobNeedsTheFeather() {
+    Quest q;
+    startDev(q, "slot=3 class=2 world=0 area=1 level=15 job=1 quest0=1");
+    talkTo(q, NPC_YSOLDE);
+    CHECK(q.dialogue.after == AFTER_NONE);
+    q.save.keys |= 1u << KEY_FROZEN_FEATHER;
+    q.save.level = 14;
+    talkTo(q, NPC_YSOLDE);
+    CHECK(q.dialogue.pages[0] == "COME BACK AT LEVEL 15.");
+    q.save.level = 15;
+    talkTo(q, NPC_YSOLDE);
+    CHECK(q.dialogue.after == AFTER_JOB);
+    readDialogue(q);
+    pressX(q);
+    CHECK(q.save.job == 2 && !(q.save.keys >> KEY_FROZEN_FEATHER & 1) && logged(q, "quest: job 2 ELEMENTALIST"));
+    talkTo(q, NPC_YSOLDE);
+    CHECK(q.dialogue.pages[0] == "COME BACK AT LEVEL 30.");
+    saveDelete(SAVE_FOLDER, 2);
+}
+
+static void buffsEndOnDeath() {
+    TestArea t;
+    makeArea(t, {});
+    Quest q;
+    startQuest(q, t, CLASS_KNIGHT, 10, 0, 24);
+    q.save.items[ITEM_RED] = 0;
+    q.save.items[ITEM_WHETSTONE] = 1;
+    Actions a = {};
+    a.item = true;   // Triangle: the next owned item
+    play(q, a, 1);
+    CHECK(q.selectedItem == ITEM_WHETSTONE);
+    a = Actions();
+    a.cycle = true;
+    play(q, a, 1);
+    CHECK(q.hero.buffTimers[0] > 119 && q.save.items[ITEM_WHETSTONE] == 0);
+    q.hero.hp = 0;
+    play(q, Actions(), (int)(2.7f / DT));
+    CHECK(q.mode == QMODE_PLAY && q.hero.buffTimers[0] == 0);
+    saveDelete(SAVE_FOLDER, 2);
+}
+
+static void drinkHealsAfterHalfASecond() {
+    TestArea t;
+    makeArea(t, {});
+    Quest q;
+    startQuest(q, t, CLASS_KNIGHT, 10, 0, 24);
+    q.save.items[ITEM_RED] = 1;
+    q.hero.hp = 10;
+    Actions a = {};
+    a.cycle = true;
+    play(q, a, 1);
+    CHECK(q.save.items[ITEM_RED] == 0 && q.soundRequested[SOUND_Q_DRINK]);
+    play(q, Actions(), (int)(0.3f / DT));
+    CHECK(q.hero.hp == 10);
+    play(q, Actions(), (int)(0.3f / DT));
+    CHECK(q.hero.hp == 10 + (int)(q.stats.maxHp * 0.35f));
+    a.cycle = true;
+    play(q, a, 1);
+    CHECK(q.soundRequested[SOUND_ROCKET_EMPTY]);   // nothing left
+}
+
+static void npcPresenceFollowsQuestStages() {
+    SaveData s;
+    CHECK(npcPresent(s, NPC_ILSA, 0, 0) && !npcPresent(s, NPC_STRANGER, 0, 2) && !npcPresent(s, NPC_CLAUDE, 0, 2));
+    CHECK(!npcPresent(s, NPC_GARRICK, 0, 2) && npcPresent(s, NPC_GARRICK, 2, 5));
+    s.quests[QUEST_TOBIN] = 2;
+    CHECK(npcPresent(s, NPC_GARRICK, 0, 2) && !npcPresent(s, NPC_GARRICK, 2, 5));
+    s.bosses |= 1u << 3;
+    s.keys |= 1u << KEY_CREDITS_SEEN;
+    CHECK(npcPresent(s, NPC_STRANGER, 0, 2) && npcPresent(s, NPC_CLAUDE, 0, 2));
+}
+
+// Every line anyone says fits the dialogue box: at most 4 lines of 72 characters (spec §14).
+static void dialogueFitsTheBox() {
+    Quest q;
+    for (int talk = 0; talk < 5; talk++)
+        for (int id = 0; id < NPC_COUNT; id++)
+            for (int highest = 1; highest <= 7; highest += 6) {
+                q.save = SaveData();
+                q.save.highest = highest;
+                q.save.ilsaTalks = talk;
+                q.save.level = talk * 5;
+                q.save.gates = talk >= 2 ? 2 : 0;
+                q.save.quests[QUEST_JOB] = talk >= 3 ? talk - 2 : 0;
+                talkTo(q, id);
+                CHECK(!q.dialogue.pages.empty());
+                for (const std::string& page : q.dialogue.pages) {
+                    int lines = 1, length = 0;
+                    for (char c : page) {
+                        length = c == '\n' ? 0 : length + 1;
+                        lines += c == '\n';
+                        CHECK(length <= 72);
+                    }
+                    CHECK(lines <= 4);
+                }
+            }
+}
+
 int main() {
     questSpritesHaveTheirSize();
     palSpritesUseOnlyPaletteChars();
@@ -1076,6 +1397,23 @@ int main() {
     secondDeathLosesTheOldEcho();
     echoReturnsNames();
     deathRespawnsEnemies();
+    levelUpSpendsAndRaisesStats();
+    cannotLevelPastForty();
+    shopPricesScaleWithHighestWorld();
+    carryLimitsStopBuying();
+    gearTierNeedsTheWorld();
+    restHealsAndRespawnsEnemies();
+    travelListsLitCheckpoints();
+    chestOpensOnceAndSaves();
+    fullBagKeepsChestShut();
+    gateWallOpens();
+    leverOpensDoorsForGood();
+    jobNeedsLevelAndGate();
+    secondJobNeedsTheFeather();
+    buffsEndOnDeath();
+    drinkHealsAfterHalfASecond();
+    npcPresenceFollowsQuestStages();
+    dialogueFitsTheBox();
     everythingIsReachable();
     printf(failures ? "%d quest check(s) failed\n" : "all quest tests passed\n", failures);
     return failures ? 1 : 0;
