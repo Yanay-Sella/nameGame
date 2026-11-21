@@ -68,6 +68,7 @@ Movement is `moveHero`: grace timers, ladders, walking, jumping (buffered, coyot
 - `Hero` has two fields the plan didn't list: `dropTimer` (down + X drop-through) and `jumped` (for the jump sound).
 - `saveWrite` takes an optional `renameFailed` flag so `questSave` can log `rename failed, wrote directly`.
 - Holding Select 2 s goes to the TEST GROUNDS area 0 (`Actions::selectHeld`, phase 2).
+- The user's request (not in the spec): the Thief's basic stab with up held (R1 + up) aims up: its 16 x 12 box turns upright (12 x 16) above the head, with an upright arc (`Hero::attackUp`; test `thiefStabsUp`). The body keeps the sideways stab frames.
 - Vents give a net lift of 900 px/s² (gravity is cancelled, then 900 more), up to a rise of 160 px/s.
 - Crumbling blocks stay solid until phase 4; spikes, electric panels and fire jets hurt since phase 2.
 - Phase 2: `Enemy` has `world` (TEST GROUNDS area 3 borrows world 2's charger and dropper so all 7 behaviours appear; world 1's roster has 5), `w`, `h`, `names`, `onGround`, `stunTimer`, the swoop target, swing ids and the wraith's stolen names. `Projectile` has `mult`, `strong` and `hitMask`; `DamageNumber` has `life` and `names`; `Effect` holds skill shapes for drawing.

@@ -46,6 +46,7 @@
 - [x] An Archer's basic arrow hits every world 1 ground enemy (the crawler was once too low: its arrows flew over it). *(`tests/quest_tests.cpp` › arrowsHitEveryGroundEnemy)*
 - [x] World 1's layers keep the value rules; its props never block spots; every ground shape has art. *(`tests/quest_tests.cpp` › layersObeyTheValueRules, propsNeverBlockSpots, everyGroundShapeHasArt)*
 - [x] The user approves world 1's style frame (`shots/world1-style-frame-1.png`, `-2.png`, sent 2026-11-21). *(user, 2026-11-21)*
+- [x] The user approves world 2's style frame (`shots/style-w2-entry.png`, `-right.png`, `-characters.png`, sent 2026-11-21). *(user, 2026-11-21)*
 - [x] Everything in world 1 is reachable and no spot is a soft lock; with the gate closed, the dome and the med bay checkpoint are out of reach and the hangar is not. *(`tests/quest_tests.cpp` › everythingIsReachable, gateGuardsTheSecondHalf)*
 - [x] World 1 keeps spec §4's layout rules (main path 13: 0 1 2 3 4 5 9 10 11 12 17 18 19; the hangar 7th, the gate next, the second checkpoint 3 before the dome; 3 dead ends, a loop, a shortcut, 2 portals, 3 tall areas, the surveyors) and §8's counts per band; each world 1 chest appears once, the shard, page and STAR IRON in dead ends. *(`tests/quest_tests.cpp` › worldLayoutRulesHold, chestsMatchTheWorldList)*
 - [x] A locked arena's ladder down holds the hero instead of killing them. *(`tests/quest_tests.cpp` › bossFightLocksAndUnlocksExits)*

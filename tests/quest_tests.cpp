@@ -25,7 +25,7 @@ static int failures = 0;
 const float DT = 1.0f / 60;
 const char* const LEGEND = ".#-|^~icgkzf<>vuSCMNPTKABDEFQWRYXLO";
 const char* const OBJECTS_TO_REACH = "CMNTKQW";
-const int REACH_WORLDS[] = {WORLD_NAMULA, 1, WORLD_TEST};   // phases 5-9 add their worlds
+const int REACH_WORLDS[] = {WORLD_NAMULA, 1, 2, WORLD_TEST};   // phases 5-9 add their worlds
 
 static const Sprite* const ALL_QUEST_SPRITES[] = {
     &HERO_KNIGHT_IDLE_1, &HERO_KNIGHT_IDLE_2, &HERO_KNIGHT_WALK_1, &HERO_KNIGHT_WALK_2, &HERO_KNIGHT_WALK_3,
@@ -79,7 +79,7 @@ static void palSpritesUseOnlyPaletteChars() {
 }
 
 static void everyGroundShapeHasArt() {
-    for (int w : {WORLD_NAMULA, 1}) {
+    for (int w : {WORLD_NAMULA, 1, 2, 3}) {
         const WorldArt& art = *worldArt(w);
         for (int shape = 0; shape < TILE_SHAPE_COUNT; shape++) CHECK(art.ground[shape][0] != nullptr);
         CHECK(art.propCount >= (w == WORLD_NAMULA ? 12 : 10) && art.landmarkCount >= 6);   // spec §22, §13
@@ -87,7 +87,7 @@ static void everyGroundShapeHasArt() {
 }
 
 static void propsNeverBlockSpots() {
-    for (int w : {WORLD_NAMULA, 1})
+    for (int w : {WORLD_NAMULA, 1, 2, 3})
     for (int i = 0; i < worldDef(w).count; i++) {
         AreaState area;
         loadArea(area, w, i, 0, 0);
@@ -139,7 +139,7 @@ static void layersObeyTheValueRulesIn(int world) {
 }
 
 static void layersObeyTheValueRules() {
-    for (int w : {WORLD_NAMULA, 1}) layersObeyTheValueRulesIn(w);
+    for (int w : {WORLD_NAMULA, 1, 2, 3}) layersObeyTheValueRulesIn(w);
 }
 
 static void outlineSurroundsTheSprite() {
@@ -493,15 +493,15 @@ static int areaWithLetter(int world, char letter, int skip = 0) {
 }
 
 // With the gate closed, the boss arena and the second checkpoint can't be reached from area 0; the mini-boss can.
-static void gateGuardsTheSecondHalf() {
-    Reach reach = worldReach(1, 0);
-    std::set<int> reached = reachableFrom(reach, firstSpotOf(1, 0, 'C'));
+static void gateGuardsTheSecondHalf(int world) {
+    Reach reach = worldReach(world, 0);
+    std::set<int> reached = reachableFrom(reach, firstSpotOf(world, 0, 'C'));
     std::set<int> areas;
     for (int spot : reached) areas.insert(keyArea(spot));
-    int miniBoss = areaWithLetter(1, 'Q'), depths = areaWithLetter(1, 'C', 1);
-    CHECK(miniBoss >= 0 && reached.count(firstSpotOf(1, miniBoss, 'Q')));
+    int miniBoss = areaWithLetter(world, 'Q'), depths = areaWithLetter(world, 'C', 1);
+    CHECK(miniBoss >= 0 && reached.count(firstSpotOf(world, miniBoss, 'Q')));
     CHECK(!areas.count(19));
-    CHECK(depths > 0 && !reached.count(firstSpotOf(1, depths, 'C')));
+    CHECK(depths > 0 && !reached.count(firstSpotOf(world, depths, 'C')));
 }
 
 // Spec §4 rules 1-6 and 9, and §8's enemy counts per band.
@@ -566,17 +566,17 @@ static void worldLayoutRulesHold(int world) {
     }
 }
 
-// Spec §10: every chest of the world's list appears once; shards and map pages in dead ends.
-static void chestsMatchTheWorldList() {
+// Spec §10: every chest of the world's list appears once; the first `deadEnds` (shard, map page, key item) in dead ends.
+static void chestsMatchTheWorldList(int world, int deadEnds) {
     int seen[6] = {};
-    for (int i = 0; i < worldDef(1).count; i++) {
-        const AreaDef& d = worldDef(1).areas[i];
+    for (int i = 0; i < worldDef(world).count; i++) {
+        const AreaDef& d = worldDef(world).areas[i];
         for (int c : d.chests) {
             if (c < 0) continue;
             CHECK(c < 6);
             if (c >= 6) continue;
             seen[c]++;
-            if (c <= 2) CHECK(linkedAreas(1, i).size() == 1);   // VIAL SHARD, MAP PAGE 1, STAR IRON: dead ends
+            if (c < deadEnds) CHECK(linkedAreas(world, i).size() == 1);
         }
     }
     for (int c = 0; c < 6; c++) CHECK(seen[c] == 1);
@@ -921,15 +921,20 @@ static void basicAttackKillsFodderInThreeHits() {
     CHECK(q.killed[WORLD_TEST][0] & 1);
 }
 
-// Every world 1 ground enemy stands tall enough for a basic arrow, flying at the bow's height, to hit it (spec §6, §22).
+// Every redrawn ground enemy (worlds 1-2) stands tall enough for a basic arrow, flying at the bow's height, to hit it (spec §6, §22).
 static void arrowsHitEveryGroundEnemy() {
+    for (int world = 1; world <= 3; world++)
     for (int slot = 0; slot < ROSTER_SLOTS; slot++) {
-        if (rosterType(1, slot).behaviour == BEH_FLYER) continue;
+        if (rosterType(world, slot).behaviour == BEH_FLYER) continue;
         TestArea t;
         makeArea(t, {{19, withLetter(24, ROSTER_LETTERS[slot])}});
         Quest q;
-        startQuest(q, t, CLASS_ARCHER, 4, 0, 14, 1);
+        startQuest(q, t, CLASS_ARCHER, 4, 0, 14, world);
         q.godMode = true;
+        if (q.enemies[0].state == ES_HANG) {   // a dropper is shot at once it has dropped onto the floor
+            q.enemies[0].state = ES_PATROL;
+            q.enemies[0].y = 20 * TILE - q.enemies[0].h;
+        }
         Actions a = {};
         a.fire = true;
         int hits = 0, last = q.enemies[0].hp;
@@ -939,7 +944,7 @@ static void arrowsHitEveryGroundEnemy() {
             if (q.enemies[0].hp < last) hits++;
             last = q.enemies[0].hp;
         }
-        if (hits == 0) printf("  the archer's arrows never hit %s\n", rosterType(1, slot).name);
+        if (hits == 0) printf("  the archer's arrows never hit %s\n", rosterType(world, slot).name);
         CHECK(hits > 0);
     }
 }
@@ -968,6 +973,28 @@ static void knightSwingHitsOnlyInItsWindow() {
     a.fire = true;
     play(q, a, 30);
     CHECK(q.enemies[0].hp == q.enemies[0].maxHp);
+}
+
+// Thief, R1 with up held: the stab hits an enemy right above the head; without up it misses it.
+static void thiefStabsUp() {
+    TestArea t;
+    makeArea(t, {{19, withLetter(16, 'D')}});
+    for (int up = 1; up >= 0; up--) {
+        Quest q;
+        startQuest(q, t, CLASS_THIEF, 10, 0, 14);
+        q.godMode = true;
+        Enemy& e = q.enemies[0];
+        Actions a = {};
+        a.fire = true;
+        a.moveY = up ? -1 : 0;
+        for (int i = 0; i < 10; i++) {   // the enemy held just above the head through the stab's window
+            e.x = q.hero.x + HERO_W / 2 - e.w / 2;
+            e.y = q.hero.y - e.h - 2 * DP;
+            play(q, a, 1);
+        }
+        CHECK(q.hero.attackUp == (up == 1));
+        CHECK((e.hp < e.maxHp) == (up == 1));
+    }
 }
 
 // R2 just after R1: the Power Slash (x2.4) still lands on the enemy the basic swing would have hit.
@@ -1709,6 +1736,277 @@ static void bossDeathLightsTheNextWorld() {
 }
 
 // make quest-maps (phase 4 step 2): every screen of every area, enemies and bosses at their spots, the hero hidden.
+// --- World 2 (phase 5) ---
+static int countProjectiles(const Quest& q, int kind) {
+    int n = 0;
+    for (const Projectile& p : q.projectiles) n += p.kind == kind;
+    return n;
+}
+
+// A palm R drops its coconut 0.3 s after the hero's centre comes within 8 px below it, for 20 % of max HP; it regrows in 4 s.
+static void coconutDropsWhenHeroPassesUnder() {
+    TestArea t;
+    makeArea(t, {{12, withLetter(30, 'R')}});
+    Quest q;
+    startQuest(q, t, CLASS_KNIGHT, 11, 1, 20, 2);
+    CHECK(q.traps.size() == 1);
+    Actions a = {};
+    a.moveX = 1;
+    float under = -1, dropped = -1;
+    for (int i = 0; i < 240 && dropped < 0; i++) {
+        play(q, a, 1);
+        if (under < 0 && fabsf(q.hero.x + HERO_W / 2 - (30 * TILE + TILE / 2)) <= 8 * DP) under = q.time;
+        if (countProjectiles(q, PROJ_COCONUT) > 0) dropped = q.time;
+    }
+    CHECK(under >= 0 && dropped >= 0 && dropped - under >= 0.3f - 0.001f && dropped - under <= 0.3f + 2 * DT);
+    if (dropped < 0) return;
+    for (const Projectile& p : q.projectiles)
+        if (p.kind == PROJ_COCONUT) CHECK(p.trap && p.damage == (int)lroundf(q.stats.maxHp * 0.2f) && p.vy == 200 * DP);
+    play(q, Actions(), (int)(3.9f / DT));
+    CHECK(q.traps[0].state == 2);
+    play(q, Actions(), (int)(0.2f / DT));
+    CHECK(q.traps[0].state == 0);
+}
+
+// A tree monkey hanging from the ceiling drops on the hero below and throws one banana as it lands.
+static void treeMonkeyThrowsOnLanding() {
+    TestArea t;
+    makeArea(t, {{4, std::string(WIDE_COLS, '#')}, {19, withLetter(30, 'E')}});
+    Quest q;
+    startQuest(q, t, CLASS_KNIGHT, 11, 1, 31, 2);   // a tile aside, so the banana flies a little before it hits
+    q.godMode = true;
+    CHECK(q.enemies.size() == 1 && q.enemies[0].state == ES_HANG);
+    int bananas = 0;
+    for (int i = 0; i < 180; i++) {
+        play(q, Actions(), 1);
+        bananas = std::max(bananas, countProjectiles(q, PROJ_BANANA));
+    }
+    CHECK(q.enemies[0].onGround && bananas == 1);
+}
+
+// A peel slides the hero 0.5 s the way it faced, at 100 px/s or more, whatever the stick says.
+static void peelSlidesTheHero() {
+    TestArea t;
+    makeArea(t, {});
+    Quest q;
+    startQuest(q, t, CLASS_KNIGHT, 11, 1, 20, 2);
+    q.hazards.push_back({HAZARD_PEEL, 22.0f * TILE, 20.0f * TILE, 6});
+    Actions a = {};
+    a.moveX = 1;
+    for (int i = 0; i < 120 && q.hero.slideTimer <= 0; i++) play(q, a, 1);
+    CHECK(q.hero.slideTimer > 0);
+    float x0 = q.hero.x;
+    a.moveX = -1;   // pushing back changes nothing while sliding
+    play(q, a, (int)(0.4f / DT));
+    CHECK(q.hero.x - x0 >= 100 * DP * 0.4f - DP);
+    play(q, a, (int)(0.3f / DT));
+    CHECK(q.hero.slideTimer <= 0);
+}
+
+// Inside the stink mist the hero loses 3 % of max HP per second (no i-frames, no knockback).
+static void mistHurtsOverTime() {
+    TestArea t;
+    makeArea(t, {});
+    Quest q;
+    startQuest(q, t, CLASS_KNIGHT, 11, 1, 20, 2);
+    q.hazards.push_back({HAZARD_MIST, q.hero.x + HERO_W / 2, q.hero.y + HERO_H / 2, 6});
+    int hp = q.hero.hp;
+    play(q, Actions(), 60);
+    float expected = q.stats.maxHp * 0.03f;
+    CHECK(fabsf(hp - q.hero.hp - expected) <= 1.5f && q.hero.iframes == 0);
+}
+
+// The Silverback's POUND wave (12 px tall) is cleared by a jump at the right moment and hurts a hero who stays down.
+static void silverbackWaveCanBeJumped() {
+    for (int jump = 0; jump < 2; jump++) {
+        TestArea t;
+        makeArea(t, {});
+        Quest q;
+        startQuest(q, t, CLASS_KNIGHT, 11, 1, 20, 2);
+        startBoss(q, QBOSS_SILVERBACK, 60 * TILE, 20.0f * TILE);
+        QuestBoss& b = q.bosses[0];
+        b.attack = 0;   // POUND
+        b.step = 0;
+        b.timer = 0;
+        int hp = q.hero.hp;
+        bool jumped = false, passed = false;
+        for (int i = 0; i < 6 * 60 && !passed; i++) {
+            Actions a = {};
+            a.jumpHeld = true;
+            for (const Projectile& p : q.projectiles)
+                if (p.kind == PROJ_WAVE && p.vx < 0 && jump && !jumped && p.x - (q.hero.x + HERO_W) < 22 * DP) a.jump = jumped = true;
+            play(q, a, 1);
+            if (q.bosses[0].attack != 0) q.bosses[0].gap = 99;   // only the one pound
+            passed = q.hero.hp < hp;
+            bool waveLeft = false;
+            for (const Projectile& p : q.projectiles) waveLeft |= p.kind == PROJ_WAVE && p.vx < 0 && p.x > q.hero.x;
+            if (i > 60 && !waveLeft) break;
+        }
+        CHECK(jump ? q.hero.hp == hp && jumped : q.hero.hp < hp);
+    }
+}
+
+// Both world 2 bosses use every attack of both phases within a minute each, and the Monkey King only lands on its trees.
+static void worldTwoBossesUseEveryAttack() {
+    for (int id : {QBOSS_MONKEY_KING, QBOSS_SILVERBACK}) {
+        std::string anchors = withLetter(13, 'X'), trees = row(WIDE_COLS, 10, 16, '-');
+        anchors[63] = 'X';
+        trees.replace(60, 7, "-------");
+        TestArea t;
+        makeArea(t, {{11, anchors}, {12, trees}});
+        Quest q;
+        startQuest(q, t, CLASS_ARCHER, 11, 1, 38, 2);
+        q.godMode = true;
+        startBoss(q, id, id == QBOSS_MONKEY_KING ? 13 * TILE + TILE / 2.0f : 40.0f * TILE, id == QBOSS_MONKEY_KING ? 12.0f * TILE : 20.0f * TILE);
+        bool seen[2][4] = {};
+        for (int i = 0; i < 120 * 60; i++) {
+            if (i == 60 * 60) q.bosses[0].hp = q.bosses[0].maxHp / 2;
+            play(q, Actions(), 1);
+            const QuestBoss& b = q.bosses[0];
+            if (b.attack >= 0 && b.attack < 4) seen[b.phase - 1][b.attack] = true;
+            if (id == QBOSS_MONKEY_KING && b.attack < 0 && b.shift <= 0 && i > 0)   // between attacks it sits on a tree
+                CHECK(fabsf(b.y + b.h - 12 * TILE) < 1);
+        }
+        CHECK(seen[0][0] && seen[0][1] && seen[0][2] && seen[1][0] && seen[1][1] && seen[1][2] && seen[1][3] && !seen[0][3]);
+        CHECK(q.bosses[0].phase == 2);
+    }
+}
+
+// --- World 3 (spec §9, §12): icicles, crumbling ice, wind, the frozen status, the Yeti and the Titan. ---
+// An icicle falls 0.25 s after the hero comes within 12 px below it (20 % trap, 280 px/s); it stays gone until a rest.
+static void icicleFallsOnceUntilRest() {
+    TestArea t;
+    makeArea(t, {{4, std::string(WIDE_COLS, '#')}, {5, withLetter(30, 'Y')}});
+    Quest q;
+    startQuest(q, t, CLASS_KNIGHT, 17, 1, 20, 3);
+    CHECK(q.traps.size() == 1 && q.traps[0].kind == 'Y');
+    Actions a = {};
+    a.moveX = 1;
+    float near = -1, dropped = -1;
+    for (int i = 0; i < 240 && dropped < 0; i++) {
+        play(q, a, 1);
+        if (near < 0 && fabsf(q.hero.x + HERO_W / 2 - (30 * TILE + TILE / 2)) <= 12 * DP) near = q.time;
+        if (countProjectiles(q, PROJ_ICICLE) > 0) dropped = q.time;
+    }
+    CHECK(near >= 0 && dropped >= 0 && dropped - near >= 0.25f - 0.001f && dropped - near <= 0.25f + 2 * DT);
+    for (const Projectile& p : q.projectiles)
+        if (p.kind == PROJ_ICICLE) CHECK(p.trap && p.damage == (int)lroundf(q.stats.maxHp * 0.2f) && p.vy == 280 * DP);
+    spawnEnemies(q);   // coming back without a rest: still gone
+    CHECK(q.traps[0].state == 2);
+    for (auto& killed : q.killed) killed.assign(killed.size(), 0);   // a rest
+    spawnEnemies(q);
+    CHECK(q.traps[0].state == 0);
+}
+
+// A crumbling block shakes 0.6 s under the hero, breaks, and returns 4 s later once the hero is off its tile.
+static void crumblingIceBreaksAndReturns() {
+    TestArea t;
+    std::string floor(WIDE_COLS, '#');
+    floor[30] = 'c';
+    makeArea(t, {{20, floor}});
+    Quest q;
+    startQuest(q, t, CLASS_KNIGHT, 17, 1, 30, 3);
+    play(q, Actions(), (int)(0.55f / DT));
+    CHECK(tileAt(q.area, 30, 20) == 'c');
+    play(q, Actions(), (int)(0.1f / DT));
+    CHECK(tileAt(q.area, 30, 20) == '.');
+    Hero moved = standing(t, 10);
+    q.hero.x = moved.x;
+    q.hero.y = moved.y;
+    play(q, Actions(), (int)(4.1f / DT));
+    CHECK(tileAt(q.area, 30, 20) == 'c');
+}
+
+// World 3's wind zones push 40 px/s and turn around every 3 s.
+static void windFlipsEveryThreeSeconds() {
+    TestArea t;
+    makeArea(t, {{19, row(WIDE_COLS, 2, WIDE_COLS - 3, '>')}});
+    Quest q;
+    startQuest(q, t, CLASS_KNIGHT, 17, 1, 40, 3);
+    q.godMode = true;
+    float x0 = q.hero.x;
+    play(q, Actions(), (int)(2.0f / DT));
+    CHECK(fabsf(q.hero.x - x0 - 40 * DP * 2) < 3 * DP);
+    play(q, Actions(), (int)(1.5f / DT));   // past 3 s
+    float x1 = q.hero.x;
+    play(q, Actions(), (int)(2.0f / DT));
+    CHECK(fabsf(q.hero.x - x1 + 40 * DP * 2) < 3 * DP);
+}
+
+// The Yeti's ice cube freezes the hero 1.2 s with no control; each X or R1 press cuts 0.15 s.
+static void frozenHeroBreaksFreeSoonerByMashing() {
+    float freed[2];
+    for (int mash = 0; mash < 2; mash++) {
+        TestArea t;
+        makeArea(t, {});
+        Quest q;
+        startQuest(q, t, CLASS_KNIGHT, 17, 1, 20, 3);
+        Projectile cube = {};
+        cube.x = q.hero.x;
+        cube.y = q.hero.y;
+        cube.w = cube.h = (int)(8 * DP);
+        cube.range = 100;
+        cube.kind = PROJ_ICE_CUBE;
+        q.projectiles.push_back(cube);
+        play(q, Actions(), 1);
+        CHECK(q.hero.frozenTimer > 1.1f && q.hero.hp == q.stats.maxHp);
+        float x0 = q.hero.x, start = q.time;
+        Actions a = {};
+        a.moveX = 1;
+        for (int i = 0; i < 120 && q.hero.frozenTimer > 0; i++) {
+            a.jump = mash && i % 6 == 0;
+            play(q, a, 1);
+            if (q.hero.frozenTimer > 0) CHECK(q.hero.x == x0);
+        }
+        freed[mash] = q.time - start;
+    }
+    CHECK(fabsf(freed[0] - 1.2f) < 3 * DT && freed[1] < 0.7f);
+}
+
+// Phase 2 of the Glacier Titan turns the middle 10 floor tiles to crumbling ice and starts the flipping blizzard.
+static void titanPhaseTwoCracksTheFloor() {
+    TestArea t;
+    makeArea(t, {});
+    Quest q;
+    startQuest(q, t, CLASS_ARCHER, 17, 2, 10, 3);
+    q.godMode = true;
+    startBoss(q, QBOSS_TITAN, 60.0f * TILE, 20.0f * TILE);
+    q.bosses[0].hp = q.bosses[0].maxHp / 2;
+    play(q, Actions(), 2);
+    int cracked = 0;
+    for (int col = 0; col < WIDE_COLS; col++) cracked += tileAt(q.area, col, 20) == 'c';
+    CHECK(cracked == 10 && tileAt(q.area, 35, 20) == 'c' && tileAt(q.area, 44, 20) == 'c' && tileAt(q.area, 45, 20) == '#');
+    CHECK(q.traps.size() == 10);
+    play(q, Actions(), (int)(1.0f / DT));   // past the 0.8 s phase-change pose
+    float wind = q.area.wind;
+    CHECK(fabsf(wind) == 40 * DP);
+    play(q, Actions(), (int)(4.1f / DT));
+    CHECK(q.area.wind == -wind);
+}
+
+// Both world 3 bosses use every attack of each phase.
+static void worldThreeBossesUseEveryAttack() {
+    for (int id : {QBOSS_YETI, QBOSS_TITAN}) {
+        TestArea t;
+        makeArea(t, {});
+        Quest q;
+        startQuest(q, t, CLASS_ARCHER, 17, 2, 10, 3);
+        q.godMode = true;
+        startBoss(q, id, 40.0f * TILE, 20.0f * TILE);
+        bool seen[2][3] = {};
+        for (int i = 0; i < 120 * 60; i++) {
+            if (i == 60 * 60) q.bosses[0].hp = q.bosses[0].maxHp / 2;
+            play(q, Actions(), 1);
+            q.hero.frozenTimer = 0;
+            const QuestBoss& b = q.bosses[0];
+            if (b.attack >= 0 && b.attack < 3) seen[b.phase - 1][b.attack] = true;
+        }
+        for (int p = 0; p < 2; p++)
+            for (int k = 0; k < 3; k++) CHECK(seen[p][k]);
+        CHECK(q.bosses[0].phase == 2 && q.bosses[0].alive);
+    }
+}
+
 static void renderMaps() {
     screenSetTarget(questPixels, QUEST_W, QUEST_H);
     int written = 0;
@@ -1766,6 +2064,7 @@ int main(int argc, char** argv) {
     referenceHitIsTwentyPercent();
     classesDifferAsDesigned();
     basicAttackKillsFodderInThreeHits();
+    thiefStabsUp();
     arrowsHitEveryGroundEnemy();
     knightSwingHitsOnlyInItsWindow();
     skillCastMidSwingStillHits();
@@ -1805,10 +2104,25 @@ int main(int argc, char** argv) {
     bossFightLocksAndUnlocksExits();
     bigBossStaysDeadMiniBossReturns();
     bossDeathLightsTheNextWorld();
+    coconutDropsWhenHeroPassesUnder();
+    treeMonkeyThrowsOnLanding();
+    peelSlidesTheHero();
+    mistHurtsOverTime();
+    silverbackWaveCanBeJumped();
+    worldTwoBossesUseEveryAttack();
+    icicleFallsOnceUntilRest();
+    crumblingIceBreaksAndReturns();
+    windFlipsEveryThreeSeconds();
+    frozenHeroBreaksFreeSoonerByMashing();
+    titanPhaseTwoCracksTheFloor();
+    worldThreeBossesUseEveryAttack();
     everythingIsReachable();
-    gateGuardsTheSecondHalf();
-    worldLayoutRulesHold(1);
-    chestsMatchTheWorldList();
+    for (int world : {1, 2}) {
+        gateGuardsTheSecondHalf(world);
+        worldLayoutRulesHold(world);
+    }
+    chestsMatchTheWorldList(1, 3);   // VIAL SHARD, MAP PAGE 1, STAR IRON
+    chestsMatchTheWorldList(2, 2);   // VIAL SHARD, MAP PAGE 2
     printf(failures ? "%d quest check(s) failed\n" : "all quest tests passed\n", failures);
     return failures ? 1 : 0;
 }
