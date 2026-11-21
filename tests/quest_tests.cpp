@@ -25,7 +25,7 @@ static int failures = 0;
 const float DT = 1.0f / 60;
 const char* const LEGEND = ".#-|^~icgkzf<>vuSCMNPTKABDEFQWRYXLO";
 const char* const OBJECTS_TO_REACH = "CMNTKQW";
-const int REACH_WORLDS[] = {WORLD_NAMULA, 1, 2, WORLD_TEST};   // phases 5-9 add their worlds
+const int REACH_WORLDS[] = {WORLD_NAMULA, 1, 2, 3, WORLD_TEST};   // phases 5-9 add their worlds
 
 static const Sprite* const ALL_QUEST_SPRITES[] = {
     &HERO_KNIGHT_IDLE_1, &HERO_KNIGHT_IDLE_2, &HERO_KNIGHT_WALK_1, &HERO_KNIGHT_WALK_2, &HERO_KNIGHT_WALK_3,
@@ -2007,6 +2007,29 @@ static void worldThreeBossesUseEveryAttack() {
     }
 }
 
+// Phase 5 story (spec §14): Garrick asks for a RED POTION and thanks the hero who has one; Ilsa and Lio speak of the
+// latest Great Name of worlds 2 and 3.
+static void worldTwoAndThreeStoryLines() {
+    TestArea t;
+    makeArea(t, {});
+    Quest q;
+    startQuest(q, t, CLASS_KNIGHT, 11, 1, 20, 2);
+    q.save.items[ITEM_RED] = 0;
+    talkTo(q, NPC_GARRICK);
+    CHECK(q.dialogue.pages.size() == 1 && q.dialogue.pages[0] == "I... I CAN'T WALK. DO YOU HAVE A RED POTION?");
+    q.save.items[ITEM_RED] = 1;
+    talkTo(q, NPC_GARRICK);
+    CHECK(q.dialogue.pages.size() == 2 && q.dialogue.pages[0].find("RED POTION") != std::string::npos);
+    q.save.ilsaTalks = 3;
+    for (int w = 2; w <= 3; w++) {
+        q.save.bosses |= 1u << w;
+        talkTo(q, NPC_ILSA);
+        CHECK(q.dialogue.pages.size() == 2 && q.dialogue.pages[0].find(w == 2 ? "LEAVES" : "COLD") != std::string::npos);
+        talkTo(q, NPC_LIO);
+        CHECK(q.dialogue.pages.size() == 2 && q.dialogue.pages[1].find(w == 2 ? "SILVERBACK" : "TITAN") != std::string::npos);
+    }
+}
+
 static void renderMaps() {
     screenSetTarget(questPixels, QUEST_W, QUEST_H);
     int written = 0;
@@ -2116,13 +2139,15 @@ int main(int argc, char** argv) {
     frozenHeroBreaksFreeSoonerByMashing();
     titanPhaseTwoCracksTheFloor();
     worldThreeBossesUseEveryAttack();
+    worldTwoAndThreeStoryLines();
     everythingIsReachable();
-    for (int world : {1, 2}) {
+    for (int world : {1, 2, 3}) {
         gateGuardsTheSecondHalf(world);
         worldLayoutRulesHold(world);
     }
     chestsMatchTheWorldList(1, 3);   // VIAL SHARD, MAP PAGE 1, STAR IRON
     chestsMatchTheWorldList(2, 2);   // VIAL SHARD, MAP PAGE 2
+    chestsMatchTheWorldList(3, 3);   // VIAL SHARD, MAP PAGE 3, FROZEN FEATHER
     printf(failures ? "%d quest check(s) failed\n" : "all quest tests passed\n", failures);
     return failures ? 1 : 0;
 }

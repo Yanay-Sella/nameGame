@@ -338,7 +338,7 @@ Run `make test`: all pass.
   new HP table; add one ticked criterion per new test (with its `tests/game_tests.cpp › name`), and unchecked PS3 criteria:
   "Waves 10 and 20 show two bosses, each in its half" · "The mage's ball charges at the wand tip and the beam reads clearly; 60 fps holds" ·
   "Twin mages at wave 20 are beatable but threatening (player report)". The old "hp 150/200/250" PS3 evidence stays in History, not in criteria.
-- `docs/features/level-1/design.md`: intro "same bosses" → "the bosses differ per boss wave ([Bosses](../bosses/design.md))";
+- `docs/features/level-1/design.md`: intro "same bosses" → "the bosses differ per boss wave ([Bosses](../features/bosses/design.md))";
   bundle row Bosses → "One classic at wave 5 (100 HP), two at 10 (100 HP each), a mage at 15 (200 HP), two mages at 20 (200 HP each)";
   wave-table rows:
   - `| 5 | Mid boss: 1 classic, 100 HP, sway 40 px/s, attack every 2.5 s | boss | 0.75 | climax |`

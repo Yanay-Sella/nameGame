@@ -47,6 +47,7 @@
 - [x] World 1's layers keep the value rules; its props never block spots; every ground shape has art. *(`tests/quest_tests.cpp` › layersObeyTheValueRules, propsNeverBlockSpots, everyGroundShapeHasArt)*
 - [x] The user approves world 1's style frame (`shots/world1-style-frame-1.png`, `-2.png`, sent 2026-11-21). *(user, 2026-11-21)*
 - [x] The user approves world 2's style frame (`shots/style-w2-entry.png`, `-right.png`, `-characters.png`, sent 2026-11-21). *(user, 2026-11-21)*
+- [x] The user approves world 3's style frame (`shots/style-w3-entry.png`, `-right.png`, `-characters.png`, sent 2026-11-21). *(user, 2026-11-21)*
 - [x] Everything in world 1 is reachable and no spot is a soft lock; with the gate closed, the dome and the med bay checkpoint are out of reach and the hangar is not. *(`tests/quest_tests.cpp` › everythingIsReachable, gateGuardsTheSecondHalf)*
 - [x] World 1 keeps spec §4's layout rules (main path 13: 0 1 2 3 4 5 9 10 11 12 17 18 19; the hangar 7th, the gate next, the second checkpoint 3 before the dome; 3 dead ends, a loop, a shortcut, 2 portals, 3 tall areas, the surveyors) and §8's counts per band; each world 1 chest appears once, the shard, page and STAR IRON in dead ends. *(`tests/quest_tests.cpp` › worldLayoutRulesHold, chestsMatchTheWorldList)*
 - [x] A locked arena's ladder down holds the hero instead of killing them. *(`tests/quest_tests.cpp` › bossFightLocksAndUnlocksExits)*
@@ -60,6 +61,17 @@
 - [ ] On the PS3: no white noise left under Namula and the DRIFTING STATION ENTRY (the hums removed). *(the user listens)*
 - [ ] On the PS3: with `quest_namula.ogg`, `quest_world1.ogg` and `quest_boss.ogg` packaged, each plays in its place, the boss song during a fight and the world's song after; a missing song falls back to the ambience. *(the user listens; PS3 log: `audio: quest_world1.ogg loaded`)*
 - [ ] The user plays world 1 from a new slot: a first run takes at least 2 hours; each boss takes more than one try; never stuck. Notes: *(user)*
+- [x] Coconuts drop 0.3 s after the hero passes under a palm (20 %, 200 px/s) and regrow in 4 s; the tree monkey throws one banana on landing; a peel slides the hero 0.5 s; the stink mist takes 3 % per second; a jump clears the Silverback's wave. *(`tests/quest_tests.cpp` › coconutDropsWhenHeroPassesUnder, treeMonkeyThrowsOnLanding, peelSlidesTheHero, mistHurtsOverTime, silverbackWaveCanBeJumped)*
+- [x] An icicle falls 0.25 s after the hero comes within 12 px below (20 %, 280 px/s) and stays gone until a rest; crumbling ice breaks after 0.6 s and returns 4 s later; world 3's wind pushes 40 px/s and turns every 3 s; mashing X frees a frozen hero sooner than waiting 1.2 s; the Titan's phase 2 cracks the middle 10 floor tiles and starts the blizzard. *(`tests/quest_tests.cpp` › icicleFallsOnceUntilRest, crumblingIceBreaksAndReturns, windFlipsEveryThreeSeconds, frozenHeroBreaksFreeSoonerByMashing, titanPhaseTwoCracksTheFloor)*
+- [x] The four world 2-3 bosses use every attack of both phases. *(`tests/quest_tests.cpp` › worldTwoBossesUseEveryAttack, worldThreeBossesUseEveryAttack)*
+- [x] Garrick asks for a RED POTION and thanks a hero who carries one; Ilsa and Lio speak of the world 2 and 3 Great Names. *(`tests/quest_tests.cpp` › worldTwoAndThreeStoryLines)*
+- [x] Worlds 2 and 3: everything is reachable with no soft lock; the gate guards the second half; spec §4's layout rules and §8's counts hold (main paths 13 areas each); each chest appears once, shards, pages and the FROZEN FEATHER in dead ends; arrows hit every ground enemy; the layers keep the value rules. *(`tests/quest_tests.cpp` › everythingIsReachable, gateGuardsTheSecondHalf, worldLayoutRulesHold, chestsMatchTheWorldList, arrowsHitEveryGroundEnemy, layersObeyTheValueRules)*
+- [x] `make quest-maps`: all 80 world 2-3 screens read (the icicles were moved under low outcrops so they show below the HUD). *(2026-11-21)*
+- [x] On the Mac: the Monkey King leaps to its tree and throws bananas; the Yeti and the Titan fight at 60 fps; Garrick's line fits the box. *(`make mac-run` 2026-11-21)*
+- [ ] On the PS3: a dev save at world 2 area 19 (phase 4 step 10 method): the Silverback in god mode, one phase-2 screenshot. *(PS3 log: `quest: boss SILVERBACK start`, `phase 2`, `down after`; fps ≥ 59)*
+- [ ] On the PS3: a dev save at world 3 area 19: the Glacier Titan in god mode, one phase-2 screenshot. *(PS3 log: `quest: boss THE GLACIER TITAN start`, `phase 2`, `down after`; fps ≥ 59)*
+- [ ] The user plays world 2 from its entry: never stuck; the coconuts, peels and wave feel fair; each boss takes more than one try. Notes: *(user)*
+- [ ] The user plays world 3 from its entry: never stuck; the ice, wind and icicles read in time; the frozen block feels fair. Notes: *(user)*
 
 ## Playtest checks
 1. `NAMEGAME_QUEST='slot=3 class=3 world=0 area=0' make mac-run BUTTONS='2|right:1.5|cross|1|l1|1|quit'`: the Thief in Namula, HUD at the top left.
@@ -72,6 +84,9 @@
 8. `NAMEGAME_QUEST='slot=3 class=0 world=1 area=0 level=4' make mac-run BUTTONS='right:0.7|l1|1|quit'`: world 1's style frame.
 9. `NAMEGAME_QUEST='slot=3 class=2 world=8 area=4 level=4' make mac-run BUTTONS='l2+l3|right:6|r1:3|l1|1|quit'`: the Overseer (area=5: the Star Mage).
 10. On the PS3, walk Namula's three areas with every class: steps, ladders and the cliffs feel calm; the jump feels right.
+11. `NAMEGAME_QUEST='slot=3 class=0 world=2 area=0 level=11 gear=1' make mac-run BUTTONS='right:0.7|l1|1|quit'`: world 2's style frame (world=3 level=17 gear=2: world 3's).
+12. `NAMEGAME_QUEST='slot=3 class=1 world=2 area=6 level=11 gear=1' make mac-run BUTTONS='l2+l3|9|l1|1|quit'`: the Monkey King on its tree (area=19: the Silverback; world=3 area=6 or 19 level=17 gear=2: the Yeti, the Titan).
+13. `NAMEGAME_QUEST='slot=3 class=0 world=2 area=12 level=11 gear=1' make mac-run BUTTONS='2|right:0.55|1|up|1.5|l1|1|quit'`: Garrick's line.
 
 ## History
 - 2026-11-20: criteria written; Mac checks done.
@@ -80,3 +95,4 @@
 - 2026-11-21: phase 4 (in progress): 5 boss checks, world 1 art checks, style frame sent for the user's OK.
 - 2026-11-21: phase 4: world 1's areas; layout, gate and chest checks; maps read; boss fight lengths measured. PS3 checks open.
 - 2026-11-21: phase 2 review: two checks added; Mac screenshots of the four tier-3 skills and the death and echo loop; `make ps3` builds.
+- 2026-11-21: phase 5: worlds 2 and 3: 12 checks for their hazards, bosses and story; both worlds in the layout, reach and chest checks; maps read; Mac checks done. PS3 checks and the user's playtests open.

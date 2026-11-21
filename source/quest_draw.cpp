@@ -31,7 +31,7 @@ const int MAP_CELL_W = 12 * DP, MAP_CELL_H = 8 * DP;
 #define NPC_ROW(N) {&NPC_##N##_A, &NPC_##N##_B}
 static const Sprite* const NPC_FRAMES[NPC_SURVEYOR_FIRST + 1][2] = {
     NPC_ROW(ILSA), NPC_ROW(MARRA), NPC_ROW(BRANN), NPC_ROW(LIO), NPC_ROW(PELL), NPC_ROW(SELA), NPC_ROW(ODO), NPC_ROW(WREN),
-    NPC_ROW(YSOLDE), NPC_ROW(KIT), NPC_ROW(GATEKEEPER), NPC_ROW(TOBIN), {}, {}, {}, {}, NPC_ROW(SURVEYOR)};
+    NPC_ROW(YSOLDE), NPC_ROW(KIT), NPC_ROW(GATEKEEPER), NPC_ROW(TOBIN), NPC_ROW(GARRICK), {}, {}, {}, NPC_ROW(SURVEYOR)};
 // Boss frames: idle 1-2, tell, attack, hurt, phase 2 (spec §22); bosses of later phases have none yet.
 #define BOSS_ROW(N) {&BOSS_##N##_IDLE_1, &BOSS_##N##_IDLE_2, &BOSS_##N##_TELL, &BOSS_##N##_ATTACK, &BOSS_##N##_HURT, &BOSS_##N##_PHASE2}
 static const Sprite* const BOSS_FRAMES[6][6] = {BOSS_ROW(OVERSEER), BOSS_ROW(STAR_MAGE), BOSS_ROW(MONKEY_KING), BOSS_ROW(SILVERBACK),

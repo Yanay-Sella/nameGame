@@ -507,7 +507,7 @@ All new drawing uses only existing palette characters; nothing the player makes 
   - Change log `0.25 (2026-11-18): level buffs and a ship skin per level (D-030, D-031).`
 - "Ship skin" rows in `jungle`, `glacier`, `volcano`, `deep-sea` `design.md`: the new skin in a few words (deep sea keeps
   "; a moving ship trails bubbles"). `level-1/design.md` row: "The current ship; later levels have their own skins (D-031)".
-- `rocket/design.md`: one rule: "R2 fires the armed strong attack: the rocket, or a level buff's ([level buffs](../level-buffs/design.md))".
+- `rocket/design.md`: one rule: "R2 fires the armed strong attack: the rocket, or a level buff's ([level buffs](../features/level-buffs/design.md))".
 - Don't touch `docs/level-guide/` (its PDF is made separately).
 - Run `python3 .claude/skills/game-docs/scripts/check_docs.py docs`: clean.
 
