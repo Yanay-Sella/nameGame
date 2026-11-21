@@ -68,6 +68,10 @@ skill), and so does the rule that no basic attack or dodge starts while a skill 
 - Nothing else in the movement code changes (the drink x0.4 and the feather x1.15 stay).
 - Add a test now (step 11 lists it): `basicAttackKeepsFullSpeed`. `make test`.
 
+> **Changed 2026-11-22 (D-065, the user's call at step 5):** the heroes are built on the reference archer's exact build: a 32 x 28
+> art-px canvas (64 x 56 real px), no outline, head rows 0-14, body 15-21, legs 22-27, feet on row 27, the hitbox on art
+> columns 12-19, drawn at (x - 12 dp, y + 14 - 28 dp). The canvas, body box, outline and box numbers below are the original plan.
+
 ## Step 2: the hero palette and the new hero art (`source/sprites.h`, `art-tools/make_quest_art.py`, new `art-tools/heroes.py`)
 
 ### Palette

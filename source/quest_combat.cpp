@@ -12,7 +12,6 @@
 const float ROLL_TIME = 0.35f, ROLL_SPEED = 140 * DP, ROLL_IFRAMES = 0.25f, ROLL_COOLDOWN = 0.6f;
 const float BLINK_DISTANCE = 48 * DP, BLINK_IFRAMES = 0.2f, BLINK_COOLDOWN = 0.8f;
 const float HURT_VX = 90 * DP, HURT_TIME = 0.25f, HURT_IFRAMES = 1.0f;
-const float BASIC_SLOW = 0.5f;                      // Archer and Magician walk at x0.5 while the basic attack plays
 const float BASIC_MULT_BY_JOB[4] = {1.0f, 1.15f, 1.3f, 1.5f};
 // The basic attack per class: cycle, multiplier, melee window and box, or the shot's speed, range and size.
 struct BasicAttack { float cycle, mult, from, to, boxW, boxH, speed, range, shotW, shotH; Sound sound; };
@@ -22,17 +21,19 @@ const BasicAttack BASIC[CLASS_COUNT] = {
     {0.50f, 1.1f, 0, 0, 0, 0, 200 * DP, 130 * DP, 6 * DP, 6 * DP, SOUND_Q_SPELL},
     {0.26f, 0.7f, 0.04f, 0.10f, 16 * DP, 12 * DP, 0, 0, 0, 0, SOUND_Q_STAB},
 };
-// Strong attacks by class and job tier (spec §6): MP cost, how long the skill plays, and the rooted cast part.
+// Strong attacks by class and job tier (spec §6): MP cost and how long the skill plays.
 const int SKILL_MP[CLASS_COUNT][4] = {{10, 12, 16, 24}, {8, 14, 18, 26}, {10, 14, 20, 34}, {8, 12, 16, 30}};
 const float SKILL_TIME[CLASS_COUNT][4] = {{0.6f, 0.3f, 0.3f, 0.3f}, {0.25f, 0.25f, 0.25f, 0.45f}, {0.3f, 0.3f, 0.3f, 0.6f},
                                           {0.25f, 0.15f, 0.5f, 0.25f}};
-const float SKILL_CAST[CLASS_COUNT][4] = {{0.6f, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0.6f}, {0, 0, 0.5f, 0}};
 const float PARTNER_TIME = 12, PARTNER_BEHIND = 10 * DP, PARTNER_MULT = 0.5f;
+const float METEOR_TIME = 0.6f;   // Meteor lands 0.6 s after the press (spec §6)
 const float SHADOW_DASH_SPEED = 72 * DP / 0.15f;
+const float RUN_FRAME = 0.1f;   // s per run frame (spec §22)
 // Hit feel (spec §7).
 const float BOSS_FLASH = 0.2f;   // a boss is white for its first 0.08 s, then shows its hurt frame
 const float FLASH_TIME = 0.08f, KNOCK_TIME = 0.1f, KNOCK_SPEED = 40 * DP, HIT_STOP = 0.04f, HURT_STOP = 0.08f, HURT_TRAUMA = 0.3f;
 const float NUMBER_TIME = 0.6f;
+const float BASIC_HIT_STOP = 0.025f, SPARK_TIME = 0.12f;   // melee basic hits stop the action briefly (D-063); hit sparks
 const int MAX_NUMBERS = 24, KILL_PARTICLES = 8;
 // Enemy stats by kind (spec §7): fodder, soldier, elite.
 const float HIT_FRACTION[3] = {0.15f, 0.20f, 0.25f}, HITS_TO_KILL[3] = {3, 5, 12}, NAMES_MULT[3] = {1, 2, 5};
@@ -584,7 +585,7 @@ void hurtHero(Quest& q, int damage, float sourceX, float bounceVy) {
     h.onGround = h.climbing = false;
     h.hurtTimer = HURT_TIME;
     h.iframes = HURT_IFRAMES;
-    h.rollTimer = h.castTimer = 0;
+    h.rollTimer = 0;
     h.skill = -1;
     q.soundRequested[SOUND_Q_HURT] = true;
     q.hitStop = fmaxf(q.hitStop, HURT_STOP);
@@ -601,8 +602,21 @@ static uint32_t mainColor(const Sprite& s) {
     return paletteColor(best);
 }
 
+static void addEffect(Quest& q, int kind, float x, float y, float w, float h, float life, char color, float x2 = 0, float y2 = 0) {
+    q.effects.push_back({kind, x, y, w, h, x2, y2, 0, life, q.hero.facingLeft, color});
+}
+
+// A hit spark at the contact point: the spark shape and 4 particles flying out, in the hit's colour (phase 5b).
+static void spark(Quest& q, float x, float y, char color) {
+    addEffect(q, FX_SPARK, x, y, 0, 0, SPARK_TIME, color);
+    for (int i = 0; i < 4 && q.particles.size() < PARTICLE_CAP; i++) {
+        float angle = random01(q) * 6.2832f, speed = (40 + 40 * random01(q)) * DP;
+        q.particles.push_back({x, y, cosf(angle) * speed, sinf(angle) * speed, 0.15f, paletteColor(color), 1});
+    }
+}
+
 static void burst(Quest& q, float x, float y, uint32_t color, int count) {
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i < count && q.particles.size() < PARTICLE_CAP; i++) {
         float angle = random01(q) * 6.2832f, speed = (30 + 50 * random01(q)) * DP;
         q.particles.push_back({x, y, cosf(angle) * speed, sinf(angle) * speed, 0.4f + 0.3f * random01(q), color, 1});
     }
@@ -625,6 +639,7 @@ static void hitEnemy(Quest& q, int index, float mult, bool strong, float sourceX
     int damage = damageToEnemy(atk, mult, 0.9f + 0.2f * random01(q), crit, q.stats.critMult, mod);
     e.hp -= damage;
     e.flash = FLASH_TIME;
+    spark(q, fmaxf(e.x, fminf(sourceX, e.x + e.w)), e.y + e.h / 2, strong ? 'N' : 'w');
     addNumber(q, ex, e.y, damage, crit ? 'o' : 'w');
     q.soundRequested[crit ? SOUND_Q_CRIT : SOUND_Q_HIT] = true;
     if (type.kind == KIND_FODDER || type.kind == KIND_SOLDIER) {
@@ -658,6 +673,8 @@ static void hitBoss(Quest& q, int index, float mult, bool strong) {
     int damage = damageToEnemy(atk, mult, 0.9f + 0.2f * random01(q), crit, q.stats.critMult, 1);
     b.hp -= damage;
     b.flash = BOSS_FLASH;
+    float heroX = q.hero.x + HERO_W / 2, heroY = q.hero.y + HERO_H / 2;   // the boss box's edge nearest the hero
+    spark(q, fmaxf(b.x, fminf(heroX, b.x + b.w)), fmaxf(b.y, fminf(heroY, b.y + b.h)), strong ? 'N' : 'w');
     addNumber(q, b.x + b.w / 2, b.y, damage, crit ? 'o' : 'w');
     q.soundRequested[crit ? SOUND_Q_CRIT : SOUND_Q_HIT] = true;
     if (strong) q.hitStop = fmaxf(q.hitStop, HIT_STOP);
@@ -731,10 +748,6 @@ static void shoot(Quest& q, float cx, float cy, float angle, float speed, float 
     q.projectiles.push_back(p);
 }
 
-static void addEffect(Quest& q, int kind, float x, float y, float w, float h, float life, char color, float x2 = 0, float y2 = 0) {
-    q.effects.push_back({kind, x, y, w, h, x2, y2, 0, life, q.hero.facingLeft, color});
-}
-
 // The box `w` x `boxH` in front of the hero, centred on its middle (spec §6 boxes).
 static void frontBox(const Hero& h, float w, float boxH, float* x, float* y) {
     *x = h.facingLeft ? h.x - w : h.x + HERO_W;
@@ -749,10 +762,10 @@ static void castSkill(Quest& q, int cls, int job) {
         return;
     }
     h.mp -= SKILL_MP[cls][job];
+    logLine(q, "quest: skill %s", SKILL_NAMES[cls][job]);
     h.attackTimer = 0;   // the skill replaces a basic attack in progress (they would share the swing id)
     h.skill = job;
     h.strongTimer = SKILL_TIME[cls][job];
-    h.castTimer = h.onGround ? SKILL_CAST[cls][job] : 0;
     h.swing++;
     h.volleys = 0;
     float dir = h.facingLeft ? -1 : 1, cx = h.x + HERO_W / 2, handY = h.y + 6 * DP, handX = cx + dir * 6 * DP;
@@ -760,18 +773,13 @@ static void castSkill(Quest& q, int cls, int job) {
     int pierce = cls == CLASS_ARCHER && job >= 1 ? 1 : 0;
     const float DEGREE = 3.14159265f / 180;
     switch (cls * 4 + job) {
-    case CLASS_KNIGHT * 4 + 0: {   // Power Slash: box in updateSkill
-        float x, y;
-        frontBox(h, 30 * DP, 20 * DP, &x, &y);
-        addEffect(q, FX_ARC, x, y, 30 * DP, 20 * DP, 0.3f, 'w');
-        q.soundRequested[SOUND_Q_SWING] = true;
+    case CLASS_KNIGHT * 4 + 0:   // Power Slash: box in updateSkill, drawn from the hero's pose
+        q.soundRequested[SOUND_Q_HEAVY] = true;
         break;
-    }
     case CLASS_KNIGHT * 4 + 1:   // Rising Slash: hop
-        addEffect(q, FX_ARC, h.facingLeft ? h.x - 24 * DP : h.x + HERO_W, h.y + HERO_H - 36 * DP, 24 * DP, 36 * DP, 0.25f, 'b');
         h.vy = -120 * DP;
         h.onGround = false;
-        q.soundRequested[SOUND_Q_SWING] = true;
+        q.soundRequested[SOUND_Q_HEAVY] = true;
         break;
     case CLASS_KNIGHT * 4 + 2: {   // Ground Quake: a shockwave each way along the floor
         int col = (int)floorf(cx / TILE), row = (int)floorf((h.y + HERO_H) / TILE);
@@ -782,26 +790,33 @@ static void castSkill(Quest& q, int cls, int job) {
             }
             break;
         }
+        burst(q, cx + dir * 10 * DP, h.y + HERO_H, paletteColor('H'), 5);   // dust at the sword point
+        burst(q, cx + dir * 10 * DP, h.y + HERO_H, paletteColor('s'), 5);
+        addEffect(q, FX_BURST, cx + dir * 10 * DP, h.y + HERO_H, 10 * DP, 10 * DP, 0.15f, 's');
+        q.trauma = fminf(1, q.trauma + 0.15f);
         q.soundRequested[SOUND_POUND] = true;
         break;
     }
-    case CLASS_KNIGHT * 4 + 3: {   // Lion's Roar: box in updateSkill
-        float x, y;
-        frontBox(h, 72 * DP, 40 * DP, &x, &y);
-        addEffect(q, FX_ARC, x, y, 72 * DP, 40 * DP, 0.35f, 'Y');
+    case CLASS_KNIGHT * 4 + 3:   // Lion's Roar: box in updateSkill, drawn from the hero's pose
+        q.trauma = fminf(1, q.trauma + 0.2f);
         q.soundRequested[SOUND_Q_ROAR] = true;
         break;
-    }
     case CLASS_ARCHER * 4 + 0:   // Double Shot
         for (int k = -1; k <= 1; k += 2) shoot(q, handX, handY + k * 2 * DP, aim, 240 * DP, 170 * DP, 6 * DP, 2 * DP, PROJ_ARROW, 1.5f, true, pierce);
         q.soundRequested[SOUND_Q_ARROW] = true;
         break;
-    case CLASS_ARCHER * 4 + 1:   // Arrow Rain: 6 arrows over a 56 px zone 80 px ahead, from 120 px above
+    case CLASS_ARCHER * 4 + 1: {   // Arrow Rain: 6 arrows over a 56 px zone 80 px ahead, from 120 px above
+        float zoneX = cx + dir * 80 * DP, floorY = h.y + HERO_H;   // the zone marked on the floor below its centre, like Meteor
+        int col = (int)floorf(zoneX / TILE);
+        for (int r = (int)floorf((h.y + HERO_H / 2) / TILE); r < (int)floorf((h.y + HERO_H) / TILE) + 8; r++)
+            if (holdsFeet(tileAt(q.area, col, r)) && !tileSolid(tileAt(q.area, col, r - 1))) { floorY = (float)(r * TILE); break; }
+        addEffect(q, FX_ZONE, zoneX, floorY, 56 * DP, 0, 0.5f, 'w');
         for (int k = 0; k < 6; k++)
             shoot(q, cx + dir * 80 * DP - 28 * DP + k * 56 * DP / 5, h.y - 120 * DP, 3.14159265f / 2, 240 * DP, 300 * DP, 2 * DP, 6 * DP,
                   PROJ_RAIN, 1.6f, true, pierce);
         q.soundRequested[SOUND_Q_ARROW] = true;
         break;
+    }
     case CLASS_ARCHER * 4 + 2:   // Piercing Bolt
         shoot(q, handX, handY, aim, 360 * DP, 300 * DP, 10 * DP, 2 * DP, PROJ_ARROW, 4.0f, true, 99);
         q.soundRequested[SOUND_Q_ARROW] = true;
@@ -846,21 +861,20 @@ static void castSkill(Quest& q, int cls, int job) {
         q.soundRequested[SOUND_Q_ZAP] = true;
         break;
     }
-    case CLASS_MAGICIAN * 4 + 3: {   // Meteor: 0.6 s cast, then it lands 120 px ahead on the floor below
+    case CLASS_MAGICIAN * 4 + 3: {   // Meteor: lands 0.6 s later 120 px ahead on the floor below
         h.skillX = cx + dir * 120 * DP;
         h.skillY = h.y + HERO_H;
         int col = (int)floorf(h.skillX / TILE);
         for (int r = (int)floorf((h.y + HERO_H / 2) / TILE); r < (int)floorf((h.y + HERO_H) / TILE) + 8; r++)
             if (holdsFeet(tileAt(q.area, col, r)) && !tileSolid(tileAt(q.area, col, r - 1))) { h.skillY = (float)(r * TILE); break; }
         h.volleys = 1;
-        h.castTimer = SKILL_CAST[cls][job];   // casts in the air too, keeping its momentum
-        addEffect(q, FX_METEOR, h.skillX, h.skillY, 48 * DP, 48 * DP, SKILL_CAST[cls][job], 'o');
-        q.soundRequested[SOUND_Q_SPELL] = true;
+        addEffect(q, FX_METEOR, h.skillX, h.skillY, 48 * DP, 48 * DP, METEOR_TIME, 'o');
+        q.soundRequested[SOUND_Q_CHARGE] = true;
         break;
     }
     case CLASS_THIEF * 4 + 0:   // Star Toss
         for (int k = -1; k <= 1; k++) shoot(q, handX, handY, aim + dir * k * 10 * DEGREE, 260 * DP, 150 * DP, 4 * DP, 4 * DP, PROJ_STAR, 1.2f, true, 0);
-        q.soundRequested[SOUND_Q_STAB] = true;
+        q.soundRequested[SOUND_Q_THROW] = true;
         break;
     case CLASS_THIEF * 4 + 1:   // Shadow Dash
         h.dashDir = dir;
@@ -868,8 +882,10 @@ static void castSkill(Quest& q, int cls, int job) {
         q.soundRequested[SOUND_Q_DODGE] = true;
         break;
     case CLASS_THIEF * 4 + 2: h.volleys = 5; q.soundRequested[SOUND_Q_SWING] = true; break;   // Blade Fury: 5 hits in updateSkill
-    case CLASS_THIEF * 4 + 3:   // Shadow Partner
+    case CLASS_THIEF * 4 + 3:   // Shadow Partner: smoke where the copy appears
         h.partnerTimer = PARTNER_TIME;
+        burst(q, cx - dir * PARTNER_BEHIND, h.y + HERO_H / 2, paletteColor('x'), 6);
+        burst(q, cx - dir * PARTNER_BEHIND, h.y + HERO_H / 2, paletteColor('p'), 6);
         q.soundRequested[SOUND_Q_SPELL] = true;
         break;
     }
@@ -901,21 +917,42 @@ static void updateSkill(Quest& q, int cls, int job) {
             float aim = h.facingLeft ? 3.14159265f : 0;
             for (int k = -2; k <= 2; k++)
                 shoot(q, cx + dir * 6 * DP, h.y + 6 * DP, aim + k * 10 * 3.14159265f / 180, 240 * DP, 170 * DP, 6 * DP, 2 * DP, PROJ_ARROW, 1.8f, true, 1);
+            burst(q, cx + dir * 6 * DP, h.y + 6 * DP, paletteColor('c'), 4);
             q.soundRequested[SOUND_Q_ARROW] = true;
             h.volleys--;
         }
         break;
-    case CLASS_MAGICIAN * 4 + 3:   // Meteor lands when the cast ends
-        if (h.volleys > 0 && h.castTimer <= 0 && elapsed >= SKILL_CAST[cls][job] - 0.001f) {
+    case CLASS_MAGICIAN * 4 + 3:   // Meteor lands METEOR_TIME after the press
+        if (h.volleys > 0 && elapsed < METEOR_TIME - 0.001f) {
+            // 2 sparks per step spiral in toward the staff tip (art column 24, row 1 of the hero sprite), and the rock's trail.
+            float tipX = h.x - 12 * DP + (h.facingLeft ? 7.5f : 24.5f) * DP, tipY = h.y + HERO_H - 27 * DP;
+            for (int k = 0; k < 2 && q.particles.size() < PARTICLE_CAP; k++) {
+                float a = random01(q) * 6.2832f, sx = tipX + cosf(a) * 16 * DP, sy = tipY + sinf(a) * 16 * DP;
+                float vx = (tipX - sx) / 0.2f - sinf(a) * 40 * DP, vy = (tipY - sy) / 0.2f + cosf(a) * 40 * DP;
+                q.particles.push_back({sx, sy, vx, vy, 0.2f, paletteColor(k ? 'N' : 'o'), 1});
+            }
+            float fall = 1 - elapsed / METEOR_TIME, rockX = h.skillX - dir * 30 * DP * fall, rockY = h.skillY - 120 * DP * fall;
+            for (int k = 0; k < 2 && q.particles.size() < PARTICLE_CAP; k++)
+                q.particles.push_back({rockX + (random01(q) - 0.5f) * 8 * DP, rockY - 8 * DP, 0, -20 * DP, 0.25f, paletteColor('O'), 1});
+        }
+        if (h.volleys > 0 && elapsed >= METEOR_TIME - 0.001f) {
             hitCircle(q, h.skillX, h.skillY, 48 * DP, 6.0f);
             addEffect(q, FX_BURST, h.skillX, h.skillY, 48 * DP, 48 * DP, 0.3f, 'o');
+            q.trauma = fminf(1, q.trauma + 0.25f);
+            burst(q, h.skillX, h.skillY - 4 * DP, paletteColor('V'), 8);   // debris
+            burst(q, h.skillX, h.skillY - 4 * DP, paletteColor('O'), 8);
             q.soundRequested[SOUND_EXPLOSION] = true;
             h.volleys = 0;
         }
         break;
-    case CLASS_THIEF * 4 + 1:   // Shadow Dash: x2.6 to every enemy passed
+    case CLASS_THIEF * 4 + 1: {   // Shadow Dash: x2.6 to every enemy passed, a slash line through each; afterimages
+        size_t before = q.effects.size();
         hitBox(q, h.x, h.y, HERO_W, HERO_H, 2.6f, true, h.swing, false);
+        for (size_t k = before; k < q.effects.size(); k++)
+            if (q.effects[k].kind == FX_SPARK) q.effects[k].w = 12 * DP;
+        if ((int)(elapsed / 0.05f) != (int)((elapsed - 1.0f / 60) / 0.05f) || elapsed < 0.001f) addEffect(q, FX_GHOST, h.x, h.y, 0, 0, 0.2f, 'x');
         break;
+    }
     case CLASS_THIEF * 4 + 2:   // Blade Fury: 5 hits of x1.0 in a radius of 30, one every 0.1 s
         if (h.volleys > 0 && elapsed >= (5 - h.volleys) * 0.1f - 0.001f) {
             hitCircle(q, cx, cy, 30 * DP, 1.0f);
@@ -924,6 +961,65 @@ static void updateSkill(Quest& q, int cls, int job) {
         }
         break;
     }
+}
+
+// The hero's drawn pose (spec §22, phase 5b): pure, from the hero's timers and the attack tables.
+HeroPose heroPose(const Quest& q) {
+    const Hero& h = q.hero;
+    int cls = q.save.heroClass;
+    const BasicAttack& basic = BASIC[cls];
+    HeroPose p;
+    p.attackT = h.attackTimer > 0 ? basic.cycle - h.attackTimer : -1;
+    p.skillT = h.skill >= 0 ? SKILL_TIME[cls][h.skill] - h.strongTimer : -1;
+    bool running = fabsf(h.vx) > 10 * DP;
+    p.legs = !h.onGround ? LEGS_AIR : running ? LEGS_RUN_1 + (int)(q.time / RUN_FRAME) % 4 : LEGS_STAND;
+
+    bool hurt = q.mode == QMODE_DEAD || h.hurtTimer > 0;
+    if (hurt) p.body = BODY_HURT;
+    else if (h.rollTimer > 0) p.body = (int)(q.time / 0.1f) % 2 ? BODY_ROLL_2 : BODY_ROLL_1;
+    else if (h.climbing) p.body = h.vy != 0 && (int)(q.time / 0.2f) % 2 ? BODY_CLIMB_2 : BODY_CLIMB_1;
+    else if (!h.onGround) p.body = h.vy < -60 * DP ? BODY_JUMP : h.vy > 40 * DP ? BODY_FALL : BODY_PEAK;
+    else if (h.landTimer > 0) p.body = BODY_LAND;
+    else if (running) p.body = BODY_RUN_1 + (int)(q.time / RUN_FRAME) % 4;
+    else p.body = (int)(q.time / 0.6f) % 2 ? BODY_IDLE_2 : BODY_IDLE_1;
+
+    bool melee = basic.speed == 0;
+    float t = p.skillT;
+    p.arms = ARMS_NONE;
+    if (hurt || h.rollTimer > 0 || h.climbing) {
+        p.arms = ARMS_NONE;
+    } else if (h.skill >= 0) {
+        switch (cls * 4 + h.skill) {
+        case CLASS_KNIGHT * 4 + 0: p.arms = t < 0.1f ? ARMS_SKILL_1 : t <= 0.25f ? ARMS_SKILL_2 : ARMS_RECOVER; break;
+        case CLASS_KNIGHT * 4 + 1: p.arms = t <= 0.15f ? ARMS_SKILL_3 : ARMS_RECOVER; break;
+        case CLASS_KNIGHT * 4 + 2: p.arms = ARMS_SKILL_4; break;
+        case CLASS_KNIGHT * 4 + 3: p.arms = t <= 0.15f ? ARMS_SKILL_5 : ARMS_RECOVER; break;
+        case CLASS_ARCHER * 4 + 0:
+        case CLASS_ARCHER * 4 + 2: p.arms = t < 0.12f ? ARMS_SKILL_2 : ARMS_RECOVER; break;
+        case CLASS_ARCHER * 4 + 1: p.arms = t < 0.12f ? ARMS_SKILL_4 : ARMS_SKILL_3; break;
+        case CLASS_ARCHER * 4 + 3: p.arms = fmodf(t, 0.225f) < 0.08f ? ARMS_SKILL_2 : ARMS_SKILL_5; break;
+        case CLASS_MAGICIAN * 4 + 0: p.arms = t < 0.12f ? ARMS_SKILL_2 : ARMS_RECOVER; break;
+        case CLASS_MAGICIAN * 4 + 1: p.arms = t < 0.12f ? ARMS_SKILL_5 : ARMS_RECOVER; break;
+        case CLASS_MAGICIAN * 4 + 2: p.arms = ARMS_SKILL_4; break;
+        case CLASS_MAGICIAN * 4 + 3: p.arms = t < 0.3f ? ARMS_SKILL_1 : ARMS_SKILL_3; break;
+        case CLASS_THIEF * 4 + 0: p.arms = t < 0.1f ? ARMS_SKILL_1 : ARMS_RECOVER; break;
+        case CLASS_THIEF * 4 + 1: p.arms = ARMS_SKILL_2; break;
+        case CLASS_THIEF * 4 + 2: p.arms = (int)(t / 0.05f) % 2 == 0 ? ARMS_SKILL_3 : ARMS_SKILL_4; break;
+        case CLASS_THIEF * 4 + 3: p.arms = ARMS_SKILL_5; break;
+        }
+    } else if (p.attackT >= 0) {
+        float at = p.attackT, c = basic.cycle;
+        if (melee) p.arms = at < basic.from ? ARMS_WINDUP : at <= basic.to ? ARMS_ACTIVE
+                          : at < basic.to + 0.6f * (c - basic.to) ? ARMS_RECOVER : ARMS_NONE;
+        else p.arms = at < 0.08f ? ARMS_ACTIVE : at >= c - 0.20f && h.fireHeld ? ARMS_WINDUP : ARMS_RECOVER;
+    } else if (!melee && h.fireHeld) {
+        p.arms = ARMS_WINDUP;   // the draw held before the first shot (it fires on the next free step)
+    }
+
+    p.slashLit = melee && p.attackT >= basic.from && p.attackT <= basic.to;
+    if (cls == CLASS_KNIGHT && h.skill == 0) p.slashLit = t >= 0.1f && t <= 0.25f;
+    if (cls == CLASS_KNIGHT && (h.skill == 1 || h.skill == 3)) p.slashLit = t >= 0 && t <= 0.15f;
+    return p;
 }
 
 void updateEffects(Quest& q, float dt) {
@@ -957,11 +1053,12 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
     int cls = q.save.heroClass, job = q.save.job < 0 ? 0 : q.save.job > 3 ? 3 : q.save.job;
     const BasicAttack& basic = BASIC[cls];
     float walk = CLASSES[cls].walk * DP;
+    h.fireHeld = a.fire;
+    h.landTimer = fmaxf(0, h.landTimer - dt);
 
     // Timers and MP regen (HP never regenerates).
     h.attackTimer = fmaxf(0, h.attackTimer - dt);
     h.strongTimer = fmaxf(0, h.strongTimer - dt);
-    h.castTimer = fmaxf(0, h.castTimer - dt);
     h.rollTimer = fmaxf(0, h.rollTimer - dt);
     h.rollCooldown = fmaxf(0, h.rollCooldown - dt);
     h.iframes = fmaxf(0, h.iframes - dt);
@@ -986,7 +1083,7 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
     }
 
     // Dodge (Circle): the Magician blinks (also in the air), the others roll on the ground.
-    bool free = h.hurtTimer <= 0 && h.castTimer <= 0 && !h.climbing && h.rollTimer <= 0 && h.slideTimer <= 0 && h.frozenTimer <= 0;
+    bool free = h.hurtTimer <= 0 && !h.climbing && h.rollTimer <= 0 && h.slideTimer <= 0 && h.frozenTimer <= 0;
     if (a.back && free && h.rollCooldown <= 0 && h.skill < 0) {
         if (cls == CLASS_MAGICIAN) {
             float dir = h.facingLeft ? -1 : 1;
@@ -1006,7 +1103,7 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
             q.soundRequested[SOUND_Q_DODGE] = true;
         }
     }
-    free = h.hurtTimer <= 0 && h.castTimer <= 0 && !h.climbing && h.rollTimer <= 0 && h.slideTimer <= 0 && h.frozenTimer <= 0;
+    free = h.hurtTimer <= 0 && !h.climbing && h.rollTimer <= 0 && h.slideTimer <= 0 && h.frozenTimer <= 0;
 
     // Strong attack (R2), then the basic attack (R1 held); neither while a skill plays.
     if (a.rocket && free && h.skill < 0) castSkill(q, cls, job);
@@ -1020,11 +1117,9 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
             shoot(q, h.x + HERO_W / 2 + dir * 6 * DP, h.y + 6 * DP, h.facingLeft ? 3.14159265f : 0, basic.speed, basic.range, basic.shotW,
                   basic.shotH, cls == CLASS_ARCHER ? PROJ_ARROW : PROJ_BOLT, basic.mult * BASIC_MULT_BY_JOB[job], false,
                   cls == CLASS_ARCHER && job >= 1 ? 1 : 0);
-        else
-            addEffect(q, FX_SWING, 0, 0, basic.boxW, basic.boxH, basic.cycle * 0.6f, "hbYN"[job]);
     }
 
-    // Movement: knockback, roll and dash keep their speed; a cast roots the hero on the ground; ranged basics walk at x0.5.
+    // Movement: knockback, roll and dash keep their speed; R1 and R2 never slow or root the hero (D-062, D-064).
     Actions move = a;
     float dir = h.facingLeft ? -1 : 1;
     if (h.frozenTimer > 0) {   // in the ice block: no control
@@ -1036,7 +1131,7 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
         move.moveX = h.slideSpeed / walk;
         move.moveY = 0;
         move.jump = false;
-    } else if (h.hurtTimer > 0 || (h.castTimer > 0 && !h.onGround)) {
+    } else if (h.hurtTimer > 0) {
         move.moveX = h.vx / walk;
         move.jump = false;
         move.jumpHeld = true;
@@ -1051,12 +1146,7 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
         move.moveX = h.dashDir * SHADOW_DASH_SPEED / walk;
         move.moveY = 0;
         move.jump = false;
-    } else if (h.castTimer > 0) {
-        h.vx = 0;
-        move.moveX = move.moveY = 0;
-        move.jump = false;
     } else {
-        if (h.attackTimer > 0 && basic.speed > 0) move.moveX *= BASIC_SLOW;
         if (h.buffTimers[2] > 0) move.moveX *= FEATHER_WALK;
         if (h.drinkTimer > 0) move.moveX *= DRINK_WALK;
     }
@@ -1076,6 +1166,7 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
                 y = h.y - bh;
             }
             int hits = hitBox(q, x, y, w, bh, basic.mult * BASIC_MULT_BY_JOB[job], false, h.swing, false);
+            if (hits > 0) q.hitStop = fmaxf(q.hitStop, BASIC_HIT_STOP);
             h.mp = h.mp + hits < s.maxMp ? h.mp + hits : s.maxMp;   // every landed basic hit gives +1 MP
             if (h.partnerTimer > 0)
                 hitBox(q, x - dir * PARTNER_BEHIND, y, w, bh, basic.mult * BASIC_MULT_BY_JOB[job] * PARTNER_MULT, false, h.swing, true);
@@ -1083,7 +1174,7 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
     }
     if (h.skill >= 0) {
         updateSkill(q, cls, h.skill);
-        if (h.strongTimer <= 0 && h.castTimer <= 0) h.skill = -1;
+        if (h.strongTimer <= 0) h.skill = -1;
     }
 
     // Enemies.
@@ -1099,6 +1190,8 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
         p.y += my;
         p.range -= sqrtf(mx * mx + my * my);
         bool gone = p.range <= 0;
+        if (p.fromHero && p.kind == PROJ_WAVE && (int)(q.time * 60) % 3 == 0 && q.particles.size() < PARTICLE_CAP)   // quake dust
+            q.particles.push_back({p.x + p.w / 2, p.y, -p.vx * 0.1f, -30 * DP, 0.3f, paletteColor('H'), 1});
         if (p.kind == PROJ_WAVE) {   // follows the floor; ends at a wall or a ledge
             float lead = p.vx > 0 ? p.x + p.w - 0.001f : p.x;
             int col = (int)floorf(lead / TILE), feetRow = (int)floorf((p.y + p.h + 1) / TILE);
@@ -1117,6 +1210,8 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
                     continue;
                 p.hitMask |= 1ull << k;
                 hitEnemy(q, k, p.mult, p.strong, p.x + p.w / 2);
+                if (p.kind == PROJ_ORB) burst(q, p.x + p.w / 2, p.y + p.h / 2, paletteColor('i'), 6);
+                if (p.kind == PROJ_ARROW && p.w >= 10 * DP) spark(q, p.x + p.w / 2, p.y + p.h / 2, 'c');   // the Piercing Bolt
                 if (p.kind == PROJ_ORB && e.alive) e.slowTimer = 3;
                 if (!p.strong) h.mp = h.mp < s.maxMp ? h.mp + 1 : s.maxMp;
                 if (p.pierce-- <= 0) gone = true;

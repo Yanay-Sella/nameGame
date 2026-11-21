@@ -16,7 +16,7 @@ SHOT_SIZE  := 172854
 EXPANDED_SHOT_SIZE := 248886
 QUEST_SHOT_SIZE := 691254
 
-.PHONY: ps3 image deploy install release log clean music test launch quit pad shot mac mac-run quest-maps ps3-state
+.PHONY: ps3 image deploy install release log clean music test launch quit pad shot mac mac-run quest-maps quest-anims ps3-state
 
 # Compile and package build/nameGame.pkg inside the container (always a full rebuild so LOG_HOST/LOG_PORT changes apply).
 # SOURCES=prototypes/<idea> builds a prototype instead of the game.
@@ -68,6 +68,14 @@ quest-maps:
 	build/tests/quest_tests --maps
 	for f in build/maps/*.bmp; do sips -s format png "$$f" --out "shots/maps/$$(basename "$$f" .bmp).png" >/dev/null; done
 	@ls shots/maps | wc -l | xargs echo "PNG files in shots/maps:"
+
+# Phase 5b: every class and tier animated step by step (sheets, lineups) and a flipbook page that plays them.
+quest-anims:
+	mkdir -p build/tests build/anims shots/anims
+	c++ -std=c++14 -O2 -Wall -Wextra -Isource tests/quest_tests.cpp $(wildcard source/quest*.cpp) source/screen.cpp -o build/tests/quest_tests
+	build/tests/quest_tests --anims
+	for f in build/anims/*.bmp; do sips -s format png "$$f" --out "shots/anims/$$(basename "$$f" .bmp).png" >/dev/null; done
+	python3 -I docs/work-plan/name-quest/art-tools/flipbook.py build/anims shots/anims/flipbook.html
 
 # Native Mac build for fast testing (SDL2 from Homebrew, silent, keyboard pads): game logic and drawing are the real code,
 # but not the PS3's SDL port, audio or controller, so confirm anything final on the PS3.

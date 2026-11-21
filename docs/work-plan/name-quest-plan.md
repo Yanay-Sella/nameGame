@@ -82,7 +82,8 @@ phase n+1 before phase n's "Done when" holds.
 | D-051 | Worlds 1–5 reuse the shooter's enemy and boss sprites where the theme matches (the RPG is set in the same worlds) — replaced by D-052 |
 | D-052 | Replaces D-051's sprite reuse: enemies and bosses are redrawn side-view, bigger and animated, from the shooter's designs. Rich pixel art: 16-colour world palettes, 4 parallax layers, autotiled ground with thick overhanging caps, 6 px platforms, scattered props and landmarks, software lights, outlined characters; each world's look approved by the user from a style frame |
 | D-053 | NAME QUEST renders at 640x360 with every design number x2 (tiles 16 px, hero 32x40); the shooter stays 320x180 (D-004) |
-| D-061 | Phase 5b heroes: chunky 2x art on a 24x24 canvas with the body in a 16x22 box, big heads and faces after the user's two references, a coloured outline instead of black |
+| D-061 | Phase 5b heroes: chunky 2x art on a 24x24 canvas with the body in a 16x22 box, big heads and faces after the user's two references, a coloured outline instead of black (canvas, box and outline replaced by D-065) |
+| D-065 | Phase 5b heroes on the user's reference archer's build: a 32x28 art-px canvas doubled, head rows 0-14, body 15-21, legs 22-27, no outline; approved 2026-11-22 after the first drawing was rejected |
 | D-062 | R1 never slows the hero: the Archer and Magician's x0.5 while the basic attack plays is removed for good |
 | D-063 | Hero shots drawn in class colours (never magenta) instead of pale yellow; a 0.025 s hit-stop on melee basic hits |
 | D-064 | No strong attack roots the hero: Power Slash, Meteor and Blade Fury let the hero run and steer (their timing unchanged) |

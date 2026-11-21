@@ -119,7 +119,8 @@ struct Projectile { float x, y, vx, vy; int w, h; int damage; bool fromHero; int
                     float mult; bool strong; uint64_t hitMask; uint8_t bossMask; float gravity; bool trap; };
 struct DamageNumber { float x, y, age; int value; uint32_t color; float life; bool names; };   // names: "+n NAMES"
 // Short-lived skill shapes for drawing (arcs, bursts, chains, Meteor's marker, a boss's beam and growing ball); x2/y2: a chain link's end.
-enum EffectKind { FX_SWING, FX_ARC, FX_BURST, FX_CHAIN, FX_METEOR, FX_SPIN, FX_BEAM, FX_BALL };
+enum EffectKind { FX_SWING, FX_ARC, FX_BURST, FX_CHAIN, FX_METEOR, FX_SPIN, FX_BEAM, FX_BALL, FX_SPARK, FX_ZONE, FX_GHOST };
+const size_t PARTICLE_CAP = 200;   // no new particle while this many are alive (phase 5b readability)
 struct Effect { int kind; float x, y, w, h, x2, y2, age, life; bool flip; char color; };
 
 // The hero's body and combat state.
@@ -132,7 +133,7 @@ struct Hero {
     float dropTimer;             // s left of falling through one-way platforms (down + X)
     bool jumped;                 // moveHero started a jump (or double jump) this step
     int hp, mp; float mpFraction;   // MP regen accumulates in mpFraction
-    float attackTimer, strongTimer, castTimer;   // s left of the basic cycle, the strong attack, its rooted cast
+    float attackTimer, strongTimer;   // s left of the basic cycle and of the strong attack
     float rollTimer, rollCooldown, iframes, hurtTimer;
     float partnerTimer;          // Shadow Partner's s left
     float buffTimers[3];         // ATK, DEF, SPD: s left of Whetstone, Iron Tonic, Swift Feather
@@ -142,11 +143,19 @@ struct Hero {
     bool attackUp;               // the basic attack aims up (the Thief with up held)
     int skill = -1;              // the strong attack playing (job tier), -1 none
     int volleys;                 // Storm Volley fans still to fire
+    float landTimer;             // s left of the landing pose (drawing only)
+    bool fireHeld;               // R1 held this step (the bow and staff draw while it is)
     float dashDir, skillX, skillY;   // Shadow Dash's direction; Meteor's target
     float slideTimer, slideSpeed;    // a banana peel: s left of sliding without control, signed speed (spec §12 world 2)
     float frozenTimer;               // the Yeti's ice block: s left without control; X or R1 presses cut it (spec §12 world 3)
     bool fireWasHeld;                // R1 held last frame (a press is a new hold)
 };
+// The hero's drawn pose (spec §22): a body frame, or an arm pose over legs; t: s into the basic attack / skill, -1 none.
+enum HeroBody { BODY_IDLE_1, BODY_IDLE_2, BODY_RUN_1, BODY_RUN_2, BODY_RUN_3, BODY_RUN_4, BODY_JUMP, BODY_PEAK, BODY_FALL,
+                BODY_LAND, BODY_CLIMB_1, BODY_CLIMB_2, BODY_ROLL_1, BODY_ROLL_2, BODY_HURT };
+enum HeroArms { ARMS_NONE = -1, ARMS_WINDUP, ARMS_ACTIVE, ARMS_RECOVER, ARMS_SKILL_1, ARMS_SKILL_2, ARMS_SKILL_3, ARMS_SKILL_4, ARMS_SKILL_5 };
+enum HeroLegs { LEGS_STAND, LEGS_RUN_1, LEGS_RUN_2, LEGS_RUN_3, LEGS_RUN_4, LEGS_AIR };
+struct HeroPose { int body, arms, legs; float attackT, skillT; bool slashLit; };   // slashLit: the melee active window
 // Things lying in the area for a while: the Monkey King's peels and the Silverback's stink mist (spec §12 world 2).
 enum FloorHazardKind { HAZARD_PEEL, HAZARD_MIST };
 struct FloorHazard { int kind; float x, y, timer; };   // x, y: a peel's bottom-centre, a mist's centre; s left
@@ -272,6 +281,7 @@ bool heroInLiquid(const Hero& hero, const AreaState& area);
 void questRefreshStats(Quest& q, bool fullHeal);          // stats from the save; fullHeal: HP and MP full
 void spawnEnemies(Quest& q);                              // the current area's A B D E F whose killed bit is clear
 void updateCombat(Quest& q, const Actions& a, float dt);  // attacks, dodge, movement, enemies, shots, damage (PLAY)
+HeroPose heroPose(const Quest& q);                          // quest_combat.cpp (it owns the attack tables)
 void updateEffects(Quest& q, float dt);                   // particles, damage numbers, skill shapes (also during hit-stop)
 bool panelOn(const Quest& q);                             // electric panels `z` (spec §9)
 bool jetBurning(const Quest& q);                          // fire jets `f`

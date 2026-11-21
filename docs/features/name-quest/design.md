@@ -62,6 +62,14 @@ Rules and numbers: see the work-plan spec [`spec.md`](../../work-plan/name-quest
 45. World 3 has 20 areas: the main path runs THE COLD MOUTH, THE LONG DRIFT, THE FROZEN STAIR, the glacier well down, THE ICE GALLERY, THE ICE CATHEDRAL, THE YETI'S DEN, THE ICE WALL (the gate), THE BLUE HOLLOW, THE DEEP CHAPEL (the second checkpoint), THE WIND GATE, THE STILL ICE (no enemies) and THE GLACIER THRONE (the Titan, down a ladder). The FROZEN FEATHER waits behind an ice knight in a dead end above the cathedral.
 46. After the Great Names of worlds 2 and 3, Ilsa greets the hero differently and Lio adds a verse about the latest one after his song.
 
+## Rules (phase 5b: heroes and combat feel; spec §5, §6, §21, §22)
+47. The four heroes are drawn on the build of the user's reference archer: big heads with 2 x 2 eyes and blush, flat shades, no outline (D-065). Each class has its own silhouette (helm and shield; ponytail and bow; wide hat and staff; scarf and mask) and each job tier adds a trim colour and one detail.
+48. Holding R1 never slows the hero, and no R2 skill roots the hero: every class runs, turns and jumps at full speed while attacking (D-062, D-064). Skills with their own movement (Shadow Dash, Rising Slash's hop) keep it.
+49. The drawn pose is an arm pose over a leg pose: the legs keep running while the arms wind up, strike and follow through; the bow and staff draw while R1 is held.
+50. A melee slash is brightest exactly while it can hit; the Knight's skills draw their crescents from the same timing. Melee basic hits stop the action for 0.025 s (D-063).
+51. Hero shots are sprites in class colours (wood and steel arrows, blue bolts, icy orbs, steel stars), never magenta; every hit throws a spark, gold for skills.
+52. Readability: hero effects draw under enemies, enemy shots and telegraphs draw on top; large hero fills are dithered; at most 200 particles live at once.
+
 ## Edge cases
 - Start does nothing on the slot, class and intro screens; it pauses in play and while `YOU FADED` shows.
 - A controller unplugged in play opens the pause menu, which waits for it (D-014).
@@ -73,6 +81,7 @@ Rules and numbers: see the work-plan spec [`spec.md`](../../work-plan/name-quest
 - 2026-11-20: phase 2 combat built (rules 10-18).
 - 2026-11-21: phase 2 reviewed: R2 cancels a basic swing, spikes bounce.
 - 2026-11-21: phase 3 RPG systems built (rules 19-29).
+- 2026-11-22: phase 5b heroes and combat feel built (rules 47-52).
 - 2026-11-21: phase 4 started: world 1's art and style frame, the boss framework, both world 1 bosses (rules 30-36).
 - 2026-11-21: music from the user's songs per place plus a boss song (D-057, rule 29); the ambience hums removed.
 - 2026-11-21: the user approved world 1's style frame; world 1's 20 areas built (rule 37). PS3 check and the user's playtest open.

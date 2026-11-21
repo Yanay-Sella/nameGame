@@ -1,6 +1,6 @@
 # NAME game — Game Design Document
 
-**Version:** 0.34 · **Updated:** 2026-11-21 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
+**Version:** 0.36 · **Updated:** 2026-11-22 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
 
 ## Summary
 You pilot a small ship at the bottom of the screen against waves of pixel-art aliens. Hold R1 to spray bullets, and save the scarce R2 rocket for the moment a wave gets out of hand. Waves get harder, and every 5th wave is a boss. The run goes through five levels of 20 waves each, every one harder than the last: level 1 (space), the jungle, the glacier, the volcano and the deep sea. It ends when you beat the deep sea's wave-20 bosses or lose your last life, and you chase the saved high score. Big bosses drop level buffs that stack until you die. Classic offers a five-level run in 1–2 Players or expanded 1–4 Players, and its Level Picker plays any single level on its own. NAME QUEST is a separate RPG platformer on the main menu, set in the same worlds, with four classes, a hub village, checkpoints and three save slots.
@@ -156,6 +156,7 @@ Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN ME
 | D-061 | 2026-11-21 | NAME QUEST heroes redrawn (phase 5b): chunky 2x art, a 24x24 canvas with the body in a 16x22 box, big heads and readable faces after the user's two references, a coloured outline instead of black | fine 1x art; today's 14x16 grid; a black or no outline | consistent with the chunky NPCs and enemies, room for faces; a soft outline that still reads on dark worlds | [NAME QUEST](features/name-quest/design.md) |
 | D-062 | 2026-11-21 | NAME QUEST's basic attack (R1) never slows the hero; the Archer and Magician's x0.5 is removed and must not return | keep the x0.5 for ranged classes | the user wants running attacks to feel smooth; skills keep their own movement | [NAME QUEST](features/name-quest/design.md) |
 | D-063 | 2026-11-21 | NAME QUEST hero shots are drawn in class colours (never magenta) instead of pale yellow; melee basic hits add a 0.025 s hit-stop | all hero shots pale yellow (spec §21); no basic hit-stop | the user chose natural-looking arrows, bolts and stars; swings need weight | [NAME QUEST](features/name-quest/design.md) |
+| D-065 | 2026-11-22 | NAME QUEST heroes built on the user's reference archer: a 32x28 art-px canvas doubled, the reference's head, body and leg proportions, no outline | D-061's 24x24 canvas with a coloured outline | the user rejected the first drawing as not close to the references | [NAME QUEST](features/name-quest/design.md) |
 | D-064 | 2026-11-21 | No NAME QUEST strong attack roots the hero: Power Slash, Meteor and Blade Fury let the hero run and steer while they play; their damage and timing don't change | keep the 0.5-0.6 s roots as the skills' cost | the user wants to run during every skill | [NAME QUEST](features/name-quest/design.md) |
 
 ## Open questions
@@ -199,4 +200,5 @@ Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN ME
 **0.32 (2026-11-21):** NAME QUEST RPG systems: checkpoints and travel, Namula's people, levels, shops, items and buffs, jobs, chests, gates, shortcuts, the map, ambience.
 **0.33 (2026-11-21):** NAME QUEST world 1, THE DRIFTING STATION: its look (approved from the style frame), 20 areas, five redrawn enemies, electric panels and vents, the boss framework, THE OVERSEER and THE STAR MAGE; world 2's entry lights when the Star Mage falls.
 **0.34 (2026-11-21):** NAME QUEST music from the user's songs, one per place plus a boss song (D-057); the hums heard as white noise under Namula and world 1 removed.
+**0.36 (2026-11-22):** NAME QUEST phase 5b: redrawn heroes, animation and combat feel; no R1 slowdown, no R2 roots (D-061 to D-065).
 **0.35 (2026-11-21):** NAME QUEST worlds 2 and 3, THE GREENDEEP and THE WHITE SILENCE: their looks (approved from the style frames), 40 areas, ten redrawn enemies, coconuts, thorns, crumbling ice, icicles and flipping wind, the MONKEY KING, the SILVERBACK, the YETI and THE GLACIER TITAN; Garrick in the Greendeep.

@@ -73,6 +73,15 @@
 - [ ] The user plays world 2 from its entry: never stuck; the coconuts, peels and wave feel fair; each boss takes more than one try. Notes: *(user)*
 - [ ] The user plays world 3 from its entry: never stuck; the ice, wind and icicles read in time; the frozen block feels fair. Notes: *(user)*
 
+### Phase 5b: heroes and combat feel
+- [x] Style preview: the first drawing was rejected; the user approved the build copied from their reference archer, then each batch (idle and run; jump, fall, land, hurt; climb, roll, attacks; skill poses; effects and tiers). *(2026-11-22)*
+- [x] R1 never slows any class (run and jump), and no R2 skill roots the hero, Meteor mid-jump included. *(`tests/quest_tests.cpp` › basicAttackKeepsFullSpeed, skillsNeverRootTheHero)*
+- [x] The melee slash is lit exactly in its hit window; melee basic hits stop 0.025 s and arrows don't; the bow draws while R1 is held; skills hit at their spec times; the standing and running frames fit the canvas with the feet on the hitbox line. *(`tests/quest_tests.cpp` › slashLitMatchesHitWindow, meleeBasicHitStops, rangedDrawShowsWhileHeld, skillTimingUnchanged, heroSpritesFitTheirBox)*
+- [x] On the Mac: every class attacks mid-run (crescent, arrow, bolt, stab), and every tier-3 skill plays while running and logs `quest: skill`. *(`make mac-run` 2026-11-22, world 1 area 0)*
+- [x] `make quest-anims`: 16 sheets and 4 lineups read; the flipbook sent to the user. *(2026-11-22)*
+- [ ] On the PS3 (when the user asks): dev saves per class at job 3; every R2 logs `quest: skill <NAME>`, fps ≥ 59 while effects play. *(PS3 log)*
+- [ ] The user plays each class for a minute on the TV: R1 held while running and jumping, every skill while running; enemy shots and hazards stay readable. Notes: *(user)*
+
 ## Playtest checks
 1. `NAMEGAME_QUEST='slot=3 class=3 world=0 area=0' make mac-run BUTTONS='2|right:1.5|cross|1|l1|1|quit'`: the Thief in Namula, HUD at the top left.
 2. `NAMEGAME_QUEST='slot=3 class=1 world=0 area=2' make mac-run BUTTONS='1|left:1.5|4|quit'`: the hero walks into the sea, `YOU FADED`, back at the hearth.
@@ -93,6 +102,7 @@
 - 2026-11-20: phase 2 combat criteria; tests and Mac checks done.
 - 2026-11-21: phase 3 criteria; 17 checks and Mac checks done.
 - 2026-11-21: phase 4 (in progress): 5 boss checks, world 1 art checks, style frame sent for the user's OK.
+- 2026-11-22: phase 5b checks (tests, Mac, sheets); PS3 checks open.
 - 2026-11-21: phase 4: world 1's areas; layout, gate and chest checks; maps read; boss fight lengths measured. PS3 checks open.
 - 2026-11-21: phase 2 review: two checks added; Mac screenshots of the four tier-3 skills and the death and echo loop; `make ps3` builds.
 - 2026-11-21: phase 5: worlds 2 and 3: 12 checks for their hazards, bosses and story; both worlds in the layout, reach and chest checks; maps read; Mac checks done. PS3 checks and the user's playtests open.

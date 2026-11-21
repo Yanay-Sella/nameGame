@@ -1,5 +1,6 @@
 """Writes NAME QUEST's sprite text grids (spec §21, §22), authored at 640x360 detail:
-- source/quest_sprites.h: the four heroes (16 frames each, small old-school 32x36 real px) and the objects (global palette);
+- source/quest_sprites.h: the objects and NPCs (global palette);
+- source/quest_sprites_hero.h/.cpp: the four heroes and their shots (heroes.py, phase 5b);
 - source/quest_sprites_0.h/.cpp: Namula's tiles, platforms, props and landmarks (world palette, '0'-'f');
 - source/quest_sprites_1.h/.cpp: world 1's art, its five enemies and two bosses;
 - source/quest_sprites_2.h/.cpp: world 2's art, its five enemies and two bosses;
@@ -120,145 +121,6 @@ def shift(pixels, dx, dy):
     return {(x + dx, y + dy) for (x, y) in pixels}
 
 
-# --- Heroes (spec §21, §22; the user asked for small old-school heroes): 14x16 art pixels from templates, a 1 art-px
-# outline baked in, then doubled: 32x36 real px. The 8x14 dp hitbox covers art columns 3-10, rows 3-16 (with the outline). ---
-HERO_FRAMES = ["IDLE_1", "IDLE_2", "WALK_1", "WALK_2", "WALK_3", "WALK_4", "JUMP", "FALL", "ATTACK_1", "ATTACK_2",
-               "ATTACK_3", "CLIMB_1", "CLIMB_2", "ROLL_1", "ROLL_2", "HURT"]
-
-# Template keys: A main, B dark, C cape/back, T trim (job colour), G hand, L front leg, K back leg, F feet, S skin,
-# E eye, H hair, X the head seen from behind.
-HEADS = {   # rows 0-6, facing right
-    "KNIGHT": ["....TT......", "...TAAA.....", "..AAAAAA....", "..AABBBB....", "..AAAEEA....", "..AAAAAA....", "...BAAB....."],
-    "ARCHER": ["............", "....AAA.....", "...AAAAA....", "..AAAHSS....", "..AASSES....", "..BAASSS....", "..B.AAA....."],
-    "MAGICIAN": ["..AA........", "...AAA......", "...AAAA.....", ".BBTTTTBB...", "..HSSES.....", "..HSSSS.....", "...SSS......"],
-    "THIEF": ["............", "..H.H.H.....", "..HHHHHH....", ".HHHHSSS....", "..HHSSES....", "..HBBBBB....", "...CCCC....."],
-}
-TORSOS = {   # rows 7-11
-    "down": ["...AAAA.....", "..AAAAAB....", "..AAAAAB....", "..AAAAAG....", "...TTTTT...."],
-    "fwd": ["...AAAA.....", "..AAAAABB...", "..AAAA..BG..", "..BAAA......", "...TTTT....."],
-    "back": ["...AAAA.....", ".BBAAAAA....", "GB.AAAAA....", "...AAAAA....", "...TTTT....."],
-    "up": [".G.AAAA.G...", ".BAAAAAAB...", "...AAAAA....", "...AAAAA....", "...TTTT....."],
-    "out": ["...AAAA.....", "GBBAAAABBG..", "...AAAAA....", "...AAAAA....", "...TTTT....."],
-    "windup": [".GBAAAA.....", "..BAAAAA....", "...AAAAA....", "...AAAAB....", "...TTTT....."],
-    "strike": ["...AAAA.....", "...AAAABBBG.", "...AAAAA....", "...AAAAB....", "...TTTT....."],
-    "follow": ["...AAAA.....", "...AAAAB....", "...AAAA.BB..", "...AAAA...G.", "...TTTT....."],
-    "hurt": ["G..AAAA..G..", ".BBAAAABB...", "...AAAAA....", "...AAAAA....", "...TTTT....."],
-}
-LEGS = {   # rows 12-15
-    "stand": ["...KK.LL....", "...KK.LL....", "...KK.LL....", "..FFF.FFF..."],
-    "strideA": ["...KKLLL....", "..KK...LL...", ".KK.....LL..", ".FF.....FFF."],
-    "strideB": ["...LLKKK....", "..LL...KK...", ".LL.....KK..", ".FF.....FFF."],
-    "passA": ["....LLL.....", "....LLK.....", "....LKK.....", "...FFFF....."],
-    "passB": ["....KKL.....", "....KLL.....", "....KLL.....", "...FFFF....."],
-    "tuck": ["...LLLLL....", "..KK..LLL...", "..FF...FF...", "............"],
-    "dangle": ["...KK.LL....", "...KK..LL...", "...KK..LL...", "..FFF...FF.."],
-}
-# Back views for climbing (CLIMB_2 is CLIMB_1 mirrored), and the tucked roll (ROLL_2 is ROLL_1 turned half a circle).
-CLIMB = ["..G.........", "..B..XXX....", "..BXXXXXX...", "..BXXXXXXBG.", "...XXXXXXB..", "....XXXX....", "...AAAAAA...",
-         "...ACCCCA...", "...CCCCCC...", "...CCCCCC...", "...CCCCCC...", "...TTTTTT...", "...LL..KK...", "...LL..KK...",
-         "...FF..KK...", ".......FF..."]
-ROLL = ["............", "............", "............", "............", "............", "............", "............",
-        "....AAAA....", "...AAXXAA...", "..AAXXXXCA..", "..AXXSSXCA..", "..AAXXXXAA..", "..AALLLLAA..", "..CALLLLAC..",
-        "...AAAAAA...", "....AAAA...."]
-# Which torso and legs each frame uses, how far the upper body sinks (bob), the cape flutter, the weapon direction.
-FRAMES = {
-    "IDLE_1": ("down", "stand", 0, 0, "down"), "IDLE_2": ("down", "stand", 1, 0, "down"),
-    "WALK_1": ("fwd", "strideA", 1, 1, "down"), "WALK_2": ("down", "passA", 0, 0, "down"),
-    "WALK_3": ("back", "strideB", 1, 1, "down"), "WALK_4": ("down", "passB", 0, 0, "down"),
-    "JUMP": ("up", "tuck", 0, 0, "up"), "FALL": ("out", "dangle", 0, 1, "up"),
-    "ATTACK_1": ("windup", "stand", 0, 0, "back"), "ATTACK_2": ("strike", "strideA", 1, 1, "fwd"),
-    "ATTACK_3": ("follow", "strideA", 1, 0, "low"), "HURT": ("hurt", "dangle", 0, 1, "up"),
-}
-COLOURS = {   # key → palette character, per class
-    "KNIGHT": dict(A="b", B="d", C="r", T="h", G="s", L="s", K="d", F="&", S="@", E="k", H="&", X="b"),
-    "ARCHER": dict(A="g", B="G", C="P", T="h", G="@", L="P", K="W", F="&", S="@", E="k", H="&", X="g"),
-    "MAGICIAN": dict(A="u", B="U", C="U", T="h", G="@", L="u", K="U", F="&", S="@", E="k", H="&", X="u"),
-    "THIEF": dict(A="X", B="x", C="p", T="h", G="@", L="X", K="x", F="x", S="@", E="k", H="&", X="&"),
-}
-CLASSES = {"KNIGHT": dict(outline="x"), "ARCHER": dict(outline="x"), "MAGICIAN": dict(outline="x"), "THIEF": dict(outline="k")}
-BACKS = {   # drawn behind the body (only into empty cells), rows 6-12: rest, flutter
-    "KNIGHT": (["............", "............", "..C.........", ".CC.........", ".CC.........", "CCC.........", "CC.........."],
-               ["............", "............", "..C.........", ".CC.........", "CCC.........", "CC..........", "............"]),
-    "ARCHER": ([".b..........", "..C.........", "..C.........", "..C.........", "..C.........", "............", "............"],) * 2,
-    "MAGICIAN": (["............"] * 7,) * 2,
-    "THIEF": (["............", "..C.........", ".CC.........", "CC..........", "............", "............", "............"],
-              ["............", ".CC.........", "CC..........", "............", "............", "............", "............"]),
-}
-WEAPON_DIRS = {"down": (1, 1), "up": (0, -1), "back": (-1, -1), "fwd": (1, 0), "low": (1, 1)}
-
-
-def hero(cls, frame):
-    col = COLOURS[cls]
-    rows = [list("." * 14) for _ in range(16)]
-    def stamp(lines, top, only_empty=False):
-        for r, text in enumerate(lines):
-            for c, k in enumerate(text):
-                if k != "." and 0 <= top + r < 16 and (not only_empty or rows[top + r][c] == "."):
-                    rows[top + r][c] = k
-    if frame.startswith("CLIMB"):
-        stamp([t if frame == "CLIMB_1" else t[::-1] for t in CLIMB], 0)
-    elif frame.startswith("ROLL"):
-        stamp(ROLL if frame == "ROLL_1" else [t[::-1] for t in ROLL[7:][::-1]], 0 if frame == "ROLL_1" else 7)
-    else:
-        torso, legs, bob, flutter, weapon_dir = FRAMES[frame]
-        stamp(LEGS[legs], 12)
-        stamp(TORSOS[torso], 7 + bob)
-        stamp(HEADS[cls], bob)
-        if frame == "HURT":
-            for r in range(7):
-                rows[r] = [{"E": "B"}.get(k, k) for k in rows[r]]   # eyes squeezed
-        stamp(BACKS[cls][flutter], 6 + bob, only_empty=True)
-        hand = next(((c, r) for r in range(16) for c in range(14) if rows[r][c] == "G"), None)
-        if hand:
-            weapon(rows, cls, hand, WEAPON_DIRS[weapon_dir], frame)
-    g = Grid(16, 18)   # the template inside a 1 px border, the outline in that border and around every shape
-    for r in range(16):
-        for c in range(14):
-            k = rows[r][c]
-            if k != ".":
-                g.set(c + 1, r + 1, col.get(k, k))
-    outline = CLASSES[cls]["outline"]
-    for (x, y) in [(x, y) for y in range(18) for x in range(16)]:
-        if g.get(x, y) == "." and any(g.get(x + dx, y + dy) not in (".", "#") for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
-            g.set(x, y, "#")
-    big = Grid(32, 36)
-    for y in range(18):
-        for x in range(16):
-            ch = g.get(x, y)
-            for dy in range(2):
-                for dx in range(2):
-                    big.set(x * 2 + dx, y * 2 + dy, outline if ch == "#" else ch)
-    return big
-
-
-def weapon(rows, cls, hand, direction, frame):
-    """The class weapon from the hand: sword, bow, staff or dagger ('w'/'b' blades, 'h' trim bow, '&' wood)."""
-    hx, hy = hand
-    dx, dy = direction
-    def put(x, y, k):
-        if 0 <= x < 14 and 0 <= y < 16 and rows[y][x] == ".":
-            rows[y][x] = k
-    if cls == "KNIGHT":
-        for i in range(1, 5):
-            put(hx + dx * i, hy + dy * i, "w" if i == 4 else "b")
-        put(hx - dy, hy + dx, "h")   # crossguard
-    elif cls == "ARCHER":
-        bx = hx + 1
-        for y in range(hy - 2, hy + 3):
-            put(bx + (1 if abs(y - hy) <= 1 else 0), y, "h")
-        if dx == 1 and dy == 0:   # drawn: an arrow on the string
-            for i in range(1, 4):
-                put(hx + 2 + i, hy, "w" if i == 3 else "b")
-    elif cls == "MAGICIAN":
-        for y in range(hy - 4, hy + 4):
-            put(hx + (1 if dx > 0 else 0), y, "&")
-        put(hx + (1 if dx > 0 else 0), hy - 5, "c")
-        put(hx + (1 if dx > 0 else 0), hy - 6, "w")
-    else:   # THIEF: a short dagger along the same direction
-        for i in range(1, 3):
-            put(hx + dx * i, hy + dy * i, "w" if i == 2 else "b")
-
-
 # --- Objects (global palette, outlined when drawn) ---
 def flames(g, cx, base, w, h, seed):
     """A fire: layered tongues, deep red outside to white-hot inside; seed varies the frame."""
@@ -376,7 +238,7 @@ def chest(opened):
     return g
 
 
-# --- NPCs (spec §14, §22): like the heroes, small old-school templates with a baked outline, doubled, facing right.
+# --- NPCs (spec §14, §22): small old-school templates with a baked outline, doubled, facing right.
 # 14x18 art px (16x20 dp with the outline); Tobin 10x10 (12x12 dp), the Gatekeeper 14x22 (16x24 dp). Frame B breathes
 # (head and shoulders 1 px lower) and blinks. Keys map to the global palette per NPC. ---
 NPC_TEMPLATES = {
@@ -531,9 +393,6 @@ def write(path, text):
 
 def build_objects():
     out = []
-    for cls in CLASSES:
-        for frame in HERO_FRAMES:
-            out.append(("HERO_%s_%s" % (cls, frame), hero(cls, frame)))
     out.append(("CHECKPOINT_UNLIT", brazier(False)))
     for i, n in enumerate("ABC"):
         out.append(("CHECKPOINT_LIT_" + n, brazier(True, i)))
@@ -560,10 +419,10 @@ def main():
     import world1   # The Drifting Station's art, enemies and bosses
     import world2   # The Greendeep's art, enemies and bosses
     import world3   # The White Silence's art, enemies and bosses
+    import heroes   # The four heroes and their shots (phase 5b)
     objects = build_objects()
     header = ["// NAME QUEST sprites (spec §21, §22), generated by docs/work-plan/name-quest/art-tools/make_quest_art.py: edit that",
-              "// script, not this file. Heroes are 14x16 art px doubled (32x36 real px with their baked outline), facing right; their trim",
-              "// is 'h' only (recoloured by job tier).",
+              "// script, not this file. The heroes are in quest_sprites_hero.h (heroes.py).",
               "#pragma once", "#include \"sprites.h\"", ""]
     for name, g in objects:
         header.append(sprite_text(name, g))
@@ -574,6 +433,7 @@ def main():
     world1.write_all(write, sprite_text, ROOT)
     world2.write_all(write, sprite_text, ROOT)
     world3.write_all(write, sprite_text, ROOT)
+    heroes.write_all(write, sprite_text, ROOT)
     if "--preview" in sys.argv:
         folder = sys.argv[sys.argv.index("--preview") + 1]
         preview_objects(objects, folder)
@@ -581,6 +441,7 @@ def main():
         world1.preview(folder, save_png, global_palette)
         world2.preview(folder, save_png, global_palette)
         world3.preview(folder, save_png, global_palette)
+        heroes.preview(folder, save_png, global_palette)
 
 
 # --- Previews (PNG, for checking the art by eye) ---
@@ -607,18 +468,7 @@ def save_png(path, w, h, rgb_rows, scale=1):
 def preview_objects(objects, folder):
     pal = global_palette()
     bg = (40, 36, 60)
-    heroes = [g for name, g in objects if name.startswith("HERO_")]
-    cols = 16
-    w, h = cols * 36, 4 * 44
-    img = [[bg] * w for _ in range(h)]
-    for i, g in enumerate(heroes):
-        ox, oy = (i % cols) * 36 + 2, (i // cols) * 44 + 2
-        for y in range(g.h):
-            for x in range(g.w):
-                if g.c[y][x] != ".":
-                    img[oy + y][ox + x] = pal[g.c[y][x]]
-    save_png(os.path.join(folder, "heroes.png"), w, h, img, 3)
-    rest = [g for name, g in objects if not name.startswith("HERO_")]
+    rest = [g for name, g in objects]
     w = sum(g.w + 4 for g in rest)
     img = [[bg] * w for _ in range(60)]
     x0 = 0

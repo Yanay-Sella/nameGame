@@ -724,7 +724,7 @@ static void bossDown(Quest& q, QuestBoss& b) {
     q.hitStop = fmaxf(q.hitStop, DEATH_STOP);
     q.trauma = DEATH_TRAUMA;
     float cx = b.x + b.w / 2, cy = b.y + b.h / 2;
-    for (int i = 0; i < DEATH_PARTICLES; i++) {
+    for (int i = 0; i < DEATH_PARTICLES && q.particles.size() < PARTICLE_CAP; i++) {
         float angle = random01(q) * 6.2832f, speed = (40 + 80 * random01(q)) * DP;
         q.particles.push_back({cx, cy, cosf(angle) * speed, sinf(angle) * speed, 0.6f + 0.6f * random01(q), paletteColor(i % 3 ? 'w' : 'm'), 1});
     }

@@ -175,7 +175,7 @@ struct WorldDef { const char* name; const AreaDef* areas; int count; /* + style,
 
 ## §5 Hero movement (feel)
 
-Hitbox 8 x 14; sprite 16 x 20 drawn at (x - 4, y - 6), facing right, flipped for left (§22).
+Hitbox 8 x 14; sprite 32 x 28 drawn at (x - 12, y - 14), facing right, flipped for left (§22, D-065).
 
 | Name | Value | Notes |
 |---|---|---|
@@ -803,19 +803,20 @@ game draws into a CPU pixel buffer (D-008), any blending is done in software and
 - A subtle precomputed vignette (corners one step darker by dither) on the playfield, not on the HUD; none in world 7.
 
 ### Characters (sizes in dp; authored at 2x in real px with full detail)
-- **Hero (phase 5b, D-061):** chunky art like the NPCs and enemies: a 24 x 24 art-px canvas doubled to 48 x 48 real px,
-  the body in a 16 x 22 box, the hitbox still 8 x 14 (drawn at x - 8, y - 9). Big heads and readable faces in the style
-  of the user's references, 2–3 flat shades per material, and a **coloured outline** (each edge pixel the dark shade of
-  its neighbour) instead of black. Frames: 15 body frames (idle, run, jump, peak, fall, land, climb, roll, hurt) and
-  8 arm poses (wind-up, active, recover, 5 skill poses) over 6 leg poses, so the legs keep running while the arms attack.
-  The brightest frame of a melee slash is its active hit window. Each job tier changes the trim colour (§21) and adds
-  one visible detail. Full rules: [`phase-5b-character-art.md`](phase-5b-character-art.md).
+- **Hero (phase 5b, D-061, D-065):** built on the user's reference archer (approved 2026-11-22): a 32 x 28 art-px canvas
+  doubled to 64 x 56 real px, facing right, with **no outline** (like the references). Head rows 0-14 (the face on rows
+  10-13: 2 x 2 eyes with a white highlight in the back eye, blush under each), body rows 15-21, legs rows 22-27 with the feet
+  on row 27; the hitbox is still 8 x 14 (art columns 12-19), drawn at (x - 12, y + 14 - 28). 2-3 flat shades per material.
+  Frames: 15 body frames (idle, run, jump, peak, fall, land, climb, roll, hurt) and 8 arm poses (wind-up, active, recover,
+  5 skill poses) over 6 leg poses, so the legs keep running while the arms attack. The brightest frame of a melee slash is
+  its active hit window. Each job tier changes the trim colour (§21) and adds one visible detail. Full rules:
+  [`phase-5b-character-art.md`](phase-5b-character-art.md).
 - **Enemies:** redrawn for NAME QUEST as side-view sprites based on the shooter's designs (same colours and shapes, so
   players recognise them), 12–20 px, 4-frame movement + a tell frame + an attack frame. New enemies the same way.
 - **Bosses:** redrawn at 40–64 px with 4–6 frames (idle, tell, attack, hurt, phase-2 look), based on the shooter's
   boss designs where §12 names one.
 - **NPCs:** 16 x 20, 2–4 idle frames (blink, breathe, a gesture).
-- Every character gets a 1 px outline in its darkest colour (`drawSpriteOutlined`), so it reads on any background; the heroes' is coloured (above).
+- Every character gets a 1 px outline in its darkest colour (`drawSpriteOutlined`), so it reads on any background; the heroes have none (D-065).
 - Hit flashes stay white silhouettes; particles take the hit thing's colours.
 
 ### Style frames (the user approves each world's look before its areas are made)

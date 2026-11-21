@@ -21,6 +21,7 @@ const float VENT_LIFT = 900 * DP, VENT_MAX_RISE = 160 * DP;   // net px/s² upwa
 const int VENT_REACH = 6;                           // tiles above a vent that still lift
 // Flow
 const float DEATH_TIME = 2.5f, STEP_TIME = 0.28f, LAND_SOUND_SPEED = 120 * DP;
+const float LAND_TIME = 0.08f;   // s of the landing pose (drawing only)
 const float BANNER_TIME = 2;
 const float TRAUMA_DECAY = 1.5f, TRAUMA_DEATH = 0.6f;
 const float ECHO_SIZE = 8 * DP, NAMES_TEXT_TIME = 1.2f, DEATH_PARTICLES = 20;
@@ -333,7 +334,7 @@ static void die(Quest& q, const char* cause) {
     q.save.echoX = h.lastSafeX + HERO_W / 2 - ECHO_SIZE / 2;
     q.save.echoY = h.lastSafeY + HERO_H - ECHO_SIZE - 2 * DP;
     q.save.names = 0;
-    for (int i = 0; i < DEATH_PARTICLES; i++) {
+    for (int i = 0; i < DEATH_PARTICLES && q.particles.size() < PARTICLE_CAP; i++) {
         float angle = i * 6.2832f / DEATH_PARTICLES, speed = (40 + 20 * (i % 3)) * DP;
         q.particles.push_back({h.x + HERO_W / 2, h.y + HERO_H / 2, cosf(angle) * speed, sinf(angle) * speed, 0.8f, paletteColor('w'), 1});
     }
@@ -748,6 +749,7 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
         if (!frozen) updateBosses(q, dt);
         if (h.jumped) q.soundRequested[SOUND_Q_JUMP] = true;
         if (!wasOnGround && h.onGround && fallSpeed > LAND_SOUND_SPEED) q.soundRequested[SOUND_Q_LAND] = true;
+        if (!wasOnGround && h.onGround) h.landTimer = LAND_TIME;
         if (h.onGround && fabsf(h.vx) > 10 * DP && move.moveX != 0) {
             h.stepTimer -= dt;
             if (h.stepTimer <= 0) {

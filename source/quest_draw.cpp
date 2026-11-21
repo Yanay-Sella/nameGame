@@ -6,6 +6,7 @@
 #include "quest_sprites_1.h"
 #include "quest_sprites_2.h"
 #include "quest_sprites_3.h"
+#include "quest_sprites_hero.h"
 #include "screen.h"
 #include <algorithm>
 #include <math.h>
@@ -18,9 +19,8 @@ double (*questClock)() = nullptr;
 float questDrawMs[3];
 
 const float SHAKE_X = 4 * DP, SHAKE_Y = 3 * DP;   // at trauma 1 and full strength, like the shooter
-const float WALK_FRAME = 0.1f, IDLE_FRAME = 0.6f, CLIMB_FRAME = 0.2f, SHIMMER_FRAME = 0.25f, FLAME_FRAME = 0.15f;
-const float LIQUID_FRAME = 0.2f, FALL_SPEED = 40 * DP;
-const float ENEMY_FRAME = 0.25f, TELL_FLASH = 0.1f, IFRAME_BLINK = 0.1f, ATTACK_FRAME = 0.07f, ROLL_FRAME = 0.1f;
+const float SHIMMER_FRAME = 0.25f, FLAME_FRAME = 0.15f, LIQUID_FRAME = 0.2f;
+const float ENEMY_FRAME = 0.25f, TELL_FLASH = 0.1f, IFRAME_BLINK = 0.1f;
 const float NUMBER_RISE = 12 * DP, ECHO_BOB = 2 * DP, PARTNER_BEHIND = 10 * DP;
 const char TRIM_BY_JOB[4] = {'h', 'b', 'Y', 'N'};
 const uint32_t HEARTH_LIGHT = 0xFFA05018, BRAZIER_LIGHT = 0xFF804010, LANTERN_LIGHT = 0xFF704018;
@@ -38,14 +38,6 @@ static const Sprite* const BOSS_FRAMES[6][6] = {BOSS_ROW(OVERSEER), BOSS_ROW(STA
                                                 BOSS_ROW(YETI), BOSS_ROW(TITAN)};
 const float BOSS_WHITE = 0.12f, MARKER_BLINK = 4, MARKER_BLINK_LAST = 12, MARKER_LAST = 0.3f, EDGE_WALL = 4 * DP;
 static const Sprite* const ITEM_ICONS[ITEM_COUNT] = {&ICON_RED, &ICON_BIG, &ICON_MANA, &ICON_WHETSTONE, &ICON_TONIC, &ICON_FEATHER};
-enum HeroFrame { FRAME_IDLE_1, FRAME_IDLE_2, FRAME_WALK_1, FRAME_WALK_2, FRAME_WALK_3, FRAME_WALK_4, FRAME_JUMP, FRAME_FALL,
-                 FRAME_ATTACK_1, FRAME_ATTACK_2, FRAME_ATTACK_3, FRAME_CLIMB_1, FRAME_CLIMB_2, FRAME_ROLL_1, FRAME_ROLL_2,
-                 FRAME_HURT, HERO_FRAME_COUNT };
-#define HERO_ROW(C) {&HERO_##C##_IDLE_1, &HERO_##C##_IDLE_2, &HERO_##C##_WALK_1, &HERO_##C##_WALK_2, &HERO_##C##_WALK_3, \
-    &HERO_##C##_WALK_4, &HERO_##C##_JUMP, &HERO_##C##_FALL, &HERO_##C##_ATTACK_1, &HERO_##C##_ATTACK_2, &HERO_##C##_ATTACK_3, \
-    &HERO_##C##_CLIMB_1, &HERO_##C##_CLIMB_2, &HERO_##C##_ROLL_1, &HERO_##C##_ROLL_2, &HERO_##C##_HURT}
-static const Sprite* const HERO_FRAMES[CLASS_COUNT][HERO_FRAME_COUNT] = {HERO_ROW(KNIGHT), HERO_ROW(ARCHER), HERO_ROW(MAGICIAN),
-                                                                          HERO_ROW(THIEF)};
 // Class select: POWER, TOUGHNESS, REACH out of 5, and two lines about the class.
 const int CLASS_BARS[CLASS_COUNT][3] = {{3, 5, 1}, {3, 2, 5}, {5, 1, 4}, {2, 3, 2}};
 const char* const CLASS_TEXT[CLASS_COUNT][2] = {
@@ -374,23 +366,39 @@ static void drawObject(const Quest& q, char letter, int tx, int ty, int camX, in
     if (sprite) drawSpriteOutlined(*sprite, cx - sprite->w / 2, bottom - sprite->h, false, paletteColor('x'));
 }
 
+// A hero sprite: trim 'h' in the tier colour, tier details '1'-'3' only from their tier on (spec §21), clipped.
+static void drawHeroSprite(const Sprite& s, int x, int y, bool flip, int job) {
+    uint32_t tier = paletteColor(TRIM_BY_JOB[job]);
+    for (int row = 0; row < s.h; row++) {
+        int py = y + row;
+        if (py < 0 || py >= QUEST_H) continue;
+        for (int col = 0; col < s.w; col++) {
+            char c = s.pixels[row * s.w + col];
+            if (c == '.' || (c >= '1' && c <= '3' && job < c - '0')) continue;
+            int px = x + (flip ? s.w - 1 - col : col);
+            if (px < 0 || px >= QUEST_W) continue;
+            questPixels[py * QUEST_W + px] = c == 'h' || (c >= '1' && c <= '3') ? tier : paletteColor(c);
+        }
+    }
+}
+
 static void drawHero(const Quest& q, int camX, int camY) {
     const Hero& h = q.hero;
-    HeroFrame frame;
-    if (q.mode == QMODE_DEAD || h.hurtTimer > 0) frame = FRAME_HURT;
-    else if (h.rollTimer > 0) frame = (int)(q.time / ROLL_FRAME) % 2 ? FRAME_ROLL_2 : FRAME_ROLL_1;
-    else if (h.attackTimer > 0 || h.skill >= 0) frame = (HeroFrame)(FRAME_ATTACK_1 + (int)(q.time / ATTACK_FRAME) % 3);
-    else if (h.climbing) frame = h.vy != 0 && (int)(q.time / CLIMB_FRAME) % 2 ? FRAME_CLIMB_2 : FRAME_CLIMB_1;
-    else if (!h.onGround) frame = h.vy > FALL_SPEED ? FRAME_FALL : FRAME_JUMP;
-    else if (fabsf(h.vx) > 10 * DP) frame = (HeroFrame)(FRAME_WALK_1 + (int)(q.time / WALK_FRAME) % 4);
-    else frame = (int)(q.time / IDLE_FRAME) % 2 ? FRAME_IDLE_2 : FRAME_IDLE_1;
-    int job = q.save.job >= 0 && q.save.job < 4 ? q.save.job : 0;
-    const Sprite& sprite = *HERO_FRAMES[q.save.heroClass][frame];
-    int x = (int)floorf(h.x - 3 * DP) - camX, y = (int)floorf(h.y - 3 * DP) - camY;
-    if (h.partnerTimer > 0) drawSpriteSolid(sprite, x + (int)(h.facingLeft ? PARTNER_BEHIND : -PARTNER_BEHIND), y, paletteColor('x'), h.facingLeft);
+    HeroPose p = heroPose(q);
+    int cls = q.save.heroClass, job = q.save.job >= 0 && q.save.job < 4 ? q.save.job : 0;
+    const Sprite& sprite = p.arms == ARMS_NONE ? *HERO_BODY[cls][p.body] : *HERO_ARMS[cls][p.arms][p.legs];
+    int x = (int)floorf(h.x - 12 * DP) - camX, y = (int)floorf(h.y + HERO_H - 28 * DP) - camY;   // feet on the hitbox bottom
+    if (h.partnerTimer > 0) {   // the Shadow Partner: the hero's silhouette in x, 50 % dithered so the hero in front stays clear
+        int px0 = x + (int)(h.facingLeft ? PARTNER_BEHIND : -PARTNER_BEHIND);
+        for (int row = 0; row < sprite.h; row++)
+            for (int col = 0; col < sprite.w; col++) {
+                int px = px0 + (h.facingLeft ? sprite.w - 1 - col : col), py = y + row;
+                if (sprite.pixels[row * sprite.w + col] != '.' && px >= 0 && px < QUEST_W && py >= 0 && py < QUEST_H && bayer4(px, py) < 8)
+                    screenTarget[py * QUEST_W + px] = paletteColor('x');
+            }
+    }
     if (h.iframes > 0 && q.mode != QMODE_DEAD && (int)(h.iframes / IFRAME_BLINK) % 2) return;   // blinks during i-frames
-    // Small old-school heroes (the user's choice): the outline is part of the sprite.
-    drawSpriteEx(sprite, x, y, h.facingLeft, job ? 'h' : 0, paletteColor(TRIM_BY_JOB[job]));
+    drawHeroSprite(sprite, x, y, h.facingLeft, job);
     if (h.frozenTimer > 0)   // the Yeti's ice block around the hero
         drawDoubled(ICE_CUBE, (int)(h.x + HERO_W / 2) - ICE_CUBE.w * DP / 2 - camX, (int)(h.y + HERO_H) - ICE_CUBE.h * DP - camY, false);
 }
@@ -406,11 +414,120 @@ static void drawArc(int x, int y, int w, int h, bool flipped, uint32_t color) {
         }
 }
 
-static void drawRing(int cx, int cy, int radius, uint32_t color) {
-    for (int a = 0; a < 48; a++) fillRect(cx + (int)(cosf(a * 0.1309f) * radius), cy + (int)(sinf(a * 0.1309f) * radius), DP, DP, color);
+// A crescent in a box: each dp cell gets its 0..1 place across the band (0 inner edge, 1 outer edge) and the colour rule
+// picks its colour (0: none). upright: bulging up and forward from the box's lower near corner, else forward from the
+// near side; scale shrinks the crescent toward the hero; clip skips cells in solid tiles (Lion's Roar).
+template <typename Rule>
+static void drawCrescent(const Quest& q, int x, int y, int w, int h, bool flip, bool upright, float scale, bool clip, int camX, int camY,
+                         Rule rule) {
+    const float INNER = 0.67f;   // drawArc's inner edge (d >= 0.45)
+    for (int row = 0; row < h; row += DP)
+        for (int col = 0; col < w; col += DP) {
+            float nx = (col + DP / 2.0f) / w, ny = (row + DP / 2.0f) / h * 2 - 1;
+            if (flip) nx = 1 - nx;
+            if (upright) ny = 1 - (row + DP / 2.0f) / h;
+            float r = sqrtf(nx * nx + ny * ny) / scale;
+            if (r > 1 || r < INNER) continue;
+            int px = x + col, py = y + row;
+            if (clip && tileSolid(tileAt(q.area, (px + camX) / TILE, (py + camY) / TILE))) continue;
+            float across = (r - INNER) / (1 - INNER), radius = scale * (upright ? (w + h) / 2.0f : (w + h / 2.0f) / 2.0f);
+            uint32_t color = rule(across, (1 - r) * radius, (r - INNER) * radius, px, py);
+            if (color) fillRect(px, py, DP, DP, color);
+        }
 }
 
-// Enemies (2 frames, white while flashing, tells flash or shake), shots, skill shapes and the name echo (spec §7, §8, §21).
+// The hero's melee slashes, drawn from heroPose (spec §22): the brightest frame is exactly the hit window.
+static void drawHeroSlash(const Quest& q, const HeroPose& p, int camX, int camY) {
+    const Hero& h = q.hero;
+    int cls = q.save.heroClass, job = q.save.job >= 0 && q.save.job < 4 ? q.save.job : 0;
+    bool left = h.facingLeft;
+    uint32_t core = paletteColor(q.reduceFlashing ? 'b' : 'w'), edge = paletteColor(job == 0 ? 'b' : TRIM_BY_JOB[job]);
+    float dir = left ? -1 : 1;
+    for (int copy = 0; copy < (h.partnerTimer > 0 ? 2 : 1); copy++) {   // the Shadow Partner's copy 10 dp behind, in x and p
+        uint32_t c = copy ? paletteColor('x') : core, e = copy ? paletteColor('p') : edge;
+        int shift = copy ? (int)(-dir * PARTNER_BEHIND) : 0;
+        if (cls == CLASS_KNIGHT && p.attackT >= 0) {   // 22 x 18 in front, centred on the hitbox's middle
+            int w = (int)(22 * DP), bh = (int)(18 * DP);
+            int x = (int)(left ? h.x - w : h.x + HERO_W) - camX + shift, y = (int)(h.y + HERO_H / 2 - bh / 2) - camY;
+            if (p.slashLit) {
+                drawCrescent(q, x, y, w, bh, left, false, 1, false, camX, camY, [&](float, float out, float in, int px, int py) -> uint32_t {
+                    return out < 2 * DP ? e : in < 2 * DP ? c : bayer4(px, py) < 8 ? c : 0;
+                });
+                if (p.attackT < 0.08f + 1.0f / 60) fillRect(x, y + bh / 2, w, DP, c);   // the blade's streak, one frame
+            } else if (p.arms == ARMS_RECOVER && p.attackT <= 0.18f + 0.06f) {
+                drawCrescent(q, x, y, w, bh, left, false, 1, false, camX, camY, [&](float, float out, float, int px, int py) -> uint32_t {
+                    return out < 2 * DP && bayer4(px, py) < 8 ? e : 0;
+                });
+            }
+        }
+        if (cls == CLASS_THIEF && p.attackT >= 0 && (p.slashLit || (p.arms == ARMS_RECOVER && p.attackT <= 0.10f + 0.04f))) {
+            // A straight stab streak from the hand to the box's far end, tapering from 1 dp at the hand to 3 dp at the tip.
+            int length = (int)(16 * DP), from = p.slashLit ? 0 : length * 2 / 3;
+            for (int k = from; k < length; k += DP) {
+                int tall = 1 + 2 * k / length;   // dp: 1, 2, 3 toward the tip
+                for (int t = -tall / 2; t <= tall / 2 + (tall == 2 ? 0 : 0); t++) {
+                    uint32_t color = t == 0 ? c : e;
+                    if (h.attackUp) fillRect((int)(h.x + HERO_W / 2) - camX + shift + t * DP, (int)h.y - camY - k - DP, DP, DP, color);
+                    else fillRect((int)(left ? h.x - k - DP : h.x + HERO_W + k) - camX + shift, (int)(h.y + HERO_H / 2) - camY + t * DP, DP, DP, color);
+                }
+            }
+        }
+    }
+    if (cls != CLASS_KNIGHT || h.skill < 0) return;
+    float t = p.skillT;
+    int sx = (int)(left ? h.x - 12 * DP : h.x - 12 * DP) - camX, sy = (int)(h.y + HERO_H - 28 * DP) - camY;
+    auto art = [&](int col, int row, uint32_t color) {   // a point of the hero's 32 x 28 art grid, mirrored with the sprite
+        fillRect(sx + (left ? 31 - col : col) * (int)DP, sy + row * (int)DP, DP, DP, color);
+    };
+    if (h.skill == 0) {   // Power Slash: a glint on the raised blade, the big crescent in its window, then its outer band fading
+        int w = (int)(30 * DP), bh = (int)(20 * DP);
+        int x = (int)(left ? h.x - w : h.x + HERO_W) - camX, y = (int)(h.y + HERO_H / 2 - bh / 2) - camY;
+        if (t < 0.1f) {
+            if ((int)(q.time * 20) % 2) art(16, 0, core), art(19, 2, core), art(14, 3, core);
+        } else if (t <= 0.25f) {
+            drawCrescent(q, x, y, w, bh, left, false, 1, false, camX, camY, [&](float, float out, float in, int px, int py) -> uint32_t {
+                return out < 2 * DP ? edge : in < 3 * DP ? core : bayer4(px, py) < 8 ? core : 0;
+            });
+            for (int k = 0; k < 6; k++) {   // speed lines behind the crescent
+                int len = (int)((6 + 3 * (k % 3)) * DP), ly = y + (int)((2 + k * 3) * DP);
+                fillRect(left ? x + w : x - len, ly, len, DP, edge);
+            }
+        } else if (t <= 0.35f) {
+            bool thin = t > 0.30f;
+            drawCrescent(q, x, y, w, bh, left, false, 1, false, camX, camY, [&](float, float out, float, int px, int py) -> uint32_t {
+                return out < 2 * DP && (thin ? ((px + py) / (int)DP) % 2 == 0 : bayer4(px, py) < 8) ? edge : 0;
+            });
+        }
+    } else if (h.skill == 1 && t <= 0.15f + 0.08f) {   // Rising Slash: an upright crescent in the 24 x 36 box above-front
+        int w = (int)(24 * DP), bh = (int)(36 * DP);
+        int x = (int)(left ? h.x - w : h.x + HERO_W) - camX, y = (int)(h.y + HERO_H - bh) - camY;
+        bool fading = t > 0.15f;
+        drawCrescent(q, x, y, w, bh, left, true, 1, false, camX, camY, [&](float, float out, float in, int px, int py) -> uint32_t {
+            if (fading) return out < 2 * DP && bayer4(px, py) < 8 ? edge : 0;
+            return out < 2 * DP ? edge : in < 2 * DP ? core : bayer4(px, py) < 8 ? core : 0;
+        });
+    } else if (h.skill == 3 && t <= 0.15f + 0.1f) {   // Lion's Roar: three golden crescents growing in the 72 x 40 box, a mane
+        int w = (int)(72 * DP), bh = (int)(40 * DP);
+        int x = (int)(left ? h.x - w : h.x + HERO_W) - camX, y = (int)(h.y + HERO_H / 2 - bh / 2) - camY;
+        bool fading = t > 0.15f;
+        float grow = 0.4f + 0.6f * fminf(1, t / 0.15f);
+        uint32_t gold[3] = {paletteColor('N'), paletteColor('Y'), paletteColor('o')};
+        drawCrescent(q, x, y, w, bh, left, false, grow, true, camX, camY, [&](float across, float out, float, int px, int py) -> uint32_t {
+            if (fading) return out < 2 * DP && bayer4(px, py) < 8 ? gold[0] : 0;
+            for (int k = 0; k < 3; k++)   // bands at the outer edge, two thirds and one third across
+                if (fabsf(across - (1 - k / 3.0f)) < 0.08f) return gold[k];
+            return bayer4(px, py) < 8 ? gold[1] : 0;
+        });
+        if (!fading)
+            for (int k = 0; k < 8; k++) {   // the mane: 8 short rays around the hero
+                float a = k * 0.785f;
+                for (int d = 6; d < 10; d++)
+                    fillRect((int)(h.x + HERO_W / 2 + cosf(a) * d * DP) - camX, (int)(h.y + HERO_H / 2 + sinf(a) * d * DP) - camY, DP, DP, gold[0]);
+            }
+    }
+}
+
+// Hero effects and shots first, then enemies and bosses, then enemy shots and telegraphs on top (spec §7, §8, §21; phase 5b).
 static void drawCombat(const Quest& q, int camX, int camY) {
     const SaveData& s = q.save;
     if (s.echoNames > 0 && s.echoWorld == q.area.world && s.echoArea == q.area.index) {   // 8 x 8 wisp, bobbing 2 px
@@ -438,6 +555,152 @@ static void drawCombat(const Quest& q, int camX, int camY) {
                     fillRect(zx + dx, zy + dy, DP, DP, paletteColor('M'));
             }
     }
+    const Hero& h = q.hero;
+    const uint32_t white = paletteColor(q.reduceFlashing ? 'b' : 'w');   // the white cores and sparks (reduce flashing: grey)
+    for (const Effect& f : q.effects) {
+        int x = (int)f.x - camX, y = (int)f.y - camY;
+        uint32_t color = paletteColor(f.color);
+        switch (f.kind) {
+        case FX_SPARK: {   // a hit spark: 3 frames over its life, centred, in the hit's colour; a Shadow Dash hit adds a slash line
+            const Sprite& sp = f.age < f.life / 3 ? SPARK_1 : f.age < f.life * 2 / 3 ? SPARK_2 : SPARK_3;
+            uint32_t c = f.color == 'w' ? white : color;
+            drawSpriteEx(sp, x - sp.w / 2, y - sp.h / 2, false, 'w', c);
+            if (f.w > 0) fillRect(x - (int)f.w / 2, y, (int)f.w, DP, white);
+            break;
+        }
+        case FX_ZONE: {   // Arrow Rain's zone: dashes along the floor, blinking faster in its last 0.15 s
+            if ((int)((f.life - f.age) * (f.life - f.age < 0.15f ? MARKER_BLINK_LAST : MARKER_BLINK)) % 2) break;
+            for (int k = -(int)f.w / 2; k < (int)f.w / 2; k += 4 * DP) fillRect(x + k, y - DP, 2 * DP, DP, white);
+            break;
+        }
+        case FX_GHOST: {   // a Shadow Dash afterimage: the hero's silhouette in x, 50 % dither fading to 25 %
+            HeroPose pose = heroPose(q);
+            const Sprite& sp = pose.arms == ARMS_NONE ? *HERO_BODY[q.save.heroClass][pose.body] : *HERO_ARMS[q.save.heroClass][pose.arms][pose.legs];
+            int gx = (int)floorf(f.x - 12 * DP) - camX, gy = (int)floorf(f.y + HERO_H - 28 * DP) - camY;
+            int level = f.age < f.life / 2 ? 8 : 4;
+            for (int row = 0; row < sp.h; row++)
+                for (int col = 0; col < sp.w; col++) {
+                    int px = gx + (f.flip ? sp.w - 1 - col : col), py = gy + row;
+                    if (sp.pixels[row * sp.w + col] != '.' && px >= 0 && px < QUEST_W && py >= 0 && py < QUEST_H && bayer4(px, py) < level)
+                        screenTarget[py * QUEST_W + px] = color;
+                }
+            break;
+        }
+        case FX_ARC: drawArc(x, y, (int)f.w, (int)f.h, f.flip, color); break;
+        case FX_BURST: {   // a white disc, then a ring growing to exactly its reach (f.w), the inside dithered, fading at the end
+            float t = f.age / f.life;
+            if (t < 0.3f) {
+                fillCircle(x, y, (int)(f.w * 0.4f), white);
+                break;
+            }
+            int r = (int)(f.w * (0.4f + 0.6f * fminf(1, (t - 0.3f) / 0.4f)));
+            for (int dy = -r; dy <= r; dy += DP)
+                for (int dx = -r; dx <= r; dx += DP) {
+                    int d2 = dx * dx + dy * dy, inner = r - 2 * (int)DP;
+                    if (d2 > r * r) continue;
+                    bool ring = d2 >= inner * inner;
+                    if (ring && (t < 0.7f || ((dx + dy) / (int)DP) % 2 == 0)) fillRect(x + dx, y + dy, DP, DP, color);
+                    else if (!ring && t < 0.7f && bayer4(x + dx, y + dy) < 8) fillRect(x + dx, y + dy, DP, DP, color);
+                }
+            break;
+        }
+        case FX_SPIN: {   // Blade Fury: a dithered ring at the hit radius around the hero, a bright quarter turning once per hit
+            int job = q.save.job >= 0 && q.save.job < 4 ? q.save.job : 0;
+            uint32_t ring = paletteColor(job == 0 ? 'b' : TRIM_BY_JOB[job]);
+            int cx = (int)(h.x + HERO_W / 2) - camX, cy = (int)(h.y + HERO_H / 2) - camY, r = (int)f.w;
+            bool pulse = fmodf(f.age, 0.1f) < 1.0f / 60;   // the 5 hit ticks, one every 0.1 s
+            float turn = fmodf(f.age, 0.1f) / 0.1f * 6.2832f;
+            for (int a = 0; a < 96; a++) {
+                float angle = a * 6.2832f / 96;
+                int px = cx + (int)(cosf(angle) * r), py = cy + (int)(sinf(angle) * r);
+                float off = fmodf(angle - turn + 12.5664f, 6.2832f);
+                if (off < 1.5708f) fillRect(px, py, DP, DP, white);
+                else if (pulse || bayer4(px, py) < 8) fillRect(px, py, DP, DP, pulse ? white : ring);
+            }
+            break;
+        }
+        case FX_CHAIN: {   // Chain Lightning: a jagged line (white core, cyan sides), re-jagged every 0.05 s; a glow at the target
+            int x2 = (int)f.x2 - camX, y2 = (int)f.y2 - camY, seed = (int)(q.time * 20);
+            int steps = std::max(4, (int)(hypotf((float)(x2 - x), (float)(y2 - y)) / (4 * DP)));
+            int lastX = x, lastY = y;
+            for (int k = 1; k <= steps; k++) {
+                int jag = k == steps ? 0 : (int)((((k * 7 + seed * 13) % 5) - 2) * DP);
+                int nx = x + (x2 - x) * k / steps, ny = y + (y2 - y) * k / steps + jag;
+                for (int i = 0; i <= 4; i++) {
+                    int px = lastX + (nx - lastX) * i / 4, py = lastY + (ny - lastY) * i / 4;
+                    fillRect(px, py - DP, DP, 3 * DP, paletteColor('c'));
+                    fillRect(px, py, DP, DP, white);
+                }
+                lastX = nx, lastY = ny;
+            }
+            if (f.age < 2.0f / 60) fillCircle(x2, y2, 4 * DP, paletteColor('c'));
+            break;
+        }
+        case FX_BEAM: {   // a boss's beam: magenta with a flickering white core
+            fillRect(x, y, (int)f.w, (int)f.h, color);
+            int core = (int)f.w / 3 + ((int)(q.time * 30) % 2) * (int)DP;
+            fillRect(x + ((int)f.w - core) / 2, y, core, (int)f.h, paletteColor('w'));
+            break;
+        }
+        case FX_BALL: {   // a growing ball of power at a wand's star
+            int r = (int)(2 * DP + (f.w - 2 * DP) * f.age / f.life);
+            fillCircle(x, y, r + (int)DP, color);
+            fillCircle(x, y, r / 2 + (int)DP, paletteColor('w'));
+            break;
+        }
+        case FX_METEOR: {   // the target: an ellipse on the floor blinking faster at the end; the rock falls onto it on a slant
+            float left = f.life - f.age;
+            if (!((int)(left * (left < 0.2f ? 12 : 4)) % 2))
+                for (int a = 0; a < 64; a++) {
+                    float angle = a * 6.2832f / 64;
+                    fillRect(x + (int)(cosf(angle) * f.w), y - (int)(3 * DP) + (int)(sinf(angle) * 3 * DP), DP, DP, color);
+                }
+            float fall = 1 - f.age / f.life, dir = f.flip ? -1 : 1;
+            int rx = x - (int)(dir * 30 * DP * fall), ry = y - (int)(120 * DP * fall);
+            drawSpriteEx(METEOR_ROCK, rx - METEOR_ROCK.w / 2, ry - METEOR_ROCK.h, f.flip);
+            break;
+        }
+        }
+    }
+    drawHeroSlash(q, heroPose(q), camX, camY);
+    for (const Projectile& p : q.projectiles) {   // hero shots: sprites in their class colours, centred on the hitbox (D-063)
+        if (!p.fromHero) continue;
+        int cx = (int)(p.x + p.w / 2) - camX, cy = (int)(p.y + p.h / 2) - camY;
+        bool flip = p.vx < 0, b = (int)(q.time / 0.08f) % 2;
+        float speed = hypotf(p.vx, p.vy), ux = speed > 0 ? p.vx / speed : 0, uy = speed > 0 ? p.vy / speed : 0;
+        const Sprite* sp = nullptr;
+        if (p.kind == PROJ_ARROW) {
+            bool big = p.w >= 10 * DP;
+            sp = big ? &ARROW_BIG : p.vy < -0.12f * fabsf(p.vx) ? &ARROW_UP : p.vy > 0.12f * fabsf(p.vx) ? &ARROW_DOWN : &ARROW_FLAT;
+            for (int k = 0; k < 6 && !big; k++) {   // a speed line behind: 6 dp, 50 % dithered
+                int px = cx - (int)(ux * (sp->w / 2 + k * DP)), py = cy - (int)(uy * (sp->w / 2 + k * DP));
+                if (bayer4(px, py) < 8) fillRect(px, py, DP, DP, white);
+            }
+            const char trail[3] = {'w', 'c', 'I'};
+            for (int k = 0; k < 3 && big; k++)   // the Piercing Bolt's glowing streak
+                fillRect(cx - (int)(ux * (sp->w / 2 + (k + 1) * 4 * DP)), cy, 4 * DP, DP, paletteColor(trail[k]));
+            if (p.strong && p.mult < 2) {   // Double Shot and Storm Volley arrows glint cyan
+                drawSpriteEx(*sp, cx - sp->w / 2, cy - sp->h / 2, flip, 'w', paletteColor('c'));
+                continue;
+            }
+        } else if (p.kind == PROJ_RAIN) {
+            sp = &ARROW_FALL;
+        } else if (p.kind == PROJ_BOLT || p.kind == PROJ_ORB) {   // a trail of 3 dots behind, at 3, 6 and 9 dp
+            bool bolt = p.kind == PROJ_BOLT;
+            sp = bolt ? (b ? &BOLT_B : &BOLT_A) : (b ? &ORB_B : &ORB_A);
+            const char* colors = bolt ? "cuU" : "iIi";
+            for (int k = 0; k < 3; k++) {
+                int d = (int)((k + 1) * 3 * DP + sp->w / 2), size = k < 2 ? 2 * DP : DP;
+                fillRect(cx - (int)(ux * d) - size / 2, cy - (int)(uy * d) - size / 2, size, size, paletteColor(colors[k]));
+            }
+        } else if (p.kind == PROJ_STAR) {
+            sp = b ? &STAR_B : &STAR_A;
+        } else if (p.kind == PROJ_WAVE) {
+            sp = b ? &QUAKE_B : &QUAKE_A;
+            cy = (int)(p.y + p.h) - camY - sp->h / 2;   // the crest stands on the floor
+        }
+        if (sp) drawSpriteEx(*sp, cx - sp->w / 2, cy - sp->h / 2, flip);
+    }
     for (const Enemy& e : q.enemies) {
         if (!e.alive) continue;
         const EnemyType& type = rosterType(e.world, e.type);
@@ -462,6 +725,8 @@ static void drawCombat(const Quest& q, int camX, int camY) {
         if (e.flash > 0 || (tell && type.behaviour != BEH_SHOOTER)) drawSpriteSolid(sprite, x, y, paletteColor('w'), e.facingLeft);
         else if (tell) drawSpriteSolid(sprite, x, y, paletteColor('o'), e.facingLeft);   // the shooter glows
         else drawSpriteOutlined(sprite, x, y, e.facingLeft, paletteColor(type.trait == TRAIT_INFLATE && e.state == ES_ACT ? 'w' : 'x'));
+        for (int k = 0; k < 3 && e.slowTimer > 0; k++)   // slowed by the Frost Orb: frost on its top edge
+            fillRect(x + sprite.w / 4 + k * sprite.w / 4 - DP / 2, y + 2 * DP, DP, DP, paletteColor('i'));
         if (type.behaviour == BEH_ARMORED && e.state == ES_ACT)   // the swing, 28 x 16 in front
             drawArc((int)(e.facingLeft ? e.x - 28 * DP : e.x + e.w) - camX, (int)(e.y + e.h - 16 * DP) - camY, (int)(28 * DP), (int)(16 * DP),
                     e.facingLeft, paletteColor('m'));
@@ -494,6 +759,26 @@ static void drawCombat(const Quest& q, int camX, int camY) {
             drawSpriteEx(sprite, x, y, b.facingLeft);
         }
     }
+    for (const Projectile& p : q.projectiles) {   // enemy shots, over everything but the hero
+        if (p.fromHero) continue;
+        int x = (int)p.x - camX, y = (int)p.y - camY;
+        if ((p.kind == PROJ_BANANA || p.kind == PROJ_COCONUT || p.kind == PROJ_PEEL || p.kind == PROJ_POOP)) {
+            const Sprite& sprite = p.kind == PROJ_BANANA ? ((int)(q.time * 8) % 2 ? BANANA_B : BANANA_A)
+                                 : p.kind == PROJ_COCONUT ? COCONUT : p.kind == PROJ_PEEL ? PEEL : POOP;
+            drawDoubled(sprite, x + p.w / 2 - sprite.w * DP / 2, y + p.h / 2 - sprite.h * DP / 2, p.vx < 0);
+        } else if ((p.kind == PROJ_ICICLE || p.kind == PROJ_SNOWBALL || p.kind == PROJ_ICE_CUBE || p.kind == PROJ_SHARD)) {
+            const Sprite& sprite = p.kind == PROJ_ICICLE ? ICICLE : p.kind == PROJ_SNOWBALL ? SNOWBALL : p.kind == PROJ_ICE_CUBE ? ICE_CUBE : ICE_SHARD;
+            drawDoubled(sprite, x + p.w / 2 - sprite.w * DP / 2, y + p.h / 2 - sprite.h * DP / 2, p.kind == PROJ_SHARD && p.vx < 0);
+        } else if (p.kind == PROJ_WAVE) {   // a boss's shockwave along the floor: a magenta crest
+            for (int k = 0; k < p.w; k += DP) {
+                int hgt = p.h * (k < p.w / 2 ? k + DP : p.w - k) / (p.w / 2);
+                fillRect(x + k, y + p.h - hgt, DP, hgt, paletteColor('m'));
+            }
+            fillRect(x + p.w / 4, y + p.h - 2 * DP, p.w / 2, 2 * DP, paletteColor('w'));
+        } else {
+            fillRect(x, y, p.w, p.h, paletteColor('m'));
+        }
+    }
     // Telegraph markers: dashed outlines in their colour, blinking faster in their last 0.3 s.
     for (const Marker& m : q.markers) {
         if ((int)(m.timer * (m.timer < MARKER_LAST ? MARKER_BLINK_LAST : MARKER_BLINK)) % 2) continue;
@@ -506,86 +791,6 @@ static void drawCombat(const Quest& q, int camX, int camY) {
         for (int k = 0; k < h; k += 4 * DP) {
             fillRect(x, y + k, DP, std::min(2 * (int)DP, h - k), color);
             fillRect(x + w - DP, y + k, DP, std::min(2 * (int)DP, h - k), color);
-        }
-    }
-    for (const Projectile& p : q.projectiles) {
-        int x = (int)p.x - camX, y = (int)p.y - camY;
-        if (!p.fromHero && (p.kind == PROJ_BANANA || p.kind == PROJ_COCONUT || p.kind == PROJ_PEEL || p.kind == PROJ_POOP)) {
-            const Sprite& sprite = p.kind == PROJ_BANANA ? ((int)(q.time * 8) % 2 ? BANANA_B : BANANA_A)
-                                 : p.kind == PROJ_COCONUT ? COCONUT : p.kind == PROJ_PEEL ? PEEL : POOP;
-            drawDoubled(sprite, x + p.w / 2 - sprite.w * DP / 2, y + p.h / 2 - sprite.h * DP / 2, p.vx < 0);
-        } else if (!p.fromHero && (p.kind == PROJ_ICICLE || p.kind == PROJ_SNOWBALL || p.kind == PROJ_ICE_CUBE || p.kind == PROJ_SHARD)) {
-            const Sprite& sprite = p.kind == PROJ_ICICLE ? ICICLE : p.kind == PROJ_SNOWBALL ? SNOWBALL : p.kind == PROJ_ICE_CUBE ? ICE_CUBE : ICE_SHARD;
-            drawDoubled(sprite, x + p.w / 2 - sprite.w * DP / 2, y + p.h / 2 - sprite.h * DP / 2, p.kind == PROJ_SHARD && p.vx < 0);
-        } else if (!p.fromHero && p.kind == PROJ_WAVE) {   // a boss's shockwave along the floor: a magenta crest
-            for (int k = 0; k < p.w; k += DP) {
-                int hgt = p.h * (k < p.w / 2 ? k + DP : p.w - k) / (p.w / 2);
-                fillRect(x + k, y + p.h - hgt, DP, hgt, paletteColor('m'));
-            }
-            fillRect(x + p.w / 4, y + p.h - 2 * DP, p.w / 2, 2 * DP, paletteColor('w'));
-        } else if (!p.fromHero) {
-            fillRect(x, y, p.w, p.h, paletteColor('m'));
-        } else if (p.kind == PROJ_WAVE) {
-            fillRect(x, y + p.h / 2, p.w, p.h / 2, paletteColor('o'));
-            fillRect(x + DP, y, p.w - 2 * DP, p.h / 2, paletteColor('N'));
-        } else if (p.kind == PROJ_ORB) {
-            fillCircle(x + p.w / 2, y + p.h / 2, p.w / 2, paletteColor('c'));
-            fillCircle(x + p.w / 2, y + p.h / 2, p.w / 4, paletteColor('w'));
-        } else {
-            fillRect(x, y, p.w, p.h, paletteColor('y'));
-        }
-    }
-    const Hero& h = q.hero;
-    for (const Effect& f : q.effects) {
-        int x = (int)f.x - camX, y = (int)f.y - camY;
-        uint32_t color = paletteColor(f.color);
-        switch (f.kind) {
-        case FX_SWING: {   // the basic sword arc follows the hero while the swing plays
-            if (h.attackTimer <= 0) break;
-            if (h.attackUp) {   // the arc turned upright above the head, bulging up
-                int w = (int)f.h, ah = (int)f.w, bx = (int)(h.x + HERO_W / 2) - w / 2 - camX, by = (int)h.y - ah - camY;
-                for (int row = 0; row < ah; row += DP)
-                    for (int col = 0; col < w; col += DP) {
-                        float nx = (col + DP / 2.0f) / w * 2 - 1, ny = 1 - (row + DP / 2.0f) / ah, d = nx * nx + ny * ny;
-                        if (d <= 1 && d >= 0.45f) fillRect(bx + col, by + row, DP, DP, color);
-                    }
-                break;
-            }
-            int bx = (int)(h.facingLeft ? h.x - f.w : h.x + HERO_W) - camX, by = (int)(h.y + HERO_H / 2 - f.h / 2) - camY;
-            drawArc(bx, by, (int)f.w, (int)f.h, h.facingLeft, color);
-            break;
-        }
-        case FX_ARC: drawArc(x, y, (int)f.w, (int)f.h, f.flip, color); break;
-        case FX_BURST:
-            fillCircle(x, y, (int)(f.w * (0.5f + 0.5f * f.age / f.life)), color);
-            fillCircle(x, y, (int)(f.w * 0.4f * (1 - f.age / f.life)), paletteColor('w'));
-            break;
-        case FX_SPIN: drawRing((int)(h.x + HERO_W / 2) - camX, (int)(h.y + HERO_H / 2) - camY, (int)f.w, color); break;
-        case FX_CHAIN: {   // a jagged bolt between two points
-            int x2 = (int)f.x2 - camX, y2 = (int)f.y2 - camY;
-            for (int k = 0; k <= 12; k++)
-                fillRect(x + (x2 - x) * k / 12, y + (y2 - y) * k / 12 + (k % 2 ? DP : -DP) * (k % 3), DP, DP, color);
-            break;
-        }
-        case FX_BEAM: {   // a boss's beam: magenta with a flickering white core
-            fillRect(x, y, (int)f.w, (int)f.h, color);
-            int core = (int)f.w / 3 + ((int)(q.time * 30) % 2) * (int)DP;
-            fillRect(x + ((int)f.w - core) / 2, y, core, (int)f.h, paletteColor('w'));
-            break;
-        }
-        case FX_BALL: {   // a growing ball of power at a wand's star
-            int r = (int)(2 * DP + (f.w - 2 * DP) * f.age / f.life);
-            fillCircle(x, y, r + (int)DP, color);
-            fillCircle(x, y, r / 2 + (int)DP, paletteColor('w'));
-            break;
-        }
-        case FX_METEOR: {   // the marker on the floor and the rock falling onto it
-            if ((int)(f.age * 10) % 2) for (int k = -(int)f.w; k <= (int)f.w; k += 4 * DP) fillRect(x + k, y - DP, 2 * DP, DP, color);
-            int fallY = y - (int)((1 - f.age / f.life) * 120 * DP);
-            fillCircle(x, fallY - 6 * DP, 6 * DP, color);
-            fillCircle(x, fallY - 6 * DP, 3 * DP, paletteColor('N'));
-            break;
-        }
         }
     }
 }
@@ -853,8 +1058,8 @@ static void drawClassSelect(const Quest& q) {
     for (int i = 0; i < CLASS_COUNT; i++) {
         int x = (12 + 76 * i) * DP, y = 30 * DP;
         drawPanel(x, y, 72 * DP, 120 * DP, q.cursor == i ? 'y' : 'n');
-        const Sprite& hero = *HERO_FRAMES[i][FRAME_IDLE_1];
-        drawSprite(hero, x + 36 * DP - hero.w / 2, y + 4 * DP);
+        const Sprite& hero = *HERO_BODY[i][BODY_IDLE_1];
+        drawHeroSprite(hero, x + 36 * DP - hero.w / 2, y - 2 * DP, false, 0);
         drawText(x + (72 * DP - textWidth(CLASS_NAMES[i], DP)) / 2, y + 26 * DP, CLASS_NAMES[i], paletteColor(q.cursor == i ? 'y' : 'w'), DP);
         for (int b = 0; b < 3; b++) {
             int by = y + (38 + 13 * b) * DP;

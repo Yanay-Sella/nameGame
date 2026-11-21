@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <stdio.h>
 #include <string.h>
+#include <vector>
 
 uint32_t screenPixels[SCREEN_W * SCREEN_H];
 uint32_t expandedPixels[EXPANDED_W * EXPANDED_H];
@@ -153,7 +154,7 @@ bool screenSaveBmp(const char* path) {
     FILE* file = fopen(path, "wb");
     if (!file) return false;
     bool ok = fwrite(header, 1, sizeof header, file) == sizeof header;
-    static uint8_t row[QUEST_W * 3];
+    std::vector<uint8_t> row(screenW * 3);   // any target width (the phase 5b animation sheets are wider than the screen)
     for (int y = screenH - 1; y >= 0; y--) {
         for (int x = 0; x < screenW; x++) {
             uint32_t p = screenTarget[y * screenW + x];
@@ -161,7 +162,7 @@ bool screenSaveBmp(const char* path) {
             row[x * 3 + 1] = (p >> 8) & 0xFF;
             row[x * 3 + 2] = (p >> 16) & 0xFF;
         }
-        ok &= fwrite(row, 1, screenW * 3, file) == (size_t)screenW * 3;
+        ok &= fwrite(row.data(), 1, screenW * 3, file) == (size_t)screenW * 3;
     }
     return fclose(file) == 0 && ok;
 }

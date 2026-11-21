@@ -241,7 +241,7 @@ void grantJob(Quest& q) {
     q.bannerColor = 'z';
     q.bannerTimer = 2;
     const Hero& h = q.hero;
-    for (int i = 0; i < 30; i++) {
+    for (int i = 0; i < 30 && q.particles.size() < PARTICLE_CAP; i++) {
         float angle = i * 6.2832f / 30, speed = (30 + 15 * (i % 4)) * DP;
         q.particles.push_back({h.x + HERO_W / 2, h.y + HERO_H / 2, cosf(angle) * speed, sinf(angle) * speed - 20 * DP, 0.9f,
                                paletteColor(i % 2 ? 'z' : 'N'), 1});

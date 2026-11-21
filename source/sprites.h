@@ -81,6 +81,24 @@ inline uint32_t paletteColor(char c) {
         case '!': return 0xFF4E4A46;   // citadel dark
         case 'z': return 0xFFC8A040;   // citadel gold
         case 'Q': return 0xFFD97757;   // Claude's cloak
+        case '+': return 0xFFE89A88;   // hero: blush
+        case '[': return 0xFF6A3A28;   // hero: skin outline
+        case ']': return 0xFF24160C;   // hero: leather and hair outline
+        case '(': return 0xFF23263A;   // hero: steel outline
+        case ')': return 0xFF4A1220;   // hero: cape outline
+        case '{': return 0xFF1E3A1C;   // hero: green outline
+        case ';': return 0xFF6E9A50;   // hero: sage green
+        case ',': return 0xFF46703A;   // hero: sage green shade
+        case '/': return 0xFF7A4A2C;   // hero: warm leather
+        case '>': return 0xFFE6E2C4;   // hero: pale hair
+        case ':': return 0xFFB4B094;   // hero: pale hair shade
+        case '_': return 0xFF6E6A58;   // hero: pale hair outline
+        case '^': return 0xFF2E5478;   // hero: navy robe
+        case '`': return 0xFF1C3450;   // hero: navy robe shade
+        case '|': return 0xFF0E1A2C;   // hero: navy outline
+        case '<': return 0xFF7A7686;   // hero: cloak light
+        case '-': return 0xFF6A44B0;   // hero: scarf shade
+        case '}': return 0xFF2E1A52;   // hero: scarf outline
         default: return 0;             // '.' and anything else: transparent
     }
 }

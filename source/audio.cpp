@@ -178,6 +178,9 @@ void audioOpen(const char* folder) {
     sounds[SOUND_Q_DRINK] = synthesize({{0, 0.05f, 400, 600, 0.15f, false}, {0.1f, 0.05f, 400, 600, 0.15f, false},
                                         {0.2f, 0.05f, 400, 600, 0.15f, false}});
     sounds[SOUND_Q_DODGE] = synthesize({{0, 0.12f, 1500, 3000, 0.15f, true}});
+    sounds[SOUND_Q_HEAVY] = synthesize({{0, 0.16f, 1800, 400, 0.25f, true}, {0, 0.10f, 120, 80, 0.15f, false}});
+    sounds[SOUND_Q_CHARGE] = synthesize({{0, 0.60f, 200, 900, 0.08f, false}, {0, 0.60f, 2000, 6000, 0.05f, true}});
+    sounds[SOUND_Q_THROW] = synthesize({{0, 0.05f, 4000, 6000, 0.08f, false}, {0, 0.06f, 3000, 1500, 0.12f, true}});
     sounds[SOUND_Q_SPLASH] = synthesize({{0, 0.3f, 1500, 300, 0.4f, true}});
     sounds[SOUND_Q_ZAP] = synthesize({{0, 0.15f, 6000, 4000, 0.3f, true}, {0, 0.15f, 120, 120, 0.2f, false}});
     sounds[SOUND_Q_ROAR] = synthesize({{0, 0.6f, 300, 120, 0.5f, true}, {0, 0.6f, 110, 70, 0.3f, false}});

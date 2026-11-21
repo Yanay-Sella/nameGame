@@ -10,6 +10,7 @@
 #include "quest.h"
 #include "quest_art.h"
 #include "quest_sprites.h"
+#include "quest_sprites_hero.h"
 #include <algorithm>
 
 static int failures = 0;
@@ -28,19 +29,6 @@ const char* const OBJECTS_TO_REACH = "CMNTKQW";
 const int REACH_WORLDS[] = {WORLD_NAMULA, 1, 2, 3, WORLD_TEST};   // phases 5-9 add their worlds
 
 static const Sprite* const ALL_QUEST_SPRITES[] = {
-    &HERO_KNIGHT_IDLE_1, &HERO_KNIGHT_IDLE_2, &HERO_KNIGHT_WALK_1, &HERO_KNIGHT_WALK_2, &HERO_KNIGHT_WALK_3,
-    &HERO_KNIGHT_WALK_4, &HERO_KNIGHT_JUMP, &HERO_KNIGHT_FALL, &HERO_KNIGHT_ATTACK_1, &HERO_KNIGHT_ATTACK_2,
-    &HERO_KNIGHT_ATTACK_3, &HERO_KNIGHT_CLIMB_1, &HERO_KNIGHT_CLIMB_2, &HERO_KNIGHT_ROLL_1, &HERO_KNIGHT_ROLL_2,
-    &HERO_KNIGHT_HURT, &HERO_ARCHER_IDLE_1, &HERO_ARCHER_IDLE_2, &HERO_ARCHER_WALK_1, &HERO_ARCHER_WALK_2,
-    &HERO_ARCHER_WALK_3, &HERO_ARCHER_WALK_4, &HERO_ARCHER_JUMP, &HERO_ARCHER_FALL, &HERO_ARCHER_ATTACK_1,
-    &HERO_ARCHER_ATTACK_2, &HERO_ARCHER_ATTACK_3, &HERO_ARCHER_CLIMB_1, &HERO_ARCHER_CLIMB_2, &HERO_ARCHER_ROLL_1,
-    &HERO_ARCHER_ROLL_2, &HERO_ARCHER_HURT, &HERO_MAGICIAN_IDLE_1, &HERO_MAGICIAN_IDLE_2, &HERO_MAGICIAN_WALK_1,
-    &HERO_MAGICIAN_WALK_2, &HERO_MAGICIAN_WALK_3, &HERO_MAGICIAN_WALK_4, &HERO_MAGICIAN_JUMP, &HERO_MAGICIAN_FALL,
-    &HERO_MAGICIAN_ATTACK_1, &HERO_MAGICIAN_ATTACK_2, &HERO_MAGICIAN_ATTACK_3, &HERO_MAGICIAN_CLIMB_1,
-    &HERO_MAGICIAN_CLIMB_2, &HERO_MAGICIAN_ROLL_1, &HERO_MAGICIAN_ROLL_2, &HERO_MAGICIAN_HURT, &HERO_THIEF_IDLE_1,
-    &HERO_THIEF_IDLE_2, &HERO_THIEF_WALK_1, &HERO_THIEF_WALK_2, &HERO_THIEF_WALK_3, &HERO_THIEF_WALK_4,
-    &HERO_THIEF_JUMP, &HERO_THIEF_FALL, &HERO_THIEF_ATTACK_1, &HERO_THIEF_ATTACK_2, &HERO_THIEF_ATTACK_3,
-    &HERO_THIEF_CLIMB_1, &HERO_THIEF_CLIMB_2, &HERO_THIEF_ROLL_1, &HERO_THIEF_ROLL_2, &HERO_THIEF_HURT,
     &CHECKPOINT_UNLIT, &CHECKPOINT_LIT_A, &CHECKPOINT_LIT_B, &CHECKPOINT_LIT_C, &HEARTH_A, &HEARTH_B, &HEARTH_C,
     &PORTAL_A, &PORTAL_B, &ARCH_CLOSED, &CHEST_CLOSED, &CHEST_OPEN, &CHEST_AJAR, &LEVER_OFF, &LEVER_ON, &NPC_ILSA_A,
     &NPC_ILSA_B, &NPC_MARRA_A, &NPC_MARRA_B, &NPC_BRANN_A, &NPC_BRANN_B, &NPC_LIO_A, &NPC_LIO_B, &NPC_PELL_A, &NPC_PELL_B,
@@ -66,6 +54,17 @@ static std::vector<const Sprite*> artSprites(const WorldArt& art) {
 
 static void questSpritesHaveTheirSize() {
     for (const Sprite* s : ALL_QUEST_SPRITES) CHECK((int)strlen(s->pixels) == s->w * s->h);
+    for (int c = 0; c < HERO_CLASSES; c++) {
+        for (int f = 0; f < HERO_BODY_FRAMES; f++) {
+            const Sprite* s = HERO_BODY[c][f];
+            CHECK(s->w == 64 && s->h == 56 && (int)strlen(s->pixels) == s->w * s->h);
+        }
+        for (int a = 0; a < HERO_ARM_POSES; a++)
+            for (int l = 0; l < HERO_LEG_POSES; l++) {
+                const Sprite* s = HERO_ARMS[c][a][l];
+                CHECK(s->w == 64 && s->h == 56 && (int)strlen(s->pixels) == s->w * s->h);
+            }
+    }
     for (int w = 0; w < WORLD_COUNT; w++)
         if (worldArt(w))
             for (const Sprite* s : artSprites(*worldArt(w))) CHECK(s && (int)strlen(s->pixels) == s->w * s->h);
@@ -946,6 +945,217 @@ static void arrowsHitEveryGroundEnemy() {
         }
         if (hits == 0) printf("  the archer's arrows never hit %s\n", rosterType(world, slot).name);
         CHECK(hits > 0);
+    }
+}
+
+// No R2 skill roots the hero (D-064): running through a skill ends where running without it does; Meteor mid-jump too.
+static void skillsNeverRootTheHero() {
+    TestArea t;
+    makeArea(t, {});
+    const int CASES[3][2] = {{CLASS_KNIGHT, 0}, {CLASS_MAGICIAN, 3}, {CLASS_THIEF, 2}};
+    for (const auto& c : CASES) {
+        float endX[2];
+        for (int skill = 0; skill <= 1; skill++) {
+            Quest q;
+            startQuest(q, t, c[0], 30, c[1], 10);
+            Actions a = {};
+            a.moveX = 1;
+            play(q, a, 30);   // a running start
+            q.hero.mp = q.stats.maxMp;
+            a.rocket = skill;
+            play(q, a, 45);
+            endX[skill] = q.hero.x;
+        }
+        CHECK(fabsf(endX[0] - endX[1]) <= 0.5f * DP);
+    }
+    float x[2][60], y[2][60];   // Meteor cast during a jump, holding right: the same path as a plain jump
+    for (int skill = 0; skill <= 1; skill++) {
+        Quest q;
+        startQuest(q, t, CLASS_MAGICIAN, 30, 3, 10);
+        q.hero.mp = q.stats.maxMp;
+        for (int i = 0; i < 60; i++) {
+            Actions a = {};
+            a.moveX = 1;
+            a.jump = i == 0;
+            a.jumpHeld = true;
+            a.rocket = skill && i == 5;
+            questUpdate(q, a, DT);
+            x[skill][i] = q.hero.x;
+            y[skill][i] = q.hero.y;
+        }
+    }
+    for (int i = 0; i < 60; i++) CHECK(fabsf(x[0][i] - x[1][i]) <= 0.5f * DP && fabsf(y[0][i] - y[1][i]) <= 0.5f * DP);
+}
+
+// The melee slash is lit exactly in its hit window: every damage step is lit, and it never lights early or late.
+static void slashLitMatchesHitWindow() {
+    TestArea t;
+    makeArea(t, {{19, withLetter(16, 'D')}});
+    const int CLASSES_MELEE[2] = {CLASS_KNIGHT, CLASS_THIEF};
+    const float TO[2] = {0.18f, 0.10f};
+    for (int k = 0; k < 2; k++) {
+        Quest q;
+        startQuest(q, t, CLASSES_MELEE[k], 10, 0, 14);
+        q.godMode = true;
+        Enemy& e = q.enemies[0];
+        e.hp = e.maxHp = 1000000;
+        Actions a = {};
+        a.fire = true;
+        int firstDamage = -1, lastLit = -1, firstLit = -1;
+        bool allDamageLit = true;
+        for (int i = 0; i < 40; i++) {
+            e.x = q.hero.x + HERO_W + 2 * DP;   // in front, inside both boxes
+            int before = e.hp;
+            play(q, a, 1);
+            a.fire = false;
+            HeroPose pose = heroPose(q);
+            bool damaged = e.hp < before;
+            if (damaged && firstDamage < 0) firstDamage = i;
+            if (damaged && !pose.slashLit) allDamageLit = false;
+            if (pose.slashLit && firstLit < 0) firstLit = i;
+            if (pose.slashLit) lastLit = i;
+            if (pose.slashLit) CHECK(pose.attackT <= TO[k] + 0.001f);
+        }
+        CHECK(firstDamage >= 0 && allDamageLit && firstLit >= firstDamage - 1 && lastLit >= firstLit);
+    }
+}
+
+// Melee basic hits stop the action for 0.025 s (D-063); an arrow's non-killing hit doesn't.
+static void meleeBasicHitStops() {
+    TestArea t;
+    makeArea(t, {{19, withLetter(16, 'D')}});
+    Quest q;
+    startQuest(q, t, CLASS_KNIGHT, 10, 0, 14);
+    q.godMode = true;
+    Enemy& e = q.enemies[0];
+    e.hp = e.maxHp = 1000000;
+    Actions a = {};
+    a.fire = true;
+    float stop = -1;
+    for (int i = 0; i < 30 && stop < 0; i++) {
+        e.x = q.hero.x + HERO_W + 2 * DP;
+        int before = e.hp;
+        play(q, a, 1);
+        a.fire = false;
+        if (e.hp < before) stop = q.hitStop;
+    }
+    CHECK(fabsf(stop - 0.025f) <= 0.001f);
+    makeArea(t, {{19, withLetter(30, 'D')}});
+    startQuest(q, t, CLASS_ARCHER, 10, 0, 14);
+    q.godMode = true;
+    Enemy& target = q.enemies[0];
+    target.hp = target.maxHp = 1000000;
+    a = {};
+    a.fire = true;
+    bool hit = false;
+    for (int i = 0; i < 90 && !hit; i++) {
+        int before = target.hp;
+        play(q, a, 1);
+        a.fire = false;
+        if (target.hp < before) {
+            hit = true;
+            CHECK(q.hitStop == 0);
+        }
+    }
+    CHECK(hit);
+}
+
+// The Archer's draw shows while R1 is held: the release right after a shot, the draw in the cycle's last 0.2 s.
+static void rangedDrawShowsWhileHeld() {
+    TestArea t;
+    makeArea(t, {});
+    Quest q;
+    startQuest(q, t, CLASS_ARCHER, 10, 0, 14);
+    Actions a = {};
+    a.fire = true;
+    play(q, a, 1);
+    CHECK(heroPose(q).arms == ARMS_ACTIVE);
+    bool drew = false;
+    for (int i = 1; i < 27; i++) {
+        play(q, a, 1);
+        HeroPose pose = heroPose(q);
+        if (pose.arms == ARMS_WINDUP) {
+            drew = true;
+            CHECK(pose.attackT >= 0.45f - 0.20f - 0.001f);
+        }
+    }
+    CHECK(drew);
+    a.fire = false;
+    play(q, a, 60);
+    CHECK(heroPose(q).arms == ARMS_NONE);
+}
+
+// The skills' damage timing is unchanged by phase 5b: the first damage lands at the spec's time after the press.
+static void skillTimingUnchanged() {
+    struct Case { int cls, job; float ahead; bool centred; float at; };   // ahead: dp from the hitbox's front (or centre)
+    const Case CASES[] = {{CLASS_KNIGHT, 0, 2, false, 0.1f}, {CLASS_KNIGHT, 1, 2, false, 0}, {CLASS_KNIGHT, 3, 2, false, 0},
+                          {CLASS_MAGICIAN, 0, 40, true, 0}, {CLASS_MAGICIAN, 2, 60, true, 0}, {CLASS_MAGICIAN, 3, 120, true, 0.6f},
+                          {CLASS_THIEF, 2, 2, false, 0}};
+    TestArea t;
+    makeArea(t, {{19, withLetter(40, 'D')}});
+    for (const Case& c : CASES) {
+        Quest q;
+        startQuest(q, t, c.cls, 30, c.job, 14);
+        q.godMode = true;
+        q.hero.mp = q.stats.maxMp;
+        Enemy& e = q.enemies[0];
+        e.hp = e.maxHp = 1000000;
+        Actions a = {};
+        a.rocket = true;
+        float firstDamage = -1, cx = q.hero.x + HERO_W / 2;
+        for (int i = 0; i < 60 && firstDamage < 0; i++) {
+            e.x = c.centred ? cx + c.ahead * DP - e.w / 2 : q.hero.x + HERO_W + c.ahead * DP;
+            int before = e.hp;
+            play(q, a, 1);
+            a.rocket = false;
+            if (e.hp < before) firstDamage = i * DT;
+        }
+        CHECK(firstDamage >= c.at - DT - 0.001f && firstDamage <= c.at + DT + 0.001f);
+    }
+}
+
+// Standing, running and landing frames stay inside the canvas edges, and the feet stand on the hitbox's bottom line.
+static void heroSpritesFitTheirBox() {
+    const int FRAMES[] = {BODY_IDLE_1, BODY_IDLE_2, BODY_RUN_1, BODY_RUN_2, BODY_RUN_3, BODY_RUN_4, BODY_LAND};
+    for (int c = 0; c < HERO_CLASSES; c++)
+        for (int f : FRAMES) {
+            const Sprite& s = *HERO_BODY[c][f];
+            bool edges = false, feet = false;
+            for (int y = 0; y < s.h; y++)
+                for (int x = 0; x < s.w; x++) {
+                    bool opaque = s.pixels[y * s.w + x] != '.';
+                    if (opaque && (x < 4 || x >= s.w - 4)) edges = true;   // art columns 0-1 and 30-31
+                    if (opaque && y >= s.h - 2 && x >= 24 && x < 40) feet = true;   // art row 27 under the hitbox (columns 12-19)
+                }
+            CHECK(!edges && feet);
+        }
+}
+
+// R1 held never slows the hero (D-062): the same run and the same jump peak with and without the basic attack.
+static void basicAttackKeepsFullSpeed() {
+    TestArea t;
+    makeArea(t, {});
+    for (int c = 0; c < CLASS_COUNT; c++) {
+        float endX[2], peak[2];
+        for (int fire = 0; fire <= 1; fire++) {
+            Quest q;
+            startQuest(q, t, c, 10, 0, 14);
+            Actions a = {};
+            a.moveX = 1;
+            a.fire = fire;
+            play(q, a, 60);
+            endX[fire] = q.hero.x;
+            startQuest(q, t, c, 10, 0, 14);
+            peak[fire] = q.hero.y;
+            for (int i = 0; i < 60; i++) {
+                a.jump = i == 10;
+                a.jumpHeld = i >= 10;
+                questUpdate(q, a, DT);
+                peak[fire] = fminf(peak[fire], q.hero.y);
+            }
+        }
+        CHECK(fabsf(endX[0] - endX[1]) <= 0.5f * DP);
+        CHECK(fabsf(peak[0] - peak[1]) <= 0.5f * DP && peak[1] < (20 * TILE - HERO_H) - 30 * DP);   // and it really jumped
     }
 }
 
@@ -2058,9 +2268,114 @@ static void renderMaps() {
     printf("quest maps: %d screens in build/maps\n", written);
 }
 
+// Animation sheets and lineups (phase 5b step 4): every class and tier, rendered step by step at gameplay scale.
+static void renderAnims() {
+    screenSetTarget(questPixels, QUEST_W, QUEST_H);
+    const char* const CLASS_FILES[CLASS_COUNT] = {"knight", "archer", "magician", "thief"};
+    // Lineups: the four classes side by side at the arrival of world 1 and Namula (area 0), at tier 0 and tier 3.
+    std::vector<uint32_t> picture(QUEST_W * QUEST_H);
+    for (int tier = 0; tier <= 3; tier += 3)
+        for (int world = 1; world >= 0; world--) {
+            Quest q = Quest();
+            q.folder = SAVE_FOLDER;
+            q.save.used = true;
+            q.save.job = tier;
+            loadArea(q.area, world, 0, 0, 0);
+            questRefreshStats(q, true);
+            spawnEnemies(q);
+            // The arrival tile: the first standable tile from the left (like entering the area).
+            const AreaDef& def = *q.area.def;
+            float arriveX = -1, arriveY = 0;
+            for (int tx = 0; tx < def.cols && arriveX < 0; tx++)
+                for (int ty = 1; ty + 1 < def.rows; ty++) {
+                    char tile = tileAt(q.area, tx, ty), below = tileAt(q.area, tx, ty + 1);
+                    if (!tileSolid(tile) && !tileSolid(tileAt(q.area, tx, ty - 1)) && tile != '~' && tile != '^' &&
+                        (tileSolid(below) || below == '-')) {
+                        arriveX = (float)(tx * TILE);
+                        arriveY = (float)((ty + 1) * TILE) - HERO_H;
+                        break;
+                    }
+                }
+            q.camX = fmaxf(0, fminf(arriveX + 60 * DP - QUEST_W / 2, (float)(def.cols * TILE - QUEST_W)));
+            q.camY = def.rows == TALL_ROWS ? fmaxf(0, fminf(arriveY - QUEST_H / 2, (float)(def.rows * TILE - QUEST_H)))
+                                           : (float)(def.rows * TILE - QUEST_H);
+            q.time = 1;
+            q.mode = QMODE_PLAY;
+            for (int c = 0; c < CLASS_COUNT; c++) {
+                q.save.heroClass = c;
+                q.hero = Hero();
+                q.hero.x = arriveX + c * 40 * DP;
+                q.hero.y = arriveY;
+                q.hero.onGround = true;
+                q.hero.hp = q.stats.maxHp;
+                q.hero.mp = q.stats.maxMp;
+                questDraw(q);
+                int bx = (int)floorf(q.hero.x - 12 * DP - q.camX), by = (int)floorf(q.hero.y + HERO_H - 28 * DP - q.camY);
+                for (int y = 0; y < QUEST_H; y++)
+                    for (int x = 0; x < QUEST_W; x++)
+                        if (c == 0 || (x >= bx && x < bx + 32 * DP && y >= by && y < by + 28 * DP))
+                            picture[y * QUEST_W + x] = questPixels[y * QUEST_W + x];
+            }
+            memcpy(questPixels, picture.data(), picture.size() * sizeof(uint32_t));
+            char path[64];
+            snprintf(path, sizeof path, "build/anims/lineup_w%d%s.bmp", world, tier ? "_t3" : "");
+            screenSaveBmp(path);
+        }
+    // Sheets: run with R1 held, R1 standing, a pause, then R2 and its aftermath; a 160 x 90 dp crop every 2nd step.
+    const int CROP_W = 160 * DP, CROP_H = 90 * DP, COLS = 8, GAP = DP, STEPS = 120;
+    const int ROWS = (STEPS / 2 + COLS - 1) / COLS, SHEET_W = COLS * (CROP_W + GAP), SHEET_H = ROWS * (CROP_H + GAP);
+    TestArea t;
+    std::string letters = withLetter(30, 'A');
+    letters[36] = 'D';
+    makeArea(t, {{19, letters}});
+    for (int c = 0; c < CLASS_COUNT; c++)
+        for (int job = 0; job < 4; job++) {
+            Quest q;
+            startQuest(q, t, c, 30, job, 14);
+            q.godMode = true;
+            std::vector<uint32_t> sheet(SHEET_W * SHEET_H, paletteColor('k'));
+            for (int i = 0; i < STEPS; i++) {
+                Actions a = {};
+                a.moveX = i < 30 ? 1 : 0;
+                a.fire = i < 48;
+                if (i == 60) {
+                    q.hero.mp = q.stats.maxMp;
+                    a.rocket = true;
+                }
+                questUpdate(q, a, DT);
+                for (Enemy& e : q.enemies) {   // held in place, never killed
+                    e.x = e.homeX;
+                    e.y = e.homeY;
+                    e.vx = e.vy = 0;
+                    e.state = ES_PATROL;
+                    e.stateTimer = 0;
+                    e.hp = e.maxHp;
+                }
+                if (i % 2) continue;
+                questDraw(q);
+                int cx = (int)(q.hero.x + HERO_W / 2 - q.camX), cy = (int)(q.hero.y + HERO_H / 2 - q.camY);
+                int x0 = std::max(0, std::min(QUEST_W - CROP_W, cx - CROP_W / 2));
+                int y0 = std::max(0, std::min(QUEST_H - CROP_H, cy - CROP_H / 2));
+                int cell = i / 2, sx = (cell % COLS) * (CROP_W + GAP), sy = (cell / COLS) * (CROP_H + GAP);
+                for (int y = 0; y < CROP_H; y++)
+                    memcpy(&sheet[(sy + y) * SHEET_W + sx], &questPixels[(y0 + y) * QUEST_W + x0], CROP_W * sizeof(uint32_t));
+            }
+            screenSetTarget(sheet.data(), SHEET_W, SHEET_H);
+            char path[64];
+            snprintf(path, sizeof path, "build/anims/%s_t%d.bmp", CLASS_FILES[c], job);
+            screenSaveBmp(path);
+            screenSetTarget(questPixels, QUEST_W, QUEST_H);
+        }
+    printf("quest anims: 4 lineups and 16 sheets in build/anims\n");
+}
+
 int main(int argc, char** argv) {
     if (argc > 1 && !strcmp(argv[1], "--maps")) {
         renderMaps();
+        return 0;
+    }
+    if (argc > 1 && !strcmp(argv[1], "--anims")) {
+        renderAnims();
         return 0;
     }
     questSpritesHaveTheirSize();
@@ -2089,6 +2404,13 @@ int main(int argc, char** argv) {
     basicAttackKillsFodderInThreeHits();
     thiefStabsUp();
     arrowsHitEveryGroundEnemy();
+    basicAttackKeepsFullSpeed();
+    skillsNeverRootTheHero();
+    slashLitMatchesHitWindow();
+    meleeBasicHitStops();
+    rangedDrawShowsWhileHeld();
+    skillTimingUnchanged();
+    heroSpritesFitTheirBox();
     knightSwingHitsOnlyInItsWindow();
     skillCastMidSwingStillHits();
     spikesHurtAndBounce();
