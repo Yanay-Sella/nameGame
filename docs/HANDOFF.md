@@ -18,6 +18,7 @@ Updated: 2026-11-21 (Classic boss-wave revives and Magic Beam tuning, NAME QUEST
 | 3 RPG systems | `phase-3-rpg-systems.md` | done, merged into `main` (`1456d78`), Mac-checked, `make ps3` builds; PS3 check (step 12) open |
 | 4 world 1 | `phase-4-world-1.md` | **built on `claude/work`**: steps 0-9 done (Mac); step 10 (PS3 check, the user's playtest) open |
 | 5 worlds 2-3 | `phase-5-worlds-2-3.md` | **in progress on `claude/work`**: world 2 done (art, mechanics, bosses, all 20 areas, tests); worlds 2-3 done (art, mechanics, bosses, all areas, tests) step 8 (story lines) and step 9 (docs, `check_docs.py` clean); next step 10: the PS3 boss checks from dev saves (ask the user first) and the user's playtests |
+| 5b character art, animation, combat feel | `phase-5b-character-art.md` | planned (2026-11-21), not started; after phase 5, required before phase 6 |
 | 6-9 | `phase-6` .. `phase-9` | planned, not started |
 
 - Master plan and rules for working through a phase: `docs/work-plan/name-quest-plan.md`. Rules, numbers and strings: `docs/work-plan/name-quest/spec.md`.
@@ -50,6 +51,7 @@ Updated: 2026-11-21 (Classic boss-wave revives and Magic Beam tuning, NAME QUEST
 - Spec examples that disagree with the spec formula `round(100 * 1.2^(L-1))`: 39→40 is 102,067 (spec 102,064), 29→30 is 16,484 (spec 10,646). The code follows the formula; the user decides.
 
 ## Session log (newest first; add a line per session: date, agent, what changed, what is next)
+- 2026-11-21, Claude: planned phase 5b (`phase-5b-character-art.md`): heroes redrawn after the user's two reference images, no R1 slowdown and no R2 roots (spec §5), animated R1/R2 for every tier, class-coloured shots, melee hit-stop (D-061 to D-064); master plan, spec §5/§6/§7/§16/§21/§22 and GDD decisions updated. Next after phase 5: phase 5b, then phase 6.
 - 2026-11-21, Codex: resolved the GDD and handoff conflicts for the merge of `codex/work` into `main`, keeping the Classic decisions and NAME QUEST phase 5 progress.
 - 2026-11-21, Claude: phase 5 steps 0-2 for world 2: art generator `world2.py` (palette, tiles, branch platforms, vines, water, thorns `^`, the thorn-root gate `g` via new `WorldArt::spikes/gate`, 13 props, 6 landmarks, coconut palms), the redrawn roster (leafhopper, beetle, stag, tree monkey, rhino) and both bosses; layers and details; coconuts `R`, banana throws, peels, stink mist; the Monkey King and the Silverback; area 0 in new `quest_world2.cpp` (placeholder removed). 7 new quest checks; `make ps3` builds. Next: the user's OK on the world 2 style frame (`shots/style-w2-*.png`), then step 3 (areas 1-19).
 - 2026-11-21, Claude: the user approved world 2's look; phase 5 step 3: world 2 areas 1-19 in `quest_world2.cpp` (graph block at the top; main path 0-1-2-3-4-5-6-7-8-9-10-18-19, Monkey King in 6, thorn gate in 7, DEPTHS in 9, Garrick in dead end 12 by the statue head, shortcut hatch 14→9, portals 16→1 and 17→0). World 2 added to the reachability, gate, layout and chest tests (`gateGuardsTheSecondHalf(world)`, `chestsMatchTheWorldList(world, deadEnds)`); quest tests green; `make quest-maps` read. Next: world 3 art and style frame.

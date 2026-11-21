@@ -197,8 +197,11 @@ Hitbox 8 x 14; sprite 16 x 20 drawn at (x - 4, y - 6), facing right, flipped for
 | HURT_IFRAMES | 1.0 | blinking |
 | Underwater (world 5) | GRAVITY 380, JUMP_SPEED 190, MAX_FALL 120, walk x0.85 | peak 47 px; layout rule 8 still uses the land numbers so world 5 feels floaty, not open |
 
-Attacks: the hero can walk while the basic attack plays (Archer and Magician at x0.5 speed); the strong attack roots
-the hero on the ground for its cast time (in the air it keeps momentum). Drinking a potion takes 0.5 s, walking at x0.4.
+Attacks: **the basic attack (R1, held or tapped) never slows the hero**: every class walks at full speed, turns, jumps
+and lands while it plays (D-062, phase 5b; the old Archer and Magician x0.5 was removed, and no phase may bring it
+back). Movement built into a skill (Shadow Dash, Rising Slash's hop) stays part of that skill. **No strong attack roots
+the hero** either (D-064, phase 5b: Power Slash, Meteor and Blade Fury used to): the hero runs and steers while any
+skill plays; a skill only blocks starting a basic attack or a dodge until it ends. Drinking a potion takes 0.5 s, walking at x0.4.
 
 ## §6 Classes and jobs (D-040)
 
@@ -225,7 +228,7 @@ recolours (§21 trim colours). The strong attack is replaced by the tier's skill
 |---|---|---|---|---|
 | KNIGHT | KNIGHT: **Power Slash** — box 30 x 20, x2.4, 10 MP, 0.6 s | VANGUARD: **Rising Slash** — box 24 x 36 above-front, x3.0, hero hops vy -120, 12 MP | WARDEN: **Ground Quake** — two shockwaves 8 x 10 run along the ground 80 px each way at 200 px/s, x3.4, ground enemies only, 16 MP | LIONHEART: **Lion's Roar** — golden arc 72 x 40 in front, x5.0, stuns 0.5 s, 24 MP |
 | ARCHER | ARCHER: **Double Shot** — 2 arrows 4 px apart, x1.5 each, 8 MP | RANGER: **Arrow Rain** — 6 arrows fall in a 56 px zone centred 80 px ahead, from 120 px above the hero, x1.6 each, 14 MP | SHARPSHOOTER: **Piercing Bolt** — 360 px/s, range 300, pierces enemies (not tiles), x4.0, 18 MP | STORMBOW: **Storm Volley** — 5-arrow fan (-20° to +20°) three times over 0.45 s, x1.8 each, 26 MP |
-| MAGICIAN | MAGICIAN: **Arcane Burst** — radius 20 burst 40 px ahead, x2.6, 10 MP | ADEPT: **Frost Orb** — orb 90 px/s, x2.8, slows enemies 50 % for 3 s (bosses 20 %), 14 MP | ELEMENTALIST: **Chain Lightning** — hits the nearest enemy within 140 px, then 3 more each within 64 px of the last, x3.0 each, 20 MP | ARCHMAGE: **Meteor** — 0.6 s cast, falls 120 px ahead, radius 48, x6.0, 34 MP |
+| MAGICIAN | MAGICIAN: **Arcane Burst** — radius 20 burst 40 px ahead, x2.6, 10 MP | ADEPT: **Frost Orb** — orb 90 px/s, x2.8, slows enemies 50 % for 3 s (bosses 20 %), 14 MP | ELEMENTALIST: **Chain Lightning** — hits the nearest enemy within 140 px, then 3 more each within 64 px of the last, x3.0 each, 20 MP | ARCHMAGE: **Meteor** — lands 0.6 s after the press (the hero keeps moving), falls 120 px ahead, radius 48, x6.0, 34 MP |
 | THIEF | THIEF: **Star Toss** — 3 stars at -10°, 0°, +10°, 260 px/s, range 150, x1.2 each, 8 MP | ROGUE: **Shadow Dash** — dash 72 px in 0.15 s, invincible, x2.6 to every enemy passed, 12 MP | SHADOW: **Blade Fury** — 0.5 s spin, radius 30, 5 hits of x1.0, 16 MP | NIGHTBLADE: **Shadow Partner** — 12 s, a dark copy 10 px behind repeats every attack at 50 % damage, 30 MP, can't recast while active |
 
 Tier 1+ Archer arrows pierce one extra enemy. Not enough MP: no attack, SOUND_ROCKET_EMPTY.
@@ -270,7 +273,7 @@ multiplies enemy HP, attack and names by `1 + 0.5 * n` (n at most 3).
 - Damage numbers float up 12 px over 0.6 s from the target's top: hero hits white, crits `o` orange, damage to the
   hero `r` red. At most 24 on screen (oldest dropped).
 - Hit feel: enemy flashes white 0.08 s; fodder/soldiers are knocked back 40 px/s for 0.1 s (elites and bosses not);
-  hit-stop 0.04 s on a strong-attack hit or a kill, 0.08 s when the hero is hurt, 0.15 s on a boss phase change or
+  hit-stop 0.025 s on a melee basic hit (Knight, Thief; D-063), 0.04 s on a strong-attack hit or a kill, 0.08 s when the hero is hurt, 0.15 s on a boss phase change or
   boss death; trauma 0.3 hero hurt, 0.5 boss big attack landing near (within 64 px), 1.0 boss death. Shake uses
   settings.shake and reduce-flashing like the shooter.
 
@@ -624,6 +627,7 @@ existing `synthesize()` tones. New `Sound` entries and tones (`{start, seconds, 
 | SOUND_Q_BLIP / TALK | square 0.03, 1000, 0.15 / square 0.02, 700, 0.08 |
 | SOUND_Q_DRINK | square 0.05 x3 at 0, 0.1, 0.2: 400→600, 0.15 |
 | SOUND_Q_DODGE | noise 0.12, 1500→3000, 0.15 |
+| SOUND_Q_HEAVY / CHARGE / THROW (phase 5b) | noise 0.16, 1800→400, 0.25 + square 0.1, 120→80, 0.15 / square 0.6, 200→900, 0.08 + noise 0.6, 2000→6000, 0.05 / square 0.05, 4000→6000, 0.08 + noise 0.06, 3000→1500, 0.12 |
 | SOUND_Q_SPLASH / ZAP / ROAR / GATE / CHEST | noise 0.3, 1500→300, 0.4 / noise 0.15, 6000→4000, 0.3 + square 0.15, 120, 0.2 / noise 0.6, 300→120, 0.5 + square 0.6, 110→70, 0.3 / noise 0.5, 200→100, 0.4 / square 0.06 x2: 660, 990, 0.25 |
 
 Footsteps: one step sound every 0.28 s of walking on the ground (the world's surface), none in the air or on ladders.
@@ -719,12 +723,13 @@ New palette characters (append to `paletteColor`; never reuse `m`, `y` outside t
 '?' 0xFF8A8478 citadel grey '!' 0xFF4E4A46 citadel dark  'z' 0xFFC8A040 citadel gold
 'Q' 0xFFD97757 Claude's cloak
 ```
-- Hero: 16 x 20 sprites per class, the 16 frames of §22 (64 sprites). The class's trim uses `h` only; it is recoloured by job tier when drawn: tier 0 `h`, 1 `b`, 2 `Y`, 3 `N`.
+- Hero (phase 5b, D-061): per class 15 body frames and 8 arm poses x 6 leg poses (§22). The class's trim uses `h`; it is recoloured by job tier when drawn: tier 0 `h`, 1 `b`, 2 `Y`, 3 `N`. Tier details use `1`–`3` (shown in the tier colour from that tier on).
+  Hero palette characters (phase 5b): `+` blush, `[` skin outline, `]` leather outline, `(` steel outline, `)` cape outline, `{` green outline, `;` `,` sage green, `/` leather, `>` `:` pale hair, `_` hair outline, `^` `` ` `` navy robe, `|` navy outline, `<` cloak light, `-` scarf shade, `}` scarf outline (values in phase 5b step 2).
   Knight: grey plate `b`/`d`, red cape `r`. Archer: green hood `g`/`G`, bow `h`. Magician: blue robe `u`/`U`, hat.
   Thief: dark `x`/`X` with a purple scarf `p`.
 - NPCs 16 x 20 with 2–4 idle frames each (§22); the hearth checkpoint is 24 x 28 (bigger brazier with a stone ring).
-- Projectiles: hero arrows, bolts, stars in `y` (the player's colour, like the shooter); enemy shots and every deadly
-  enemy projectile in `m` (pillar 1). Deadly projectiles drawn with a themed sprite (banana, coconut, icicle, rock,
+- Projectiles: hero arrows, bolts, orbs and stars are drawn as sprites in their class's colours (D-063, phase 5b: wood and
+  steel arrows, blue bolts, icy orbs, steel stars), never in `m`; enemy shots and every deadly enemy projectile in `m` (pillar 1). Deadly projectiles drawn with a themed sprite (banana, coconut, icicle, rock,
   fireball, boot, snowball, ice shard) get a 1 px `m` outline so they still read as danger.
 - Recolouring at draw time: `drawSpriteEx(sprite, x, y, flip, fromChar, toColor)` (one swap) and the grey recolour for
   world 7 / the First Name maps every colour to its luminance on the grey ramp `k n d s b w`.
@@ -798,15 +803,19 @@ game draws into a CPU pixel buffer (D-008), any blending is done in software and
 - A subtle precomputed vignette (corners one step darker by dither) on the playfield, not on the HUD; none in world 7.
 
 ### Characters (sizes in dp; authored at 2x in real px with full detail)
-- **Hero:** 16 x 20 sprites (hitbox still 8 x 14, drawn at x - 4, y - 6): IDLE 1–2, WALK 1–4, JUMP, FALL, ATTACK 1–3,
-  CLIMB 1–2, ROLL 1–2, HURT (16 per class). Cape, weapon and hair have 1–2 px of secondary motion between frames.
-  Each job tier changes the trim colour (§21) and adds one visible detail (pauldron, quiver, staff gem, mask).
+- **Hero (phase 5b, D-061):** chunky art like the NPCs and enemies: a 24 x 24 art-px canvas doubled to 48 x 48 real px,
+  the body in a 16 x 22 box, the hitbox still 8 x 14 (drawn at x - 8, y - 9). Big heads and readable faces in the style
+  of the user's references, 2–3 flat shades per material, and a **coloured outline** (each edge pixel the dark shade of
+  its neighbour) instead of black. Frames: 15 body frames (idle, run, jump, peak, fall, land, climb, roll, hurt) and
+  8 arm poses (wind-up, active, recover, 5 skill poses) over 6 leg poses, so the legs keep running while the arms attack.
+  The brightest frame of a melee slash is its active hit window. Each job tier changes the trim colour (§21) and adds
+  one visible detail. Full rules: [`phase-5b-character-art.md`](phase-5b-character-art.md).
 - **Enemies:** redrawn for NAME QUEST as side-view sprites based on the shooter's designs (same colours and shapes, so
   players recognise them), 12–20 px, 4-frame movement + a tell frame + an attack frame. New enemies the same way.
 - **Bosses:** redrawn at 40–64 px with 4–6 frames (idle, tell, attack, hurt, phase-2 look), based on the shooter's
   boss designs where §12 names one.
 - **NPCs:** 16 x 20, 2–4 idle frames (blink, breathe, a gesture).
-- Every character gets a 1 px outline in its darkest colour (`drawSpriteOutlined`), so it reads on any background.
+- Every character gets a 1 px outline in its darkest colour (`drawSpriteOutlined`), so it reads on any background; the heroes' is coloured (above).
 - Hit flashes stay white silhouettes; particles take the hit thing's colours.
 
 ### Style frames (the user approves each world's look before its areas are made)

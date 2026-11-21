@@ -3,7 +3,7 @@
 Read first: [`../name-quest-plan.md`](../name-quest-plan.md), the **world authoring recipe** in
 [`phase-4-world-1.md`](phase-4-world-1.md), then spec §5 (underwater row), §8 (worlds 4–5 rosters and traits), §9
 (worlds 4–5), §10 (their chests), §12 (worlds 4–5 rows), §13 (their rows, "Areas that are special"), §14 (Calder's spot).
-Phases 1–5 done. World 4 fully first, `make test`, then world 5.
+Phases 1–5 and 5b (character art, animation, combat feel) done. World 4 fully first, `make test`, then world 5.
 
 **Art first (spec §22, recipe step 0 in phase 4):** for each world in this phase, build its `WorldArt` from its §13 art
 brief and get the user's OK on its style frame before authoring its areas. Redraw its roster and bosses per §22

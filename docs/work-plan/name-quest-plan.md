@@ -5,7 +5,7 @@ NAME QUEST is a second game on the main menu: a hard 2D side-scrolling action RP
 Dark Souls hub, death and checkpoints, Hollow Knight-style getting lost), built in its own files next to the shooter.
 
 This file is the entry point. The design lives in [`name-quest/spec.md`](name-quest/spec.md); the work is cut into
-ten phase plans (1, 1b, 2–9), one agent session each (Claude Opus 5.5 or Codex). Each phase ends playable and checked on the Mac and the PS3.
+eleven phase plans (1, 1b, 2–5, 5b, 6–9), one agent session each (Claude Opus 5.5 or Codex). Each phase ends playable and checked on the Mac and the PS3.
 
 ## For the implementer (Claude or Codex): how to work through a phase
 
@@ -45,12 +45,19 @@ ten phase plans (1, 1b, 2–9), one agent session each (Claude Opus 5.5 or Codex
 | 3 | [phase-3-rpg-systems.md](name-quest/phase-3-rpg-systems.md) | checkpoints (rest, travel), Namula hub (3 areas), Ilsa's level up, two shops, potions and buffs, jobs, chests, gates, shortcuts, map NPC and map screen, NPC dialogue box, ambience and SFX | the full RPG loop in the test areas: earn, die, rest, level, shop |
 | 4 | [phase-4-world-1.md](name-quest/phase-4-world-1.md) | intro, world 1 (The Drifting Station): 20 areas, enemies, hazards, the boss framework, The Overseer, The Star Mage; first Namula dialogue | world 1 start to finish |
 | 5 | [phase-5-worlds-2-3.md](name-quest/phase-5-worlds-2-3.md) | world 2 (The Greendeep), world 3 (The White Silence), 4 bosses | worlds 1–3 |
+| 5b | [phase-5b-character-art.md](name-quest/phase-5b-character-art.md) | no world work: the four heroes redrawn in the user's reference style, running attacks (no R1 slowdown, no R2 roots), every R1 and R2 animated with wind-up, release, impact; real arrows, bolts, stars; hit sparks, hit-stop, sounds | every class and job tier fights with the new art and feel; the user approved the style preview |
 | 6 | [phase-6-worlds-4-5.md](name-quest/phase-6-worlds-4-5.md) | world 4 (The Ember Maw), world 5 (The Sunken Halls, underwater physics, darkness), 4 bosses | worlds 1–5 |
 | 7 | [phase-7-quests.md](name-quest/phase-7-quests.md) | every quest chain and NPC, job trials, Trial of Echoes, Sky Stair | the whole Namula story so far |
 | 8 | [phase-8-citadel-finale.md](name-quest/phase-8-citadel-finale.md) | world 6 (The Nameless Citadel), Hollow Twins, Name-Eater, Claude, credits, New Game+ | the game can be finished |
 | 9 | [phase-9-secret-balance.md](name-quest/phase-9-secret-balance.md) | secret world (The Unwritten), The First Name, balance pass with a simulated playthrough, docs, release | release candidate |
 
-Phase 1 was implemented before the art direction was added, so phase 1b redoes its look. Phases depend on the ones before them; don't start phase n+1 before phase n's "Done when" holds.
+Phase 1 was implemented before the art direction was added, so phase 1b redoes its look. Phase 5b comes after phase 5 and
+is a prerequisite for phase 6 (it pauses world work for the heroes). Phases depend on the ones before them; don't start
+phase n+1 before phase n's "Done when" holds.
+
+```
+1 → 1b → 2 → 3 → 4 → 5 → 5b → 6 → 7 → 8 → 9
+```
 
 ## Decisions taken with the user (record them in the GDD in phase 1)
 
@@ -75,6 +82,10 @@ Phase 1 was implemented before the art direction was added, so phase 1b redoes i
 | D-051 | Worlds 1–5 reuse the shooter's enemy and boss sprites where the theme matches (the RPG is set in the same worlds) — replaced by D-052 |
 | D-052 | Replaces D-051's sprite reuse: enemies and bosses are redrawn side-view, bigger and animated, from the shooter's designs. Rich pixel art: 16-colour world palettes, 4 parallax layers, autotiled ground with thick overhanging caps, 6 px platforms, scattered props and landmarks, software lights, outlined characters; each world's look approved by the user from a style frame |
 | D-053 | NAME QUEST renders at 640x360 with every design number x2 (tiles 16 px, hero 32x40); the shooter stays 320x180 (D-004) |
+| D-061 | Phase 5b heroes: chunky 2x art on a 24x24 canvas with the body in a 16x22 box, big heads and faces after the user's two references, a coloured outline instead of black |
+| D-062 | R1 never slows the hero: the Archer and Magician's x0.5 while the basic attack plays is removed for good |
+| D-063 | Hero shots drawn in class colours (never magenta) instead of pale yellow; a 0.025 s hit-stop on melee basic hits |
+| D-064 | No strong attack roots the hero: Power Slash, Meteor and Blade Fury let the hero run and steer (their timing unchanged) |
 
 ## Research that shaped the spec
 
