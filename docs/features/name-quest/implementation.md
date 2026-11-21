@@ -1,6 +1,6 @@
 # NAME QUEST: implementation
 
-**Updated:** 2026-11-20 · [Design](design.md) · [Testing](testing.md)
+**Updated:** 2026-11-21 · [Design](design.md) · [Testing](testing.md)
 
 ## Approach
 NAME QUEST lives in its own `source/quest*` files with no SDL or PS3 headers, so `make test` builds them on the Mac. `main.cpp` owns one `Quest`, opens it from the main menu, steps it at 60 Hz with player 1's `Actions`, plays its requested sounds, prints its log lines and draws it. The quest is one mode machine (`QuestMode`: slots, delete, class, intro, play, dead) in `questUpdate`, with one `switch`.
@@ -12,7 +12,9 @@ Movement is `moveHero`: grace timers, ladders, walking, jumping (buffered, coyot
 |---|---|
 | `source/quest.h` | constants, area and save data, `Hero`, `Quest`, and every function the game and tests call |
 | `source/quest.cpp` | `tileAt`, `loadArea`, `moveHero`, `heroInLiquid`; `questOpen`, `questUpdate`, `questSave`, `questStartDev` |
-| `source/quest_areas.cpp` › `worldDef` | the world table (name, style, areas); Namula and the TEST GROUNDS tile maps |
+| `source/quest_stats.cpp` › `heroStats`, `referenceHero` | class table, job and skill names, gear tables; enemy attack, HP and names from the reference hero; level cost; damage formulas |
+| `source/quest_combat.cpp` › `updateCombat` | rosters (worlds 1-6, world 7 by reference), `spawnEnemies`, one `updateEnemy` switch per behaviour, the hero's basic attacks, skills (`castSkill`, `updateSkill`), dodge, shots, hits, contact and trap damage, hit-stop |
+| `source/quest_areas.cpp` › `worldDef` | the world table (name, style, areas); Namula and the TEST GROUNDS tile maps (with enemy spawns) |
 | `source/quest_save.cpp` | `saveWrite` (tmp then rename), `saveRead`, `saveDelete` |
 | `source/quest_draw.cpp` › `questDraw` | slot, class and intro screens; play: background, tiles, objects, hero, HUD, banner, shake |
 | `source/quest_sprites.h` | hero frames for the four classes, checkpoint, hearth, portal, closed arch, chest |
@@ -30,19 +32,32 @@ Movement is `moveHero`: grace timers, ladders, walking, jumping (buffered, coyot
 - The 5-second fps line shows `quest <world>.<area>` instead of the wave and score.
 
 ## Data and config
-- **Config constants:** movement numbers at the top of `quest.cpp` (spec §5); `WALK_SPEED` per class; death, banner and camera timings below them.
+- **Config constants:** movement numbers at the top of `quest.cpp` (spec §5); class stats and walk speeds in `CLASSES` (`quest_stats.cpp`); combat numbers at the top of `quest_combat.cpp` (spec §5-§9); death, banner and camera timings in `quest.cpp`.
 - **Persistence:** `<EBOOT folder>/quest1.txt` .. `quest3.txt`, key=value lines (spec §17).
 - **Dev aids:** `NAMEGAME_QUEST='slot=3 class=0 world=8 area=0'` starts straight into play; L2+L3 test mode; Select warps to the next area.
+
+## Combat (phase 2)
+- `questUpdate` in play calls `updateEffects` (particles, numbers, skill shapes run even during hit-stop), then `updateCombat`, which handles timers, dodge, attacks, then calls `moveHero` with the inputs adjusted (knockback, roll, dash, root, x0.5 walk), then enemies, shots and damage. `die` drops the echo; the echo is touched in `questUpdate`.
+- `enterArea` calls `spawnEnemies` (letters A B D E F whose bit in `Quest::killed[world][area]` is clear); death clears every killed list.
+- Enemies are drawn from the shooter's 1x sprites doubled at start-up into chunky 2x copies (like the old-school heroes); new enemies use `PLACEHOLDER_ENEMY` until their world's phase. Hitbox: sprite minus 2 dp each side.
+- `Hero::swing` ids make each melee swing hit an enemy once; shots keep a bitmask of the enemies they hit.
 
 ## Deviations from design
 - `Hero` has two fields the plan didn't list: `dropTimer` (down + X drop-through) and `jumped` (for the jump sound).
 - `saveWrite` takes an optional `renameFailed` flag so `questSave` can log `rename failed, wrote directly`.
-- Holding Select 2 s to go to the TEST GROUNDS isn't built: `Actions` has no held-Select field. Use `NAMEGAME_QUEST='... world=8'`.
+- Holding Select 2 s goes to the TEST GROUNDS area 0 (`Actions::selectHeld`, phase 2).
 - Vents give a net lift of 900 px/s² (gravity is cancelled, then 900 more), up to a rise of 160 px/s.
-- Crumbling blocks stay solid and spikes don't hurt yet; hazards come with combat and hazards (phases 2 and 4).
-- The HUD shows `LV n` and a full HP bar, without the `HP n/n` numbers, until stats come in phase 2.
+- Crumbling blocks stay solid until phase 4; spikes, electric panels and fire jets hurt since phase 2.
+- Phase 2: `Enemy` has `world` (TEST GROUNDS area 3 borrows world 2's charger and dropper so all 7 behaviours appear; world 1's roster has 5), `w`, `h`, `names`, `onGround`, `stunTimer`, the swoop target, swing ids and the wraith's stolen names. `Projectile` has `mult`, `strong` and `hitMask`; `DamageNumber` has `life` and `names`; `Effect` holds skill shapes for drawing.
+- The puffer stays deflated 1 s after inflating before it can inflate again (otherwise a melee hero within 32 px could never hit it).
+- Skill timings the spec leaves open: Power Slash's box is live 0.1-0.25 s of its 0.6 s; Rising Slash and Lion's Roar 0-0.15 s; Storm Volley fires at 0, 0.225, 0.45 s; Frost Orb's range is 200 px; Arrow Rain arrows pass through tiles for their first 120 px of fall.
+- `levelCost(39)` is 102,067 by the spec's formula; the spec's example says 102,064. Its 29→30 example (10,646) is off too: the formula gives 16,484. Code follows the formula; the examples are reported, not changed.
+- A strong attack cancels a basic attack in progress (the spec is silent): otherwise both used one swing id and the basic box used up the skill's hit.
+- `drawSpriteSolid` takes a `flip` (enemy flashes and the Shadow Partner face their way).
 - Namula's background has no hearth glow on the near walls: a glowing edge read as a platform.
 - Namula's `N` spots have no `npcs[]` entries (an area holds more NPCs than `npcs[2]`); phase 3 places them.
 
 ## History
 - 2026-11-20: phase 1 implemented.
+- 2026-11-20: phase 2 (combat) implemented.
+- 2026-11-21: phase 2 review: R2 during a melee swing no longer loses the skill's hit; spikes bounce the hero up (vy -180, spec §4); `make test` runs the quest tests even when shooter tests fail.

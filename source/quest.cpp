@@ -17,11 +17,12 @@ const float DROP_TIME = 0.2f;                       // s one-way tops are ignore
 const float CURRENT_PUSH = 50 * DP;                 // px/s added to x inside < and >
 const float VENT_LIFT = 900 * DP, VENT_MAX_RISE = 160 * DP;   // net px/s² upward inside a vent's column, up to this rise speed
 const int VENT_REACH = 6;                           // tiles above a vent that still lift
-const float WALK_SPEED[CLASS_COUNT] = {66 * DP, 72 * DP, 68 * DP, 80 * DP};
 // Flow
 const float DEATH_TIME = 2.5f, STEP_TIME = 0.28f, LAND_SOUND_SPEED = 120 * DP;
 const float BANNER_TIME = 2;
 const float TRAUMA_DECAY = 1.5f, TRAUMA_DEATH = 0.6f;
+const float ECHO_SIZE = 8 * DP, NAMES_TEXT_TIME = 1.2f, DEATH_PARTICLES = 20;
+const float SELECT_HOLD_TIME = 2;                   // dev: Select held this long → TEST GROUNDS area 0 (spec §20)
 const float CAMERA_LEAD = 32 * DP, CAMERA_EASE_X = 5, CAMERA_EASE_Y = 6;
 
 const char* const INTRO_PAGES[4] = {
@@ -89,7 +90,7 @@ void moveHero(Hero& h, const Actions& a, const AreaState& area, HeroClass heroCl
     }
 
     // Walking eases toward the stick's speed; ice is slow to start and to stop.
-    float walk = WALK_SPEED[heroClass];
+    float walk = CLASSES[heroClass].walk * DP;
     if (h.climbing) {
         h.vx = 0;
         h.vy = a.moveY * CLIMB_SPEED;
@@ -265,6 +266,7 @@ static void enterArea(Quest& q, int world, int index, int tx, int ty) {
     q.hero.lastSafeX = q.hero.x;
     q.hero.lastSafeY = q.hero.y;
     updateCamera(q, 0, true);
+    spawnEnemies(q);
     bool firstVisit = world < SAVED_WORLDS && !(q.save.visited[world] >> index & 1);
     if (world < SAVED_WORLDS) q.save.visited[world] |= 1u << index;
     if (newWorld || firstVisit) {
@@ -286,6 +288,7 @@ static void enterAtCheckpoint(Quest& q) {
         for (int t = 0; t < def.cols * def.rows; t++) {
             if (def.tiles[t] != 'C' || seen++ != q.save.checkpointId) continue;
             q.hero = Hero();
+            questRefreshStats(q, true);
             enterArea(q, world, i, t % def.cols, t / def.cols);
             q.mode = QMODE_PLAY;
             q.modeTimer = 0;
@@ -293,6 +296,7 @@ static void enterAtCheckpoint(Quest& q) {
         }
     }
     q.hero = Hero();
+    questRefreshStats(q, true);
     enterArea(q, world, 0, -1, -1);
     q.mode = QMODE_PLAY;
     q.modeTimer = 0;
@@ -305,12 +309,25 @@ static void die(Quest& q, const char* cause) {
         q.hero.vx = q.hero.vy = 0;
         return;
     }
+    // Every carried name drops as an echo where the hero last stood on safe ground; an older echo is lost (spec §7).
+    Hero& h = q.hero;
+    int dropped = q.save.names;
+    q.save.echoNames = dropped;
+    q.save.echoWorld = q.area.world;
+    q.save.echoArea = q.area.index;
+    q.save.echoX = h.lastSafeX + HERO_W / 2 - ECHO_SIZE / 2;
+    q.save.echoY = h.lastSafeY + HERO_H - ECHO_SIZE - 2 * DP;
+    q.save.names = 0;
+    for (int i = 0; i < DEATH_PARTICLES; i++) {
+        float angle = i * 6.2832f / DEATH_PARTICLES, speed = (40 + 20 * (i % 3)) * DP;
+        q.particles.push_back({h.x + HERO_W / 2, h.y + HERO_H / 2, cosf(angle) * speed, sinf(angle) * speed, 0.8f, paletteColor('w'), 1});
+    }
     q.mode = QMODE_DEAD;
     q.modeTimer = 0;
     q.soundRequested[SOUND_Q_DEATH] = true;
     if (!strcmp(cause, "liquid")) q.soundRequested[SOUND_Q_SPLASH] = true;
     q.trauma = fminf(1, q.trauma + TRAUMA_DEATH);
-    logLine(q, "quest: hero died in %d.%d (%s), dropped %d names", q.area.world, q.area.index, cause, 0);   // names drop in phase 2
+    logLine(q, "quest: hero died in %d.%d (%s), dropped %d names", q.area.world, q.area.index, cause, dropped);
 }
 
 void questOpen(Quest& q, const char* folder) {
@@ -365,6 +382,7 @@ void questStartDev(Quest& q, const char* spec) {
     logLine(q, "quest: slot %d new (class %s, level %d)", q.slot + 1, CLASS_NAMES[s.heroClass], s.level);
     questSave(q);
     q.hero = Hero();
+    questRefreshStats(q, true);
     enterArea(q, world, area, -1, -1);
     q.mode = QMODE_PLAY;
     q.modeTimer = 0;
@@ -441,6 +459,7 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
             const AreaDef& namula = worldDef(WORLD_NAMULA).areas[0];
             const char* start = strchr(namula.tiles, 'S');
             q.hero = Hero();
+            questRefreshStats(q, true);
             q.area.def = nullptr;
             enterArea(q, WORLD_NAMULA, 0, (int)(start - namula.tiles) % namula.cols, (int)(start - namula.tiles) / namula.cols);
             q.mode = QMODE_PLAY;
@@ -452,6 +471,13 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
         if (q.devAids && a.godMode) {
             q.godMode = !q.godMode;
             logLine(q, "quest: test mode %s", q.godMode ? "on" : "off");
+        }
+        updateEffects(q, dt);
+        q.selectHeldTime = a.selectHeld ? q.selectHeldTime + dt : 0;
+        if (q.devAids && q.selectHeldTime >= SELECT_HOLD_TIME && q.selectHeldTime - dt < SELECT_HOLD_TIME) {   // Select held 2 s
+            logLine(q, "quest: warp %d.%d", WORLD_TEST, 0);
+            enterArea(q, WORLD_TEST, 0, -1, -1);
+            break;
         }
         if (q.devAids && a.autopilot) {   // Select: warp to the next area of this world
             int next = (q.area.index + 1) % worldDef(q.area.world).count;
@@ -481,7 +507,7 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
 
         bool wasOnGround = h.onGround;
         float fallSpeed = h.vy;
-        moveHero(h, move, q.area, (HeroClass)q.save.heroClass, dt);
+        updateCombat(q, move, dt);
         if (h.jumped) q.soundRequested[SOUND_Q_JUMP] = true;
         if (!wasOnGround && h.onGround && fallSpeed > LAND_SOUND_SPEED) q.soundRequested[SOUND_Q_LAND] = true;
         if (h.onGround && fabsf(h.vx) > 10 * DP && move.moveX != 0) {
@@ -509,11 +535,26 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
         }
         if (exit == &def.down) die(q, "pit");
         else if (heroInLiquid(h, q.area)) die(q, "liquid");
+        else if (h.hp <= 0) die(q, "hp");
+
+        // Touching the name echo gives the names back.
+        SaveData& s = q.save;
+        if (q.mode == QMODE_PLAY && s.echoNames > 0 && s.echoWorld == q.area.world && s.echoArea == q.area.index &&
+            h.x < s.echoX + ECHO_SIZE && s.echoX < h.x + HERO_W && h.y < s.echoY + ECHO_SIZE && s.echoY < h.y + HERO_H) {
+            s.names = s.names > MAX_NAMES - s.echoNames ? MAX_NAMES : s.names + s.echoNames;
+            q.numbers.push_back({h.x + HERO_W / 2, h.y, 0, s.echoNames, paletteColor('y'), NAMES_TEXT_TIME, true});
+            q.soundRequested[SOUND_Q_NAMES] = true;
+            logLine(q, "quest: names recovered %d", s.echoNames);
+            s.echoNames = 0;
+            questSave(q);
+        }
         if (q.mode == QMODE_PLAY) updateCamera(q, dt, false);
         break;
     }
     case QMODE_DEAD:
-        if (q.modeTimer >= DEATH_TIME) {
+        updateEffects(q, dt);
+        if (q.modeTimer >= DEATH_TIME) {   // respawn: every enemy back, full HP and MP, buffs off
+            for (auto& killed : q.killed) killed.assign(killed.size(), 0);
             q.save.deaths++;
             enterAtCheckpoint(q);
             questSave(q);

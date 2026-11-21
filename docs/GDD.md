@@ -1,22 +1,22 @@
 # NAME game — Game Design Document
 
-**Version:** 0.29 · **Updated:** 2026-11-20 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
+**Version:** 0.31 · **Updated:** 2026-11-21 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
 
 ## Summary
-You pilot a small ship at the bottom of the screen against waves of pixel-art aliens. Hold R1 to spray bullets, and save the scarce R2 rocket for the moment a wave gets out of hand. Waves get harder, and every 5th wave is a boss. The run goes through five levels of 20 waves each, every one harder than the last: level 1 (space), the jungle, the glacier, the volcano and the deep sea. It ends when you beat the deep sea's wave-20 bosses or lose your last life, and you chase the saved high score. Big bosses drop level buffs that stack until you die. Classic plays the five levels as one run; the level picker plays any single level on its own. NAME QUEST, the third item on the main menu, is a separate RPG platformer set in the same worlds, with four classes, a hub village, checkpoints and three save slots.
+You pilot a small ship at the bottom of the screen against waves of pixel-art aliens. Hold R1 to spray bullets, and save the scarce R2 rocket for the moment a wave gets out of hand. Waves get harder, and every 5th wave is a boss. The run goes through five levels of 20 waves each, every one harder than the last: level 1 (space), the jungle, the glacier, the volcano and the deep sea. It ends when you beat the deep sea's wave-20 bosses or lose your last life, and you chase the saved high score. Big bosses drop level buffs that stack until you die. Classic plays all five levels in one run, with a choice of 1–2 Players or an expanded 1–4 Players. The Level Picker plays any single level on its own. NAME QUEST, the third item on the main menu, is a separate RPG platformer set in the same worlds, with four classes, a hub village, checkpoints and three save slots.
 
 | | |
 |---|---|
 | Genre and camera | 2D fixed-screen arcade shooter (shmup), vertical: enemies above, ship below |
 | Audience | casual players with arcade instincts; pick up and play, no tutorial |
-| Platforms and input | real PS3 (HEN), one DualShock 3 / Sixaxis; a second one joins for co-op |
+| Platforms and input | real PS3 (HEN), DualShock 3 or Sixaxis, up to four local players in Classic |
 | Session | one run is about 15–20 min per level: a level clear or game over |
 | Engine | C++ with SDL2 + SDL2_mixer on PSL1GHT (see `CLAUDE.md`) |
 | Scope | small homebrew release; a greybox prototype first |
 | References | 80s fixed-screen shooters (alien formations that sway and dive), wave-based shmups with bosses (the waves-plus-boss rhythm and weapon upgrades). Characters, art and names are our own |
 
 ## Pillars
-1. **Readable at a glance.** Chunky pixels at 320×180, enemy shots in a colour nothing else uses; a background or effect that hides a bullet is cut.
+1. **Readable at a glance.** Chunky pixels and a dedicated enemy-shot colour. Backgrounds and effects keep bullets visible.
 2. **The rocket is the panic button.** Bullets handle the routine and the rocket saves you, so rockets stay scarce and every one is decisive; no rocket spam.
 3. **Arcade, not a campaign (Classic and the level picker).** 3 lives, a score and a high score; no story, no menus beyond what the screens below need.
 4. **60 fps on a real PS3.** A feature or effect that drops frames on the console is simplified or cut.
@@ -41,10 +41,10 @@ dodge + shoot (R1) → kill aliens → score and pickups → stronger gun / more
 | Bosses | implemented | MVP | A boss on every 5th wave: classic, twin classics, a mage with a power-ball beam, twin mages | [design](features/bosses/design.md) |
 | Music and sound | implemented | MVP | Two songs to choose from (Mizrahit, Dubstep) looped during gameplay; synthesized retro SFX | [design](features/music-and-sound/design.md) |
 | Pixel art | implemented | MVP | 320×180 palette art: sprites, font and starfield as text grids in code; a ship skin per level | [design](features/pixel-art/design.md) |
-| Screens | implemented | MVP | Main menu (Classic, Level picker, Settings), spinning level picker, pause menu, settings (music Mizrahit/Dubstep/Off, shake, flashing), high score on the title, game over | [design](features/screens/design.md) |
+| Screens | implemented | MVP | Main menu, Classic variant selection and controller lobby, spinning level picker, pause, settings and game over | [design](features/screens/design.md) |
 | High score save | implemented | MVP | Best score saved on the PS3, shown on the title | [design](features/high-score/design.md) |
 | Game feel | implemented | MVP | Shake, hit-stop, flashes, particles by event tier; shake and flash options | [design](features/game-feel/design.md) |
-| Co-op | implemented | MVP | A second player drops in with Start on a second controller | [design](features/co-op/design.md) |
+| Co-op | implemented | MVP | Two Classic variants with drop-in play and a larger, denser 1–4 player arena | [design](features/co-op/design.md) |
 | Level 1 | implemented | MVP | First world: waves 1-20 of today's game, ends when the wave-20 boss dies; template for later themed levels | [design](features/level-1/design.md) |
 | Jungle | implemented | MVP | Level 2: insects, roaming heavy beetles, monkeys and gorillas with bananas, peels and stink mist | [design](features/jungle/design.md) |
 | Glacier | implemented | MVP | Level 3: ice monsters, a gliding ship, a sneezing yeti and an ice golem whose ice blocks freeze you | [design](features/glacier/design.md) |
@@ -63,11 +63,13 @@ The task-by-task plan for each milestone is in the [work plan](work-plan/nameGam
 
 ## Screens and flow
 ```
-MAIN MENU ─ CLASSIC ─→ level 1 ─→ JUNGLE ─→ GLACIER ─→ VOLCANO ─→ DEEP SEA ─ DEEP SEA CLEAR (3 s) ─→ end screen (win)
+MAIN MENU ─ CLASSIC ─┬ 1–2 PLAYERS ─────────────────→ five-world run
+          │         └ 1–4 PLAYERS ─ CONTROLLERS ─→ five-world run
           ├ LEVEL PICKER ─→ wheel of SPACE / JUNGLE / GLACIER / VOLCANO / DEEP SEA ─→ that level only ─ <LEVEL> CLEAR ─→ end screen (win)
           ├ NAME QUEST ─→ SLOTS ─ empty slot → CLASS SELECT → INTRO → PLAY in Namula; used slot → PLAY at the last checkpoint
           │               PLAY ⇄ (Start) PAUSED ─ RETURN TO MENU (saves the slot) ─→ MAIN MENU; SLOTS: Circle → MAIN MENU
           └ SETTINGS
+Five-world run: level 1 → JUNGLE → GLACIER → VOLCANO → DEEP SEA → end screen (win).
 Between levels: "<LEVEL> CLEAR" for 3 s, then the next level's name banner and WAVE 1, with the same players.
 Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN MENU; game over / <LEVEL> CLEAR end screen: X/Start = play again (same mode and level), Circle = MAIN MENU
 ```
@@ -79,7 +81,7 @@ Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN ME
 - **Game over / level clear:** final score and wave; the panel reads GAME OVER, or <LEVEL> CLEAR after the run's last level (deep sea in Classic, the picked level in the picker); X or Start plays again, Circle goes to the main menu.
 
 ## Direction
-- **Art:** pixel art drawn at 320×180 and scaled up by a whole number (×6 at 1080p, ×4 at 720p) with no smoothing. A small fixed palette; magenta marks only deadly enemy projectiles (shots, bananas, coconuts, snowballs, icicles, fireballs, eruptions, bubbles, the boot); hazards that don't kill (peels, ice blocks, lava drops, the hook) never use it. Dark starfield background that scrolls slowly.
+- **Art:** the shooter uses a 320×180 picture for 1–2 Players and the Level Picker, and 384×216 for Classic 1–4 Players. Both use nearest-neighbour scaling. A small fixed palette; magenta marks only deadly enemy projectiles (shots, bananas, coconuts, snowballs, icicles, fireballs, eruptions, bubbles, the boot); hazards that don't kill (peels, ice blocks, lava drops, the hook) never use it. Dark starfield background that scrolls slowly.
 - **Audio:** the chosen song (Mizrahit or Dubstep, OGG copies) loops during gameplay only. Short square-wave and noise SFX for shooting, hits, explosions, pickups and death, mixed under the music.
 - **Game feel:** the [game-feel](../.claude/skills/game-feel/SKILL.md) tiers: bullet hits are small, kills and pickups medium, rocket explosions, boss hits and the player's death large. Shooting itself gets almost no feedback so held R1 doesn't buzz.
 - **Controls:** left stick or D-pad moves, R1 fires (hold), R2 strong attack (rocket or a buff's), Square picks it, Start pauses, X confirms in menus, Circle backs out in menus. Button numbers are measured in M1.
@@ -145,6 +147,7 @@ Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN ME
 | D-049 | 2026-11-20 | No music in NAME QUEST for now: synthesized ambience per world and sound effects | the shooter's songs; a song per world | user's choice | [NAME QUEST](features/name-quest/design.md) |
 | D-050 | 2026-11-20 | Each world's mini-boss holds the key to the gate in front of the world's second half | no gates; keys found in chests | user's choice | [NAME QUEST](features/name-quest/design.md) |
 | D-051 | 2026-11-20 | Worlds 1–5 reuse the shooter's enemy and boss sprites where the theme matches (the RPG is set in the same worlds) | all-new sprites | user's choice | [NAME QUEST](features/name-quest/design.md) |
+| D-055 | 2026-11-21 | Classic has a 1–2 player variant and an expanded 1–4 player variant with a three-pad entry gate and its own high score | one scale and balance for every party | user requested more room and denser waves for larger parties | [Co-op](features/co-op/design.md), [Screens](features/screens/design.md) |
 
 ## Open questions
 - **Assumptions to confirm:** sprites as text grids in code (D-006); every number marked `[ASSUMPTION]` in the feature notes.
@@ -182,3 +185,5 @@ Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN ME
 **0.27 (2026-11-18):** upgrade parts and gauge, random wave patterns, classic difficulty ramp (D-033).
 **0.28 (2026-11-19):** 29 traced formation shapes (D-034).
 **0.29 (2026-11-20):** NAME QUEST designed (D-035 to D-051); phase 1 engine.
+**0.30 (2026-11-20):** NAME QUEST combat: classes, job skills, enemies, damage, death and the name echo.
+**0.31 (2026-11-21):** Classic variants and live controller lobby (D-055).

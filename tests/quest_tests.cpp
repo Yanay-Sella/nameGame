@@ -655,6 +655,386 @@ static void deleteRemovesTheSlot() {
     CHECK(!saveRead(SAVE_FOLDER, 2, s));
 }
 
+// --- Combat (spec §6-§8): formulas, attacks, enemies, death and the name echo. ---
+static void levelCostMatchesSpec() {
+    CHECK(levelCost(1) == 100);
+    CHECK(levelCost(4) == 173);
+    CHECK(levelCost(14) == 1070);
+    CHECK(levelCost(39) == 102067);   // round(100 * 1.2^38); the spec's example says 102,064
+}
+
+// Integer damage can't be within 1 % of a small HP share, so the tolerance is 1 % or 1 HP, whichever is larger.
+static void referenceHitIsTwentyPercent() {
+    const float FRACTIONS[3] = {0.15f, 0.20f, 0.25f};
+    for (int w = 1; w <= 7; w++) {
+        RefStats ref = referenceHero(w);
+        for (float f : FRACTIONS) {
+            int hit = damageToHero(enemyAttack(w, f, 0), (int)lroundf(ref.def));
+            float want = f * ref.hp;
+            bool ok = fabsf(hit - want) <= fmaxf(0.01f * want, 1);
+            if (!ok) printf("  world %d fraction %.2f: hit %d, want %.1f\n", w, f, hit, want);
+            CHECK(ok);
+        }
+    }
+}
+
+static void classesDifferAsDesigned() {
+    HeroStats st[CLASS_COUNT];
+    for (int c = 0; c < CLASS_COUNT; c++) {
+        SaveData s;
+        s.heroClass = c;
+        s.level = 10;
+        st[c] = heroStats(s);
+        CHECK(SKILL_NAMES[c][3] && SKILL_NAMES[c][3][0]);
+    }
+    for (int c = 0; c < CLASS_COUNT; c++) {
+        if (c != CLASS_KNIGHT) CHECK(st[CLASS_KNIGHT].maxHp > st[c].maxHp && st[CLASS_KNIGHT].def > st[c].def);
+        if (c != CLASS_MAGICIAN) CHECK(st[CLASS_MAGICIAN].maxMp > st[c].maxMp && st[CLASS_MAGICIAN].atk > st[c].atk);
+        if (c != CLASS_THIEF) CHECK(st[CLASS_THIEF].walk > st[c].walk);
+    }
+}
+
+// A quest in play in test area `t` (world `world`), the hero standing at column tx facing right, no crits.
+static void startQuest(Quest& q, TestArea& t, int heroClass, int level, int job, int tx, int world = WORLD_TEST) {
+    q = Quest();
+    q.folder = SAVE_FOLDER;
+    q.slot = 2;
+    q.save.used = true;
+    q.save.heroClass = heroClass;
+    q.save.level = level;
+    q.save.job = job;
+    t.state.world = world;
+    q.area = t.state;
+    q.hero = standing(t, tx);
+    questRefreshStats(q, true);
+    q.stats.crit = 0;
+    spawnEnemies(q);
+    q.mode = QMODE_PLAY;
+}
+
+// Presses happen on the first step only; held inputs (fire, stick, X held) stay for every step.
+static void play(Quest& q, Actions a, int steps) {
+    for (int i = 0; i < steps; i++) {
+        questUpdate(q, a, DT);
+        a.jump = a.rocket = a.back = a.up = a.down = a.left = a.right = a.autopilot = a.godMode = false;
+    }
+}
+
+static std::string row(int length, int from, int to, char c) {
+    std::string r(length, '.');
+    for (int i = from; i <= to; i++) r[i] = c;
+    return r;
+}
+
+static std::string withLetter(int col, char letter) {
+    std::string r(WIDE_COLS, '.');
+    r[col] = letter;
+    return r;
+}
+
+// Bolts of a level-4 Magician (world 1's reference level): x1.1 at 0.9-1.1 always takes 3 to kill world-1 fodder.
+static void basicAttackKillsFodderInThreeHits() {
+    TestArea t;
+    makeArea(t, {{19, withLetter(24, 'A')}});
+    Quest q;
+    startQuest(q, t, CLASS_MAGICIAN, 4, 0, 14);
+    q.godMode = true;
+    CHECK(q.enemies.size() == 1 && q.enemies[0].hp == enemyHealth(1, 3, 0));
+    Actions a = {};
+    a.fire = true;
+    int hits = 0, last = q.enemies[0].hp;
+    for (int i = 0; i < 600 && q.enemies[0].alive; i++) {
+        play(q, a, 1);
+        if (q.enemies[0].hp < last) hits++;
+        last = q.enemies[0].hp;
+    }
+    CHECK(!q.enemies[0].alive && hits == 3);
+    CHECK(q.save.names == enemyNames(1, 1, 0, false) && q.save.kills == 1);
+    CHECK(q.killed[WORLD_TEST][0] & 1);
+}
+
+static void knightSwingHitsOnlyInItsWindow() {
+    TestArea t;
+    makeArea(t, {{19, withLetter(16, 'D')}});
+    Quest q;
+    startQuest(q, t, CLASS_KNIGHT, 10, 0, 14);
+    q.godMode = true;
+    q.enemies[0].x = q.hero.x + HERO_W + 2 * DP;   // just in front, inside the 22 x 18 box
+    Actions a = {};
+    a.fire = true;
+    play(q, a, 1);
+    a.fire = false;
+    float hitAt = -1;
+    for (int i = 1; i < 30 && hitAt < 0; i++) {
+        play(q, a, 1);
+        if (q.enemies[0].hp < q.enemies[0].maxHp) hitAt = i * DT;
+    }
+    CHECK(hitAt >= 0.08f - DT && hitAt <= 0.18f + DT);
+    // Out of reach (30 dp ahead): never hit.
+    startQuest(q, t, CLASS_KNIGHT, 10, 0, 14);
+    q.godMode = true;
+    q.enemies[0].x = q.hero.x + HERO_W + 30 * DP;
+    a.fire = true;
+    play(q, a, 30);
+    CHECK(q.enemies[0].hp == q.enemies[0].maxHp);
+}
+
+// R2 just after R1: the Power Slash (x2.4) still lands on the enemy the basic swing would have hit.
+static void skillCastMidSwingStillHits() {
+    TestArea t;
+    makeArea(t, {{19, withLetter(16, 'D')}});
+    Quest q;
+    startQuest(q, t, CLASS_KNIGHT, 10, 0, 14);
+    q.godMode = true;
+    q.enemies[0].x = q.hero.x + HERO_W + 2 * DP;
+    Actions a = {};
+    a.fire = true;
+    play(q, a, 1);
+    a.fire = false;
+    play(q, a, 2);
+    a.rocket = true;
+    play(q, a, 40);
+    CHECK(q.hero.skill == -1 && q.enemies[0].maxHp - q.enemies[0].hp >= (int)(q.stats.atk * 2.4f * 0.9f));
+}
+
+static void spikesHurtAndBounce() {
+    TestArea t;
+    makeArea(t, {{19, withLetter(10, '^')}});
+    Quest q;
+    startQuest(q, t, CLASS_KNIGHT, 10, 0, 10);
+    int hp = q.hero.hp;
+    updateCombat(q, Actions(), DT);
+    CHECK(q.hero.hp == hp - (int)lroundf(q.stats.maxHp * 0.2f) && q.hero.vy == -180 * DP && q.hero.iframes > 0.9f);
+}
+
+static void arrowsStopAtWalls() {
+    TestArea t;
+    std::map<int, std::string> rows;
+    for (int r = 0; r < 20; r++) rows[r] = withLetter(18, '#');
+    rows[19][24] = 'D';
+    makeArea(t, rows);
+    Quest q;
+    startQuest(q, t, CLASS_ARCHER, 10, 0, 14);
+    q.godMode = true;
+    Actions a = {};
+    a.fire = true;
+    play(q, a, 1);
+    CHECK(q.projectiles.size() == 1);
+    play(q, Actions(), 60);
+    bool heroShots = false;
+    for (const Projectile& p : q.projectiles) heroShots |= p.fromHero;
+    CHECK(!heroShots && q.enemies[0].hp == q.enemies[0].maxHp);
+}
+
+static void chargerTellsThenCharges() {
+    TestArea t;
+    makeArea(t, {{19, withLetter(30, 'D')}});   // world 2's D: the STAG, a charger
+    Quest q;
+    startQuest(q, t, CLASS_KNIGHT, 10, 0, 24, 2);
+    q.godMode = true;
+    CHECK(rosterType(2, 2).behaviour == BEH_CHARGER);
+    play(q, Actions(), 1);
+    float x0 = q.enemies[0].x;
+    CHECK(q.enemies[0].state == ES_TELL);
+    play(q, Actions(), 18);
+    CHECK(q.enemies[0].state == ES_TELL && q.enemies[0].x == x0);
+    play(q, Actions(), 18);
+    CHECK(q.enemies[0].state == ES_ACT && q.enemies[0].x < x0);
+}
+
+static void armoredGuardsItsFront() {
+    TestArea t;
+    makeArea(t, {{19, withLetter(40, 'F')}});
+    int damage[2];
+    for (int back = 0; back < 2; back++) {
+        Quest q;
+        startQuest(q, t, CLASS_ARCHER, 1, 0, 22);   // 18 tiles = 144 dp away: outside its 120 px sight
+        q.godMode = true;
+        q.enemies[0].facingLeft = !back;
+        Actions a = {};
+        a.fire = true;
+        play(q, a, 1);
+        a.fire = false;
+        for (int i = 0; i < 90 && q.enemies[0].hp == q.enemies[0].maxHp; i++) play(q, a, 1);
+        damage[back] = q.enemies[0].maxHp - q.enemies[0].hp;
+    }
+    CHECK(damage[0] >= 1 && damage[0] <= 3);   // 9 ATK x0.25
+    CHECK(damage[1] >= 8 && damage[1] <= 10);
+}
+
+static void dropperFallsWhenHeroBelow() {
+    TestArea t;
+    makeArea(t, {{5, row(WIDE_COLS, 25, 35, '#')}, {6, withLetter(30, 'E')}});   // world 2's E: the TREE MONKEY
+    Quest q;
+    startQuest(q, t, CLASS_KNIGHT, 10, 0, 10, 2);
+    q.godMode = true;
+    float hangY = q.enemies[0].y;
+    CHECK(q.enemies[0].state == ES_HANG && hangY == 6 * TILE);
+    play(q, Actions(), 60);
+    CHECK(q.enemies[0].state == ES_HANG && q.enemies[0].y == hangY);
+    q.hero.x = q.enemies[0].x;
+    play(q, Actions(), 1);
+    CHECK(q.enemies[0].state == ES_ACT);
+    q.hero.x = 10 * TILE;   // step aside so the banana it throws on landing stays in the air
+    bool banana = false;
+    for (int i = 0; i < 120 && q.enemies[0].state == ES_ACT; i++) play(q, Actions(), 1);
+    for (const Projectile& p : q.projectiles) banana |= !p.fromHero;
+    CHECK(q.enemies[0].state == ES_PATROL && q.enemies[0].onGround && q.enemies[0].y > hangY);
+    CHECK(banana);
+}
+
+static void walkersNeverWalkIntoPits() {
+    TestArea t;
+    std::string island = row(WIDE_COLS, 20, 30, '#');
+    makeArea(t, {{19, withLetter(25, 'A')}, {20, island}, {21, island}, {22, island}});
+    Quest q;
+    startQuest(q, t, CLASS_KNIGHT, 10, 0, 22);
+    q.hero.x = 70 * TILE;   // far away, on no ground: keep it out of the way
+    q.hero.y = 0;
+    q.godMode = true;
+    float y0 = q.enemies[0].y;
+    bool stayed = true;
+    for (int i = 0; i < 600; i++) {
+        updateCombat(q, Actions(), DT);
+        q.hero.x = 70 * TILE;
+        q.hero.y = 0;
+        stayed &= q.enemies[0].y == y0 && q.enemies[0].x >= 20 * TILE && q.enemies[0].x + q.enemies[0].w <= 31 * TILE;
+    }
+    CHECK(stayed);
+}
+
+static void iframesBlockDamage() {
+    TestArea t;
+    makeArea(t, {{19, withLetter(16, 'D')}});
+    Quest q;
+    startQuest(q, t, CLASS_KNIGHT, 10, 0, 16);
+    q.enemies[0].x = q.hero.x;
+    int hp = q.hero.hp;
+    q.hero.iframes = 0.5f;
+    for (int i = 0; i < 20; i++) {
+        q.enemies[0].x = q.hero.x;
+        updateCombat(q, Actions(), DT);
+    }
+    CHECK(q.hero.hp == hp);
+    for (int i = 0; i < 30; i++) {
+        q.enemies[0].x = q.hero.x;
+        updateCombat(q, Actions(), DT);
+    }
+    CHECK(q.hero.hp < hp && q.hero.iframes > 0.5f);
+}
+
+static void rollGivesIframes() {
+    TestArea t;
+    makeArea(t, {});
+    Quest q;
+    startQuest(q, t, CLASS_KNIGHT, 10, 0, 10);
+    float x0 = q.hero.x;
+    Actions a = {};
+    a.back = true;
+    play(q, a, 1);
+    CHECK(q.hero.rollTimer > 0 && q.hero.iframes > 0.2f && q.hero.iframes <= 0.25f);
+    play(q, Actions(), 20);
+    CHECK(q.hero.x - x0 >= 140 * DP * 0.3f);
+}
+
+static void blinkStopsBeforeWalls() {
+    TestArea t;
+    std::map<int, std::string> rows;
+    for (int r = 0; r < 20; r++) rows[r] = withLetter(13, '#');
+    makeArea(t, rows);
+    Quest q;
+    startQuest(q, t, CLASS_MAGICIAN, 10, 0, 10);
+    float x0 = q.hero.x;
+    Actions a = {};
+    a.back = true;
+    play(q, a, 1);
+    CHECK(q.hero.x > x0 && q.hero.x + HERO_W <= 13 * TILE && q.hero.x + HERO_W >= 13 * TILE - DP);
+    CHECK(q.hero.iframes > 0.15f && q.hero.iframes <= 0.2f);
+}
+
+static void strongAttackNeedsMp() {
+    TestArea t;
+    makeArea(t, {});
+    Quest q;
+    startQuest(q, t, CLASS_KNIGHT, 10, 0, 10);
+    q.hero.mp = 5;
+    Actions a = {};
+    a.rocket = true;
+    play(q, a, 1);
+    CHECK(q.hero.mp == 5 && q.hero.skill == -1 && q.soundRequested[SOUND_ROCKET_EMPTY]);
+    q.hero.mp = 30;
+    play(q, a, 1);
+    CHECK(q.hero.mp == 20 && q.hero.skill == 0);
+}
+
+static bool logged(const Quest& q, const char* text) {
+    for (const std::string& line : q.logLines)
+        if (line.find(text) != std::string::npos) return true;
+    return false;
+}
+
+static void deathDropsNamesAtLastSafeGround() {
+    TestArea t;
+    std::string floor = row(WIDE_COLS, 0, WIDE_COLS - 1, '#');
+    for (int c = 30; c <= 33; c++) floor[c] = '.';
+    makeArea(t, {{20, floor}, {21, floor}, {22, floor}});
+    Quest q;
+    startQuest(q, t, CLASS_KNIGHT, 10, 0, 24);
+    q.save.names = 500;
+    Actions a = {};
+    a.moveX = 1;
+    for (int i = 0; i < 600 && q.mode == QMODE_PLAY; i++) play(q, a, 1);
+    CHECK(q.mode == QMODE_DEAD && q.save.names == 0 && q.save.echoNames == 500);
+    CHECK(q.save.echoWorld == WORLD_TEST && q.save.echoArea == 0);
+    CHECK(q.save.echoX + 8 * DP <= 30 * TILE + HERO_W && q.save.echoX >= 26 * TILE);
+    CHECK(logged(q, "(pit), dropped 500 names"));
+}
+
+static void secondDeathLosesTheOldEcho() {
+    TestArea t;
+    makeArea(t, {});
+    Quest q;
+    startQuest(q, t, CLASS_KNIGHT, 10, 0, 24);
+    q.save.echoNames = 500;
+    q.save.echoX = 60 * TILE;
+    q.save.names = 200;
+    q.hero.hp = 0;
+    play(q, Actions(), 1);
+    CHECK(q.mode == QMODE_DEAD && q.save.echoNames == 200 && q.save.names == 0);
+    CHECK(logged(q, "(hp), dropped 200 names"));
+}
+
+static void echoReturnsNames() {
+    TestArea t;
+    makeArea(t, {});
+    Quest q;
+    startQuest(q, t, CLASS_KNIGHT, 10, 0, 24);
+    q.save.names = 7;
+    q.save.echoNames = 300;
+    q.save.echoWorld = WORLD_TEST;
+    q.save.echoArea = 0;
+    q.save.echoX = q.hero.x;
+    q.save.echoY = q.hero.y;
+    play(q, Actions(), 1);
+    CHECK(q.save.names == 307 && q.save.echoNames == 0 && logged(q, "quest: names recovered 300"));
+    CHECK(q.soundRequested[SOUND_Q_NAMES] && !q.numbers.empty() && q.numbers.back().names);
+    saveDelete(SAVE_FOLDER, 2);
+}
+
+static void deathRespawnsEnemies() {
+    TestArea t;
+    makeArea(t, {{19, withLetter(40, 'A')}});
+    Quest q;
+    startQuest(q, t, CLASS_KNIGHT, 10, 0, 24);
+    q.killed[WORLD_TEST][0] = 1;
+    q.hero.hp = 0;
+    play(q, Actions(), 1);
+    CHECK(q.mode == QMODE_DEAD);
+    play(q, Actions(), (int)(2.6f / DT));
+    CHECK(q.mode == QMODE_PLAY && q.killed[WORLD_TEST][0] == 0 && q.hero.hp == q.stats.maxHp && q.hero.mp == q.stats.maxMp);
+    saveDelete(SAVE_FOLDER, 2);
+}
+
 int main() {
     questSpritesHaveTheirSize();
     palSpritesUseOnlyPaletteChars();
@@ -676,6 +1056,26 @@ int main() {
     saveRoundTrip();
     missingSaveIsUnused();
     deleteRemovesTheSlot();
+    levelCostMatchesSpec();
+    referenceHitIsTwentyPercent();
+    classesDifferAsDesigned();
+    basicAttackKillsFodderInThreeHits();
+    knightSwingHitsOnlyInItsWindow();
+    skillCastMidSwingStillHits();
+    spikesHurtAndBounce();
+    arrowsStopAtWalls();
+    chargerTellsThenCharges();
+    armoredGuardsItsFront();
+    dropperFallsWhenHeroBelow();
+    walkersNeverWalkIntoPits();
+    iframesBlockDamage();
+    rollGivesIframes();
+    blinkStopsBeforeWalls();
+    strongAttackNeedsMp();
+    deathDropsNamesAtLastSafeGround();
+    secondDeathLosesTheOldEcho();
+    echoReturnsNames();
+    deathRespawnsEnemies();
     everythingIsReachable();
     printf(failures ? "%d quest check(s) failed\n" : "all quest tests passed\n", failures);
     return failures ? 1 : 0;

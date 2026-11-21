@@ -1,6 +1,6 @@
 # Ship controls: implementation
 
-**Updated:** 2026-11-17 · [Design](design.md) · [Testing](testing.md)
+**Updated:** 2026-11-21 · [Design](design.md) · [Testing](testing.md)
 
 ## Approach
 `input.cpp` turns each controller into named `Actions` (move, fire, rocket, pause, confirm, stress); gameplay never reads button numbers. `main.cpp` runs the game in fixed 1/60 s steps and `updatePlayer` in `game.cpp` applies the actions. Players are a `std::vector<Player>` with one controller each (GDD D-007); player 2 is appended when they join ([co-op](../co-op/implementation.md)).
@@ -9,7 +9,7 @@
 | File / module | Role in this feature |
 |---|---|
 | `source/input.h` | `Actions` reader API, `applyDeadzone`, `STICK_DEADZONE` |
-| `source/input.cpp` | button numbers, opening controllers by count (the port sends no connect events), D-pad over stick |
+| `source/input.cpp` | PSL1GHT port detection and button states, D-pad over stick |
 | `source/game.cpp` › `updatePlayer` | movement inside the zone, the fire rhythm, bullets |
 | `source/main.cpp` | fixed 60 Hz steps; a press counts once, in the first step of a frame |
 
@@ -23,3 +23,4 @@
 
 ## History
 - 2026-11-17: implemented in M2.
+- 2026-11-21: PS3 port polling keeps each controller assigned to its ship during disconnects (D-055).

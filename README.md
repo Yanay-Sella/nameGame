@@ -1,12 +1,12 @@
 # NAME game
 
-An arcade shooter for the PS3: hold R1 to spray bullets at waves of aliens, save the R2 rocket for emergencies, beat a boss every 5th wave and chase the high score. One or two players.
+An arcade shooter for the PS3. Hold R1 to spray bullets at waves of aliens, save the R2 rocket for emergencies, beat a boss every 5th wave and chase the high score. Classic offers 1–2 player and 1–4 player runs.
 
 ## What you need
 
 - A PS3 running PS3HEN (tested on firmware 4.93). HEN must be enabled again after every PS3 restart.
 - A USB stick formatted FAT32.
-- One DualShock 3 controller (a second one for two players).
+- A DualShock 3 or Sixaxis for each player. Classic 1–4 Players requires at least three connected controllers to start.
 
 ## Install
 
@@ -26,11 +26,12 @@ Installing a newer version the same way keeps your high score and settings.
 | Rocket | R2 |
 | Pause | Start |
 | Menus | X select, Circle back |
-| Player 2 | Press Start on a second controller during a run |
+| Join a run | Press Start or X on a spare controller |
+| 1–4 player lobby | Left or right sets the starting party size. X starts once three or more pads are connected. |
 
 ## Saving
 
-The high score and settings are saved automatically.
+High scores and settings are saved automatically. Classic 1–4 Players has its own high score.
 
 ## Troubleshooting
 

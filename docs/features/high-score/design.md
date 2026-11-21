@@ -1,20 +1,20 @@
 # High score save
 
-**Status:** implemented · **Updated:** 2026-11-17 · [GDD](../../GDD.md)
+**Status:** implemented · **Updated:** 2026-11-21 · [GDD](../../GDD.md)
 
 The best score is written to a small file on the PS3's hard drive, so it survives quitting and rebooting. It gives a run something to beat (pillar 3: a score and a high score).
 
 ## Rules
-1. The high score is the best single-player score of any finished run; in co-op, the better of the two players' scores.
+1. A finished run submits the highest score among its players to the corresponding record. Classic 1–2 Players and the Level Picker share one record. Classic 1–4 Players has its own record.
 2. It is loaded at boot and written when a run ends (game over or level clear), only when beaten. A run left through RETURN TO MENU doesn't count (that path is screen code).
 3. The HUD shows `HI 0012345` centred at y = 9, under `WAVE n`. The game-over panel adds `NEW HIGH SCORE` in yellow when the run beat it.
 4. Missing or unreadable file: high score 0. A save failure keeps the value in memory and logs `SAVE FAILED`.
-5. The main menu shows it as `HI 0012345` under the panel.
+5. The main menu shows the Classic 1–2 Players and Level Picker record as `HI 0012345` under the panel.
 
 ## Numbers
 | Name | Value | Unit | What to watch in playtests |
 |---|---|---|---|
-| File | `highscore.txt`, one line `best=<n>`, next to EBOOT.BIN | | survives reinstalling the pkg |
+| Files | `highscore.txt` for 1–2 Players and the Level Picker, `highscore-expanded.txt` for 1–4 Players. Each has one `best=<n>` line and sits next to EBOOT.BIN. | | survives reinstalling the pkg |
 | Range | 0 to 9,999,999 | points | loaded values are clamped |
 | HUD position | centred, y = 9 | px | doesn't touch the score, lives or boss bar |
 
@@ -28,3 +28,4 @@ The best score is written to a small file on the PS3's hard drive, so it survive
 - 2026-11-17: designed.
 - 2026-11-17: implemented in M3.
 - 2026-11-17: numbers confirmed in single-player and co-op playtests.
+- 2026-11-21: added a separate Classic 1–4 record for its denser waves (D-055).

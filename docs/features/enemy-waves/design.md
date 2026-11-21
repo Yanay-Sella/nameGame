@@ -4,6 +4,8 @@
 
 Aliens fly in, line up in a formation at the top of the screen, sway side to side and drop shots; from wave 3 some break off and dive at the ship. Clearing a wave brings a harder one, and every 5th wave is a boss (see Bosses in the GDD index). This is the core loop's minutes.
 
+The base formation and dive rules are below. See [Co-op](../co-op/design.md) for the larger Classic 1–4 Players waves.
+
 ## Rules
 1. A wave starts with its aliens flying in from above the screen into formation slots; they can't shoot until they reach their slot.
 2. The formation sways left and right as one and reverses at the screen edges.

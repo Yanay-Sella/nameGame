@@ -4,6 +4,8 @@
 
 Every 5th wave a boss replaces the formation (GDD D-002), and each boss wave is different (D-019). It is the rocket's moment (pillar 2): a wall of HP that bullets chip at and a rocket blast really hurts, while the attacks keep the player dodging.
 
+See [Co-op](../co-op/design.md) for the Classic 1–4 Players boss line-up, lanes and HP scaling.
+
 ## Rules
 The jungle has its own line-up (monkeys and gorillas): see [Jungle](../jungle/design.md). So do the [glacier](../glacier/design.md) (yeti, ice golem), the [volcano](../volcano/design.md) (fire imp, fire lord) and the [deep sea](../deep-sea/design.md) (anglerfish, fisherman fish). Every level's boss HP, sway, attack interval and reward now come from one per-level table in `game.cpp` (D-025); level 1's values are unchanged.
 

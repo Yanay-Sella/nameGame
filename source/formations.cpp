@@ -45,7 +45,7 @@ static const char* const LETTER_STROKES[26] = {
     "00 20 04 24",                   // Z
 };
 
-bool traceFormation(int shape, const char* word, int count, std::vector<Slot>& slots) {
+bool traceFormation(int shape, const char* word, int count, std::vector<Slot>& slots, int columns, float extraWidth, float extraHeight) {
     std::vector<Stroke> strokes;
     auto line = [&](float x1, float y1, float x2, float y2) { strokes.push_back({{x1, y1}, {x2, y2}}); };
     auto poly = [&](Stroke points, bool closed) {
@@ -164,6 +164,11 @@ bool traceFormation(int shape, const char* word, int count, std::vector<Slot>& s
         default: return false;
     }
 
+    float width = W + extraWidth, height = H + extraHeight;
+    if (extraWidth != 0 || extraHeight != 0)
+        for (Stroke& stroke : strokes)
+            for (Pt& point : stroke) { point.x *= width / W; point.y *= height / H; }
+
     float length = 0;
     for (const Stroke& s : strokes)
         for (size_t j = 1; j < s.size(); j++) length += hypotf(s[j].x - s[j - 1].x, s[j].y - s[j - 1].y);
@@ -192,8 +197,8 @@ bool traceFormation(int shape, const char* word, int count, std::vector<Slot>& s
                     segment = hypotf(s[j].x - s[j - 1].x, s[j].y - s[j - 1].y);
                 }
                 float t = segment > 0.001f ? std::min((along - segmentStart) / segment, 1.0f) : 0;
-                slots.push_back({LEFT + std::max(0.0f, std::min(s[j - 1].x + (s[j].x - s[j - 1].x) * t, W)),
-                                 TOP + std::max(0.0f, std::min(s[j - 1].y + (s[j].y - s[j - 1].y) * t, H))});
+                slots.push_back({LEFT + std::max(0.0f, std::min(s[j - 1].x + (s[j].x - s[j - 1].x) * t, width)),
+                                 TOP + std::max(0.0f, std::min(s[j - 1].y + (s[j].y - s[j - 1].y) * t, height))});
             }
         }
         if ((int)slots.size() < count) continue;
@@ -221,8 +226,8 @@ bool traceFormation(int shape, const char* word, int count, std::vector<Slot>& s
                 }
             }
             for (Slot& slot : slots) {
-                slot.x = std::max(LEFT, std::min(slot.x, LEFT + W));
-                slot.y = std::max(TOP, std::min(slot.y, TOP + H));
+                slot.x = std::max(LEFT, std::min(slot.x, LEFT + width));
+                slot.y = std::max(TOP, std::min(slot.y, TOP + height));
             }
         }
         if (!settled) continue;
@@ -230,10 +235,10 @@ bool traceFormation(int shape, const char* word, int count, std::vector<Slot>& s
         for (size_t i = 0; i < slots.size(); i++) moved = std::max(moved, hypotf(slots[i].x - sampled[i].x, slots[i].y - sampled[i].y));
         if (moved > MAX_PUSH) continue;   // the shape would come out smudged
 
-        // Rows of 8 from the top (the tougher aliens take the top rows), each row left to right.
+        // Tougher aliens take the top rows; order each row left to right for the entry animation.
         std::sort(slots.begin(), slots.end(), [](const Slot& a, const Slot& b) { return a.y < b.y; });
-        for (int row = 0; row < count; row += 8)
-            std::sort(slots.begin() + row, slots.begin() + std::min(row + 8, count), [](const Slot& a, const Slot& b) { return a.x < b.x; });
+        for (int row = 0; row < count; row += columns)
+            std::sort(slots.begin() + row, slots.begin() + std::min(row + columns, count), [](const Slot& a, const Slot& b) { return a.x < b.x; });
         return true;
     }
     return false;

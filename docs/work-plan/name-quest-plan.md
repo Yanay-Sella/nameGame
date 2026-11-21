@@ -5,9 +5,9 @@ NAME QUEST is a second game on the main menu: a hard 2D side-scrolling action RP
 Dark Souls hub, death and checkpoints, Hollow Knight-style getting lost), built in its own files next to the shooter.
 
 This file is the entry point. The design lives in [`name-quest/spec.md`](name-quest/spec.md); the work is cut into
-ten phase plans (1, 1b, 2–9), one Opus 5.5 session each. Each phase ends playable and checked on the Mac and the PS3.
+ten phase plans (1, 1b, 2–9), one agent session each (Claude Opus 5.5 or Codex). Each phase ends playable and checked on the Mac and the PS3.
 
-## For the implementer (Opus 5.5): how to work through a phase
+## For the implementer (Claude or Codex): how to work through a phase
 
 1. Start a fresh session per phase. Read this file, then the phase file, then only the `spec.md` sections that phase
    names (the spec is long; each phase lists its `§` sections). Read the source files each step names before editing them.
@@ -15,7 +15,7 @@ ten phase plans (1, 1b, 2–9), one Opus 5.5 session each. Each phase ends playa
    Don't redesign them. Where the spec says "author" (tile maps, sprites, dialogue lines, backgrounds), the content is
    yours to create inside the stated rules; the validators in `tests/quest_tests.cpp` decide whether it is acceptable.
    If a number turns out wrong in play, don't change it outside phase 9 (master plan rule 2): write it in the phase's report instead.
-3. **Code style:** `CLAUDE.md` and the existing code. Plain C++14, no new libraries, no classes with virtual methods,
+3. **Code style:** `AGENTS.md` and the existing code. Plain C++14, no new libraries, no classes with virtual methods,
    no scene or entity frameworks, no `new`/`delete` (use `std::vector` and fixed arrays), short one-line comments.
    Keep each update and draw function readable from top to bottom; one `switch` per state machine. Don't touch the
    shooter's rules (`game.cpp`, `formations.cpp`) except where a step says so.
@@ -31,8 +31,8 @@ ten phase plans (1, 1b, 2–9), one Opus 5.5 session each. Each phase ends playa
 8. **Don't commit.** The user commits. End the phase by listing the changed files and a suggested one-line commit
    message, plus a short report: what was built, what the PS3 check showed, anything that didn't work or that you
    think should be retuned (with numbers).
-9. Long phases (4–6, 8): if your context gets long, finish the current step, run `make test`, and write a
-   `docs/work-plan/name-quest/progress.md` note (what is done, what step is next) so a new session can resume.
+9. Long phases (3–6, 8): if your context gets long, finish the current step, run `make test`, and add a line to the session log in `docs/HANDOFF.md` (what is done, which step is next); older plans say
+   `progress.md`: use `docs/HANDOFF.md` instead, so a new session can resume.
    Delete that note when the phase is done.
 
 ## Phases

@@ -11,8 +11,9 @@ VERSION  := 1.0
 RELEASE  ?= 0
 
 APP_FOLDER := /dev_hdd0/game/NMGM00001/USRDIR
-# A shot is a 54-byte BMP header + 320*180*3 pixel bytes, or 640*360*3 for NAME QUEST (no trailing comments: make keeps the spaces).
+# A shot is a 54-byte BMP header plus 3 bytes per pixel at 320x180, 384x216 or 640x360.
 SHOT_SIZE  := 172854
+EXPANDED_SHOT_SIZE := 248886
 QUEST_SHOT_SIZE := 691254
 
 .PHONY: ps3 image deploy install release log clean music test launch quit pad shot mac mac-run
@@ -55,8 +56,10 @@ release:
 # Build and run the game-rule and NAME QUEST tests on the Mac (game.cpp, quest*.cpp and screen.cpp have no SDL or PS3 code).
 test:
 	mkdir -p build/tests
-	c++ -std=c++14 -Wall -Wextra -Isource tests/game_tests.cpp source/game.cpp source/formations.cpp source/screen.cpp source/settings.cpp -o build/tests/game_tests && build/tests/game_tests
-	c++ -std=c++14 -O2 -Wall -Wextra -Isource tests/quest_tests.cpp $(wildcard source/quest*.cpp) source/screen.cpp -o build/tests/quest_tests && build/tests/quest_tests
+	c++ -std=c++14 -Wall -Wextra -Isource tests/game_tests.cpp source/game.cpp source/formations.cpp source/screen.cpp source/settings.cpp -o build/tests/game_tests
+	c++ -std=c++14 -O2 -Wall -Wextra -Isource tests/quest_tests.cpp $(wildcard source/quest*.cpp) source/screen.cpp -o build/tests/quest_tests
+	# Both suites always run (a shooter failure must not hide the quest results); either failing fails the target.
+	build/tests/game_tests; shooter=$$?; build/tests/quest_tests && exit $$shooter
 
 # Native Mac build for fast testing (SDL2 from Homebrew, silent, keyboard pads): game logic and drawing are the real code,
 # but not the PS3's SDL port, audio or controller, so confirm anything final on the PS3.
@@ -116,7 +119,7 @@ shot:
 	@for i in 1 2 3 4 5 6 7 8 9 10; do \
 		sleep 1; \
 		if curl -s -m 10 -o shots/shot.bmp ftp://$(PS3_IP)$(APP_FOLDER)/shot.bmp && \
-			{ [ "$$(stat -f %z shots/shot.bmp)" = "$(SHOT_SIZE)" ] || [ "$$(stat -f %z shots/shot.bmp)" = "$(QUEST_SHOT_SIZE)" ]; }; then \
+			{ [ "$$(stat -f %z shots/shot.bmp)" = "$(SHOT_SIZE)" ] || [ "$$(stat -f %z shots/shot.bmp)" = "$(EXPANDED_SHOT_SIZE)" ] || [ "$$(stat -f %z shots/shot.bmp)" = "$(QUEST_SHOT_SIZE)" ]; }; then \
 			sips -s format png --resampleWidth 1280 shots/shot.bmp --out shots/shot.png >/dev/null && echo "shots/shot.png" && exit 0; \
 		fi; \
 	done; echo "No screenshot arrived: is a dev build of the game running? Check make log."; exit 1

@@ -61,7 +61,62 @@ struct SaveData {
 
 struct SlotSummary { bool used; int heroClass, level, job, highest, ngPlus; float playtime; bool secretDone; };
 
-// The hero's body; combat fields come in phase 2.
+// --- Stats and formulas (quest_stats.cpp; spec §6, §7, §10). Pure functions and tables. ---
+struct ClassInfo { const char* name; float hp, hpG, mp, mpG, atk, atkG, def, defG, walk, mpRegen, crit, critMult; };
+extern const ClassInfo CLASSES[CLASS_COUNT];               // spec §6 base table (walk in dp/s)
+extern const char* const JOB_NAMES[CLASS_COUNT][4];        // KNIGHT VANGUARD WARDEN LIONHEART, ...
+extern const char* const SKILL_NAMES[CLASS_COUNT][4];      // POWER SLASH ... SHADOW PARTNER
+struct HeroStats { int maxHp, maxMp, atk, def; float walk, mpRegen, crit, critMult; };
+HeroStats heroStats(const SaveData& save);                 // class, level, job, weapon, armor, refine, charm (spec §6, §10)
+struct RefStats { float hp, atk, def; };
+RefStats referenceHero(int world);                         // spec §7: average class at REF_LEVEL with REF_GEAR and the level's job
+enum EnemyKind { KIND_FODDER, KIND_SOLDIER, KIND_ELITE, KIND_MINIBOSS, KIND_BOSS };
+int enemyAttack(int world, float hitFraction, int ngPlus);
+int enemyHealth(int world, float hitsToKill, int ngPlus);
+int enemyNames(int world, float namesMult, int ngPlus, bool strangerRing);
+int levelCost(int level);                                  // names to go from level to level + 1 (spec §10)
+int damageToHero(int enemyAtk, int heroDef);               // spec §7
+int damageToEnemy(float heroAtk, float mult, float roll, bool crit, float critMult, float enemyMod);   // spec §7, roll 0.9..1.1
+float jobMultiplier(int job);                              // 1, 1.1, 1.2, 1.3
+const int MAX_NAMES = 99999999;
+
+// --- Enemies (quest_combat.cpp; spec §8). ---
+struct Sprite;
+enum Behaviour { BEH_WALKER, BEH_CHARGER, BEH_FLYER, BEH_SHOOTER, BEH_JUMPER, BEH_ARMORED, BEH_DROPPER };
+enum EnemyTrait { TRAIT_NONE, TRAIT_BANANA_ON_LAND, TRAIT_REVIVE, TRAIT_INFLATE, TRAIT_STEAL_NAMES };
+// One roster slot of a world (spec §8 rosters).
+struct EnemyType { const char* name; Behaviour behaviour; EnemyKind kind; EnemyTrait trait;
+                   const Sprite* frames[2]; float speedScale; Sound attackSound; };
+const int ROSTER_SLOTS = 5;
+extern const char ROSTER_LETTERS[ROSTER_SLOTS + 1];       // "ABDEF"
+const EnemyType& rosterType(int world, int slot);          // slot 0..4 = A, B, D, E, F
+int statsWorld(int world);                                 // the world whose reference hero tunes an area's enemies
+enum EnemyState { ES_PATROL, ES_TELL, ES_ACT, ES_RECOVER, ES_STUNNED, ES_RETURN, ES_HANG, ES_EMBER };
+struct Enemy {
+    int type;                 // roster slot
+    int world;                // its roster's world (TEST GROUNDS area 3 borrows world 2's charger and dropper)
+    int spawn;                // index of its letter in the area (bit in the killed list)
+    float x, y, vx, vy;       // top-left of the hitbox
+    float w, h;               // hitbox: the sprite minus 2 dp each side
+    float homeX, homeY;       // spawn point (flyers drift around it)
+    int hp, maxHp, atk, names;
+    int state; float stateTimer;   // behaviour state machine (EnemyState)
+    bool facingLeft, alive, onGround;
+    float flash, knockTimer, slowTimer, stunTimer;
+    float targetX, targetY;   // flyer swoop target, taken at the tell's start
+    bool revived;             // phoenix
+    int lastSwing, lastPartnerSwing;   // the hero's swing ids that already hit it
+    int stolen; float stolenTimer;     // name wraith: names taken, s left to win them back
+};
+const int PROJ_ENEMY = 0, PROJ_ARROW = 1, PROJ_BOLT = 2, PROJ_STAR = 3, PROJ_ORB = 4, PROJ_WAVE = 5, PROJ_RAIN = 6;
+struct Projectile { float x, y, vx, vy; int w, h; int damage; bool fromHero; int pierce; float range; int kind;
+                    float mult; bool strong; uint64_t hitMask; };   // hero shots: multiplier, skill or basic, enemies already hit
+struct DamageNumber { float x, y, age; int value; uint32_t color; float life; bool names; };   // names: "+n NAMES"
+// Short-lived skill shapes for drawing (arcs, bursts, chains, Meteor's marker); x2/y2: a chain link's end.
+enum EffectKind { FX_SWING, FX_ARC, FX_BURST, FX_CHAIN, FX_METEOR, FX_SPIN };
+struct Effect { int kind; float x, y, w, h, x2, y2, age, life; bool flip; char color; };
+
+// The hero's body and combat state.
 struct Hero {
     float x, y, vx, vy;          // top-left of the 8x14 hitbox
     bool facingLeft, onGround, climbing, doubleJumpUsed;
@@ -70,6 +125,16 @@ struct Hero {
     float stepTimer;             // s until the next footstep sound
     float dropTimer;             // s left of falling through one-way platforms (down + X)
     bool jumped;                 // moveHero started a jump (or double jump) this step
+    int hp, mp; float mpFraction;   // MP regen accumulates in mpFraction
+    float attackTimer, strongTimer, castTimer;   // s left of the basic cycle, the strong attack, its rooted cast
+    float rollTimer, rollCooldown, iframes, hurtTimer;
+    float partnerTimer;          // Shadow Partner's s left
+    float buffTimers[3];         // ATK, DEF, SPD (phase 3)
+    float drinkTimer;            // phase 3
+    int swing;                   // id of the current melee swing (each enemy is hit once per swing)
+    int skill = -1;              // the strong attack playing (job tier), -1 none
+    int volleys;                 // Storm Volley fans still to fire
+    float dashDir, skillX, skillY;   // Shadow Dash's direction; Meteor's target
 };
 
 // The current area's tiles as they are now (gates, crumbles, shortcut doors change them).
@@ -95,6 +160,17 @@ struct Quest {
     float trauma;
     float shakeStrength = 1; bool reduceFlashing;   // draw-only, copied from Settings by main.cpp
     std::vector<std::string> logLines;  // spec §18 lines for main.cpp to print
+    // Combat (phase 2)
+    HeroStats stats;                    // recomputed by questRefreshStats
+    std::vector<Enemy> enemies;
+    std::vector<Projectile> projectiles;
+    std::vector<DamageNumber> numbers;
+    std::vector<Particle> particles;
+    std::vector<Effect> effects;
+    std::vector<uint64_t> killed[WORLD_COUNT];   // per area, bits by spawn index; cleared on rest, travel, death
+    float hitStop;
+    uint32_t seed = 12345;              // the combat RNG
+    float selectHeldTime;               // dev: Select held 2 s → TEST GROUNDS
 };
 
 void questOpen(Quest& q, const char* folder);             // reads the slot summaries, shows the slot screen
@@ -110,6 +186,14 @@ char tileAt(const AreaState& area, int tx, int ty);       // outside: '#' past a
 void loadArea(AreaState& area, int world, int index, uint32_t gates, uint32_t shortcuts);   // copies the tiles, opens gates and doors
 void moveHero(Hero& hero, const Actions& a, const AreaState& area, HeroClass heroClass, float dt);
 bool heroInLiquid(const Hero& hero, const AreaState& area);
+// Combat (quest_combat.cpp):
+void questRefreshStats(Quest& q, bool fullHeal);          // stats from the save; fullHeal: HP and MP full
+void spawnEnemies(Quest& q);                              // the current area's A B D E F whose killed bit is clear
+void updateCombat(Quest& q, const Actions& a, float dt);  // attacks, dodge, movement, enemies, shots, damage (PLAY)
+void updateEffects(Quest& q, float dt);                   // particles, damage numbers, skill shapes (also during hit-stop)
+bool panelOn(const Quest& q);                             // electric panels `z` (spec §9)
+bool jetBurning(const Quest& q);                          // fire jets `f`
+float jetWarning(const Quest& q);                         // > 0 while a jet sparks before burning
 // Save files (quest_save.cpp; stdio only):
 bool saveWrite(const char* folder, int slot, const SaveData& save, bool* renameFailed = nullptr);   // renameFailed: wrote directly
 bool saveRead(const char* folder, int slot, SaveData& save);    // false when missing

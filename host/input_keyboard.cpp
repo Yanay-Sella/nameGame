@@ -1,9 +1,10 @@
-// Mac build: two virtual PS3 pads driven by the keyboard, plus a button script in NAMEGAME_PAD (same syntax as make pad).
+// Mac build: two keyboard pads and a NAMEGAME_PAD script that can drive any port.
 // Player 1: arrows, Z cross (jump), X circle (dodge), C square (potion), V triangle (item), Enter start, Backspace select, Space R1 (fire), Right Shift R2 (rocket),
 //           P L1 (screenshot), 1 L2, 2 L3 (1 + 2 together: test mode).
 // Player 2: WASD, K cross (joins the run), L square, H R1 (fire), J R2 (rocket).
 #include "../source/input.h"
 #include <SDL.h>
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 #include <string>
@@ -24,18 +25,20 @@ const KeyBinding KEYS[] = {
     {SDL_SCANCODE_K, 1, BTN_CROSS}, {SDL_SCANCODE_L, 1, BTN_SQUARE}, {SDL_SCANCODE_H, 1, BTN_R1}, {SDL_SCANCODE_J, 1, BTN_R2},
 };
 
-static bool held[MAX_PLAYERS][BUTTON_COUNT];      // keys held down
-static bool pressed[MAX_PLAYERS][BUTTON_COUNT];   // set by a press, cleared by inputRead
-static bool scriptHeld[BUTTON_COUNT];             // player 1 buttons the script is holding
+static bool connected[CONTROLLER_PORTS] = {true, true};
+static bool held[CONTROLLER_PORTS][BUTTON_COUNT];
+static bool pressed[CONTROLLER_PORTS][BUTTON_COUNT];
+static bool scriptHeld[BUTTON_COUNT];
+static int scriptPort;
 
-// One script step: wait, or hold a chord of buttons (bit per button) for a time, or quit.
-struct ScriptStep { double seconds; unsigned buttons; bool quit; };
+enum ScriptAction { SCRIPT_BUTTONS, SCRIPT_QUIT, SCRIPT_CONNECT, SCRIPT_DISCONNECT };
+struct ScriptStep { double seconds; unsigned buttons; int port; ScriptAction action; };
 static std::vector<ScriptStep> script;
 static size_t scriptStep = 0;
 static bool scriptStepStarted = false;
 static Uint32 scriptStepEnds = 0;
 
-// Reads NAMEGAME_PAD: tokens split by '|'; a number waits that many seconds, "cross", "l2+l3" or "cross:2" (held 2 s) press, "quit" ends.
+// A pN. prefix targets a port; pN.connect and pN.disconnect simulate hot-plug for tests.
 static void loadScript() {
     const char* text = getenv("NAMEGAME_PAD");
     if (!text) return;
@@ -45,8 +48,17 @@ static void loadScript() {
         std::string token = rest.substr(0, bar);
         rest = bar == std::string::npos ? "" : rest.substr(bar + 1);
         if (token.empty()) continue;
-        if (token == "quit") { script.push_back({0, 0, true}); continue; }
-        if (isdigit((unsigned char)token[0])) { script.push_back({atof(token.c_str()), 0, false}); continue; }
+        if (token == "quit") { script.push_back({0, 0, 0, SCRIPT_QUIT}); continue; }
+        if (isdigit((unsigned char)token[0])) { script.push_back({atof(token.c_str()), 0, 0, SCRIPT_BUTTONS}); continue; }
+        int port = 0;
+        if (token.size() > 3 && token[0] == 'p' && token[2] == '.' && token[1] >= '1' && token[1] < '1' + CONTROLLER_PORTS) {
+            port = token[1] - '1';
+            token = token.substr(3);
+        }
+        if (token == "connect" || token == "disconnect") {
+            script.push_back({0, 0, port, token == "connect" ? SCRIPT_CONNECT : SCRIPT_DISCONNECT});
+            continue;
+        }
         double hold = 0.1;
         size_t colon = token.find(':');
         if (colon != std::string::npos) { hold = atof(token.c_str() + colon + 1); token = token.substr(0, colon); }
@@ -57,7 +69,7 @@ static void loadScript() {
             start = plus == std::string::npos ? token.size() + 1 : plus + 1;
             for (int b = 0; b < BUTTON_COUNT; b++) if (name == BUTTON_NAMES[b]) buttons |= 1u << b;
         }
-        if (buttons) script.push_back({hold, buttons, false});
+        if (buttons) script.push_back({hold, buttons, port, SCRIPT_BUTTONS});
         else SDL_Log("NAMEGAME_PAD: unknown button '%s'", token.c_str());
     }
 }
@@ -71,9 +83,11 @@ static void advanceScript() {
     if (!scriptStepStarted) {
         scriptStepStarted = true;
         scriptStepEnds = SDL_GetTicks() + (Uint32)(step.seconds * 1000);
-        if (step.quit) { SDL_Event quit = {}; quit.type = SDL_QUIT; SDL_PushEvent(&quit); }
+        if (step.action == SCRIPT_QUIT) { SDL_Event quit = {}; quit.type = SDL_QUIT; SDL_PushEvent(&quit); }
+        if (step.action == SCRIPT_CONNECT || step.action == SCRIPT_DISCONNECT) connected[step.port] = step.action == SCRIPT_CONNECT;
+        scriptPort = step.port;
         for (int b = 0; b < BUTTON_COUNT; b++)
-            if (step.buttons & (1u << b)) { scriptHeld[b] = true; pressed[0][b] = true; }
+            if (step.buttons & (1u << b)) { scriptHeld[b] = true; pressed[scriptPort][b] = true; }
     }
     if ((int)(SDL_GetTicks() - scriptStepEnds) >= 0) {
         memset(scriptHeld, 0, sizeof scriptHeld);
@@ -91,38 +105,43 @@ void inputHandleEvent(const SDL_Event& event) {
     }
 }
 
-Actions inputRead(int player) {
-    if (player == 0) advanceScript();
-    auto down = [&](int button) { return held[player][button] || (player == 0 && scriptHeld[button]); };
-    Actions a = {};
-    a.connected = true;
-    float dx = down(BTN_RIGHT) - down(BTN_LEFT), dy = down(BTN_DOWN) - down(BTN_UP);
-    if (dx || dy) {
-        float length = sqrtf(dx * dx + dy * dy);
-        a.moveX = dx / length;
-        a.moveY = dy / length;
+void inputRead(Actions* actions) {
+    advanceScript();
+    for (int port = 0; port < CONTROLLER_PORTS; port++) {
+        Actions& a = actions[port];
+        a = {};
+        a.connected = connected[port];
+        if (a.connected) {
+            auto down = [&](int button) { return held[port][button] || (port == scriptPort && scriptHeld[button]); };
+            const bool* press = pressed[port];
+            float dx = down(BTN_RIGHT) - down(BTN_LEFT), dy = down(BTN_DOWN) - down(BTN_UP);
+            if (dx || dy) {
+                float length = sqrtf(dx * dx + dy * dy);
+                a.moveX = dx / length;
+                a.moveY = dy / length;
+            }
+            a.fire = down(BTN_R1);
+            a.rocket = press[BTN_R2];
+            a.pause = press[BTN_START];
+            a.confirm = press[BTN_CROSS] || press[BTN_START];
+            a.stress = press[BTN_TRIANGLE];
+            a.autopilot = press[BTN_SELECT];
+            a.screenshot = press[BTN_L1];
+            a.godMode = (press[BTN_L2] || press[BTN_L3]) && down(BTN_L2) && down(BTN_L3);
+            a.cycle = press[BTN_SQUARE];
+            a.jump = press[BTN_CROSS];
+            a.jumpHeld = down(BTN_CROSS);
+            a.selectHeld = down(BTN_SELECT);
+            a.item = press[BTN_TRIANGLE];
+            a.up = press[BTN_UP];
+            a.down = press[BTN_DOWN];
+            a.left = press[BTN_LEFT];
+            a.right = press[BTN_RIGHT];
+            a.back = press[BTN_CIRCLE];
+        }
+        for (bool& b : pressed[port]) b = false;
     }
-    a.fire = down(BTN_R1);
-    a.rocket = pressed[player][BTN_R2];
-    a.pause = pressed[player][BTN_START];
-    a.confirm = pressed[player][BTN_CROSS] || pressed[player][BTN_START];
-    a.stress = pressed[player][BTN_TRIANGLE];
-    a.autopilot = pressed[player][BTN_SELECT];
-    a.screenshot = pressed[player][BTN_L1];
-    a.godMode = (pressed[player][BTN_L2] || pressed[player][BTN_L3]) && down(BTN_L2) && down(BTN_L3);
-    a.cycle = pressed[player][BTN_SQUARE];
-    a.jump = pressed[player][BTN_CROSS];
-    a.jumpHeld = down(BTN_CROSS);
-    a.item = pressed[player][BTN_TRIANGLE];
-    a.up = pressed[player][BTN_UP];
-    a.down = pressed[player][BTN_DOWN];
-    a.left = pressed[player][BTN_LEFT];
-    a.right = pressed[player][BTN_RIGHT];
-    a.back = pressed[player][BTN_CIRCLE];
-    for (bool& b : pressed[player]) b = false;
-    return a;
 }
 
 void inputRumblePulse(int, float, float) {}
-void inputRumbleUpdate(float, float) {}
-void inputRumbleStop() {}
+void inputRumbleUpdate(unsigned, float, float) {}

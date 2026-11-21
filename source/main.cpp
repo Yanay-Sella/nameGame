@@ -27,9 +27,12 @@ const float STEP = 1.0f / 60;   // s per game update
 const int MAX_STEPS_PER_FRAME = 4;
 const bool DEV_AIDS = !RELEASE;   // Triangle stress test, Select autopilot, L2+L3 test mode and L1 screenshot; off in make release
 
-enum Scene { SCENE_MAIN_MENU, SCENE_LEVEL_PICKER, SCENE_SETTINGS, SCENE_PLAYING, SCENE_PAUSED, SCENE_QUEST };
-const char* const SCENE_NAMES[] = {"main menu", "level picker", "settings", "playing", "paused", "quest"};
+enum Scene { SCENE_MAIN_MENU, SCENE_CLASSIC_MENU, SCENE_CONTROLLERS, SCENE_LEVEL_PICKER, SCENE_SETTINGS,
+             SCENE_PLAYING, SCENE_PAUSED, SCENE_QUEST };
+const char* const SCENE_NAMES[] = {"main menu", "classic menu", "controllers", "level picker", "settings", "playing", "paused", "quest"};
 const char* const MAIN_ITEMS[] = {"CLASSIC", "LEVEL PICKER", "NAME QUEST", "SETTINGS"};   // classic plays every level in order
+const char* const CLASSIC_ITEMS[] = {"1-2 PLAYERS", "1-4 PLAYERS"};
+const int EXPANDED_MIN_CONTROLLERS = 3;
 const int PICKER_ITEM = 1, QUEST_ITEM = 2, SETTINGS_ITEM = 3;
 const char* const PICKER_NAMES[LEVEL_COUNT] = {"SPACE", "JUNGLE", "GLACIER", "VOLCANO", "DEEP SEA"};
 const float PICKER_SPIN_TIME = 0.12f;   // s for the picker wheel to turn one row
@@ -73,7 +76,7 @@ static void watchdog(void*) {
 // Dev aid (Triangle): tops the screen up to the 60 fps stress case of 60 aliens, 100 bullets and 2 explosions.
 static void addStressLoad(Game& game) {
     for (int i = 0; i < 100; i++) {
-        Shot bullet = {(float)(i * 3 % SCREEN_W), (float)(SCREEN_H - 20 - i % 60), -40, 0, 0};
+        Shot bullet = {(float)(i * 3 % game.arenaWidth()), (float)(game.arenaHeight() - 20 - i % 60), -40, 0, 0};
         game.bullets.push_back(bullet);
     }
     for (int i = (int)game.aliens.size(); i < 60; i++) {
@@ -101,10 +104,16 @@ int main(int argc, char** argv) {
     sysThreadCreate(&watchdogThread, watchdog, NULL, 1000, 0x4000, 0, (char*)"watchdog");
 
     stage = "SDL_Init";
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK | SDL_INIT_AUDIO) != 0) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
         debugNetPrintf(ERROR, "SDL_Init failed: %s\n", SDL_GetError());
         return 1;
     }
+#ifndef NAMEGAME_MAC
+    if (!inputOpen()) {
+        SDL_Quit();
+        return 1;
+    }
+#endif
     // The window matches the PS3's video output; the picture is copied into it scaled (CLAUDE.md, GDD D-008).
     SDL_DisplayMode desktop;
     SDL_GetDesktopDisplayMode(0, &desktop);
@@ -116,9 +125,11 @@ int main(int argc, char** argv) {
     SDL_Renderer* renderer = window ? SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC) : NULL;
     SDL_Texture* picture = renderer ? SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
                                                         SCREEN_W, SCREEN_H) : NULL;
+    SDL_Texture* expandedPicture = renderer ? SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
+                                                                EXPANDED_W, EXPANDED_H) : NULL;
     SDL_Texture* questPicture = renderer ? SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
                                                              QUEST_W, QUEST_H) : NULL;   // NAME QUEST's 640x360 (D-053)
-    if (!picture || !questPicture) {
+    if (!picture || !expandedPicture || !questPicture) {
         debugNetPrintf(ERROR, "window/renderer/texture failed: %s\n", SDL_GetError());
         return 1;
     }
@@ -126,6 +137,9 @@ int main(int argc, char** argv) {
     SDL_GetRendererOutputSize(renderer, &outputW, &outputH);
     int scale = SDL_min(outputW / SCREEN_W, outputH / SCREEN_H);
     SDL_Rect pictureRect = {(outputW - SCREEN_W * scale) / 2, (outputH - SCREEN_H * scale) / 2, SCREEN_W * scale, SCREEN_H * scale};
+    int expandedScale = SDL_min(outputW / 16, outputH / 9);
+    int expandedOutputW = 16 * expandedScale, expandedOutputH = 9 * expandedScale;
+    SDL_Rect expandedRect = {(outputW - expandedOutputW) / 2, (outputH - expandedOutputH) / 2, expandedOutputW, expandedOutputH};
     int questScale = SDL_min(outputW / QUEST_W, outputH / QUEST_H);
     SDL_Rect questRect = {(outputW - QUEST_W * questScale) / 2, (outputH - QUEST_H * questScale) / 2, QUEST_W * questScale, QUEST_H * questScale};
     debugNetPrintf(INFO, "output %dx%d, picture x%d at %d,%d, quest x%d\n", outputW, outputH, scale, pictureRect.x, pictureRect.y, questScale);
@@ -143,9 +157,10 @@ int main(int argc, char** argv) {
     Settings settings = settingsLoad(settingsPath.c_str());
     debugNetPrintf(INFO, "settings: music %s, shake %d, flashing %s\n", MUSIC_NAMES[settings.music], settings.shake,
                    settings.reduceFlashing ? "reduced" : "normal");
-    std::string highScorePath = exeFolder + "/highscore.txt";
-    int highScore = highScoreLoad(highScorePath.c_str());
-    debugNetPrintf(INFO, "high score: %d\n", highScore);
+    const std::string highScorePaths[] = {exeFolder + "/highscore.txt", exeFolder + "/highscore-expanded.txt"};
+    int highScores[] = {highScoreLoad(highScorePaths[CLASSIC_STANDARD].c_str()), highScoreLoad(highScorePaths[CLASSIC_EXPANDED].c_str())};
+    debugNetPrintf(INFO, "high score: %d\n", highScores[CLASSIC_STANDARD]);
+    debugNetPrintf(INFO, "classic 1-4 record: %d\n", highScores[CLASSIC_EXPANDED]);
 
     Game game;
     startGame(game, 1, (uint32_t)SDL_GetPerformanceCounter());   // gives the menu its stars; a second player joins with Start (co-op)
@@ -154,6 +169,9 @@ int main(int argc, char** argv) {
     Actions questCarry = {};    // NAME QUEST presses read in a frame that ran no game step, kept for the next frame
     Scene scene = SCENE_MAIN_MENU, settingsBack = SCENE_MAIN_MENU;
     int selected = 0;
+    int lobbyPlayerChoice = 0;   // 0 starts with as many players as connected pads, up to four
+    int playerPorts[MAX_PLAYERS] = {};
+    int questPort = 0;
     int runLevel = 1;   // the level the menu started; play again restarts there
     bool runSingleLevel = false;   // a level picker run: play again replays just that level
     float pickerSpin = 0;   // rows the picker wheel still has to turn: + after Down, - after Up
@@ -193,54 +211,106 @@ int main(int argc, char** argv) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) running = false;
+#ifdef NAMEGAME_MAC
             inputHandleEvent(event);
+#endif
         }
-        Actions actions[MAX_PLAYERS];
-        for (int p = 0; p < MAX_PLAYERS; p++) actions[p] = inputRead(p);
+        Actions pads[CONTROLLER_PORTS];
+        inputRead(pads);
+        Actions actions[MAX_PLAYERS] = {};
         if (scene == SCENE_QUEST) {
             Actions& a = actions[0];
+            a = pads[questPort];
             a.jump |= questCarry.jump; a.item |= questCarry.item; a.back |= questCarry.back; a.up |= questCarry.up;
             a.down |= questCarry.down; a.left |= questCarry.left; a.right |= questCarry.right;
-            a.godMode |= questCarry.godMode; a.autopilot |= questCarry.autopilot;
+            a.godMode |= questCarry.godMode; a.autopilot |= questCarry.autopilot; a.rocket |= questCarry.rocket;
         }
         questCarry = {};
         // Every controller drives the menus.
         Actions menu = {};
-        for (const Actions& a : actions) {
+        int connectedCount = 0;
+        int connectedPorts[MAX_PLAYERS] = {};
+        for (int port = 0; port < CONTROLLER_PORTS; port++) {
+            const Actions& a = pads[port];
+            if (!a.connected) continue;
+            if (connectedCount < MAX_PLAYERS) connectedPorts[connectedCount] = port;
+            connectedCount++;
             menu.up |= a.up; menu.down |= a.down; menu.left |= a.left; menu.right |= a.right;
-            menu.confirm |= a.confirm; menu.back |= a.back; menu.pause |= a.pause; menu.screenshot |= a.screenshot;
+            menu.confirm |= a.confirm; menu.stress |= a.stress; menu.back |= a.back; menu.pause |= a.pause; menu.screenshot |= a.screenshot;
         }
-        // The first joined player whose controller is gone, or -1: a run pauses until it is back (D-014).
+        int available = SDL_min(connectedCount, MAX_PLAYERS);
+        int lobbyPlayers = lobbyPlayerChoice == 0 ? available : SDL_min(lobbyPlayerChoice, available);
+        // A run waits for a disconnected player's assigned port (D-014).
         int lostController = -1;
         for (int p = (int)game.players.size() - 1; p >= 0; p--)
-            if (!actions[p].connected) lostController = p;
-        if (questPaused) lostController = actions[0].connected ? -1 : 0;   // NAME QUEST is single player
-        int itemCount = scene == SCENE_SETTINGS ? 4 : scene == SCENE_LEVEL_PICKER ? LEVEL_COUNT : scene == SCENE_MAIN_MENU ? 4 : 3;
-        if (scene != SCENE_PLAYING && scene != SCENE_QUEST) {
+            if (!pads[playerPorts[p]].connected) lostController = playerPorts[p];
+        if (questPaused) lostController = pads[questPort].connected ? -1 : questPort;
+        int itemCount = scene == SCENE_SETTINGS || scene == SCENE_MAIN_MENU ? 4 : scene == SCENE_LEVEL_PICKER ? LEVEL_COUNT
+                      : scene == SCENE_CLASSIC_MENU ? 2 : scene == SCENE_PAUSED ? 3 : 0;
+        if (itemCount > 0) {
             if (menu.up) selected = (selected + itemCount - 1) % itemCount;
             if (menu.down) selected = (selected + 1) % itemCount;
         }
 
+        auto startRun = [&](int playerCount, ClassicVariant variant) {
+            std::copy_n(connectedPorts, playerCount, playerPorts);
+            startGame(game, playerCount, (uint32_t)SDL_GetPerformanceCounter(), runLevel, runSingleLevel, variant);
+            audioStartMusic(settings.music);
+            setScene(SCENE_PLAYING);
+        };
         Scene frameScene = scene;   // a press that changes the scene this frame never also reaches NAME QUEST
         switch (scene) {
         case SCENE_MAIN_MENU:
             if (menu.confirm && selected == 0) {
-                runLevel = 1;
-                runSingleLevel = false;
-                startGame(game, 1, (uint32_t)SDL_GetPerformanceCounter());
-                audioStartMusic(settings.music);
-                debugNetPrintf(INFO, "classic run starts\n");
-                setScene(SCENE_PLAYING);
+                game.level = 1;
+                setScene(SCENE_CLASSIC_MENU);
             } else if (menu.confirm && selected == PICKER_ITEM) {
                 selected = runSingleLevel ? runLevel - 1 : 0;   // back on the last picked level
                 pickerSpin = 0;
                 setScene(SCENE_LEVEL_PICKER);
             } else if (menu.confirm && selected == QUEST_ITEM) {
+                questPort = connectedPorts[0];
                 openQuest();
+            } else if (DEV_AIDS && menu.stress && selected == QUEST_ITEM) {   // dev: Triangle on NAME QUEST warps into the TEST GROUNDS (slot 3)
+                questPort = connectedPorts[0];
+                openQuest();
+                questStartDev(quest, "slot=3 class=0 world=8 area=0");
             } else if (menu.confirm && selected == SETTINGS_ITEM) {
                 settingsBack = SCENE_MAIN_MENU;
                 selected = 0;
                 setScene(SCENE_SETTINGS);
+            }
+            break;
+        case SCENE_CLASSIC_MENU:
+            if (menu.back) {
+                selected = 0;
+                setScene(SCENE_MAIN_MENU);
+            } else if (menu.confirm && selected == 0) {
+                runLevel = 1;
+                runSingleLevel = false;
+                debugNetPrintf(INFO, "classic run starts\n");
+                startRun(1, CLASSIC_STANDARD);
+            } else if (menu.confirm) {
+                lobbyPlayerChoice = 0;
+                lobbyPlayers = available;
+                setScene(SCENE_CONTROLLERS);
+            }
+            break;
+        case SCENE_CONTROLLERS:
+            if (menu.back) {
+                selected = 1;
+                setScene(SCENE_CLASSIC_MENU);
+            } else if (available >= EXPANDED_MIN_CONTROLLERS) {
+                if (menu.left || menu.right) {
+                    lobbyPlayers = SDL_max(1, SDL_min(lobbyPlayers + (menu.left ? -1 : 1), available));
+                    lobbyPlayerChoice = lobbyPlayers;
+                }
+                if (menu.confirm) {
+                    runLevel = 1;
+                    runSingleLevel = false;
+                    debugNetPrintf(INFO, "classic 1-4 run starts: %d players, %d controllers\n", lobbyPlayers, connectedCount);
+                    startRun(lobbyPlayers, CLASSIC_EXPANDED);
+                }
             }
             break;
         case SCENE_LEVEL_PICKER:
@@ -251,10 +321,8 @@ int main(int argc, char** argv) {
             if (menu.confirm) {
                 runLevel = selected + 1;
                 runSingleLevel = true;
-                startGame(game, 1, (uint32_t)SDL_GetPerformanceCounter(), runLevel, true);
-                audioStartMusic(settings.music);
                 debugNetPrintf(INFO, "picked level %d starts\n", runLevel);
-                setScene(SCENE_PLAYING);
+                startRun(1, CLASSIC_STANDARD);
             } else if (menu.back) {
                 game.level = 1;
                 selected = PICKER_ITEM;
@@ -308,7 +376,7 @@ int main(int argc, char** argv) {
                 setScene(SCENE_PAUSED);
             }
             break;
-        case SCENE_PLAYING:
+        case SCENE_PLAYING: {
             if (lostController >= 0 && !game.over) {
                 for (Player& player : game.players) player.rocketPressedAt = -1;   // as for a Start pause
                 selected = 0;
@@ -316,49 +384,65 @@ int main(int argc, char** argv) {
                 setScene(SCENE_PAUSED);
                 break;
             }
-            for (int p = 0; p < MAX_PLAYERS; p++) {
-                // A controller without a ship joins the running game with Start or X (co-op/design.md).
-                if (p >= (int)game.players.size()) {
-                    if (actions[p].confirm && p == (int)game.players.size() && !game.over && !game.levelClear) {
-                        joinGame(game);
-                        debugNetPrintf(INFO, "player %d joined at wave %d\n", p + 1, game.wave);
-                    }
-                    continue;
-                }
-                if (actions[p].pause && !game.over) {
+            int playerCount = (int)game.players.size();
+            bool canJoin = !game.over && !game.levelClear;
+            for (int p = 0; p < playerCount; p++) {
+                const Actions& a = pads[playerPorts[p]];
+                if (a.pause && !game.over) {
                     for (Player& player : game.players) player.rocketPressedAt = -1;   // a buffered R2 doesn't survive a pause
                     selected = 0;
                     setScene(SCENE_PAUSED);
                     break;   // a second Start in the same frame can't act
                 }
-                if (DEV_AIDS && actions[p].stress) addStressLoad(game);
-                if (DEV_AIDS && actions[p].godMode) {
+                if (DEV_AIDS && a.stress) addStressLoad(game);
+                if (DEV_AIDS && a.godMode) {
                     godMode = !godMode;
                     if (!godMode) for (Player& player : game.players) player.invincibleTimer = 0;
                     else for (Player& player : game.players) player.buffs = BUFF_ALL;   // test mode on: every level buff
                     debugNetPrintf(INFO, "test mode %s\n", godMode ? "on" : "off");
                 }
-                if (DEV_AIDS && actions[p].autopilot) { autopilot = !autopilot; debugNetPrintf(INFO, "autopilot %s\n", autopilot ? "on" : "off"); }
+                if (DEV_AIDS && a.autopilot) { autopilot = !autopilot; debugNetPrintf(INFO, "autopilot %s\n", autopilot ? "on" : "off"); }
                 // Game over: after the input lock, X or Start begins a new run and Circle goes to the main menu.
                 if (game.over && game.time - game.overTime > GAME_OVER_INPUT_LOCK) {
-                    if (actions[p].confirm) {
-                        startGame(game, (int)game.players.size(), (uint32_t)SDL_GetPerformanceCounter(), runLevel, runSingleLevel);   // co-op runs stay co-op
-                        Uint64 musicStart = SDL_GetPerformanceCounter();
-                        audioStartMusic(settings.music);
-                        debugNetPrintf(INFO, "new run (music restart took %.0f ms)\n", (SDL_GetPerformanceCounter() - musicStart) * 1000.0 / counterHz);
-                    } else if (actions[p].back) {
+                    if (a.confirm) {
+                        if (game.variant == CLASSIC_EXPANDED && (available < EXPANDED_MIN_CONTROLLERS || lostController >= 0)) {
+                            lobbyPlayerChoice = playerCount;
+                            lobbyPlayers = SDL_min(playerCount, available);
+                            game.level = 1;
+                            setScene(SCENE_CONTROLLERS);
+                        } else {
+                            startGame(game, playerCount, (uint32_t)SDL_GetPerformanceCounter(), runLevel, runSingleLevel, game.variant);
+                            Uint64 musicStart = SDL_GetPerformanceCounter();
+                            audioStartMusic(settings.music);
+                            debugNetPrintf(INFO, "new run (music restart took %.0f ms)\n", (SDL_GetPerformanceCounter() - musicStart) * 1000.0 / counterHz);
+                        }
+                        break;
+                    } else if (a.back) {
                         selected = 0;
                         setScene(SCENE_MAIN_MENU);
                         break;
                     }
                 }
             }
+            if (scene == SCENE_PLAYING && canJoin) {
+                for (int port = 0; port < CONTROLLER_PORTS && playerCount < game.playerLimit(); port++) {
+                    if (!pads[port].connected || !pads[port].confirm) continue;
+                    if (std::find(playerPorts, playerPorts + playerCount, port) != playerPorts + playerCount) continue;
+                    if (joinGame(game)) {
+                        playerPorts[playerCount++] = port;
+                        debugNetPrintf(INFO, "player %d joined at wave %d\n", playerCount, game.wave);
+                    }
+                }
+            }
             break;
         }
+        }
+        if (scene == SCENE_PLAYING)
+            for (size_t p = 0; p < game.players.size(); p++) actions[p] = pads[playerPorts[p]];
         // Dev aid (Select): player 1 sweeps along the bottom firing, a rocket every 5 s, invincible (30-minute soak test).
         if (autopilot && scene == SCENE_PLAYING) {
             Player& pilot = game.players[0];
-            float targetX = 152 + 120 * sinf(game.time * 0.7f);   // 152: the ship centred
+            float targetX = game.arenaWidth() / 2.0f - 8 + game.arenaWidth() * 0.375f * sinf(game.time * 0.7f);
             actions[0].moveX = SDL_max(-1.0f, SDL_min((targetX - pilot.x) / 20, 1.0f));
             actions[0].moveY = 1;
             actions[0].fire = true;
@@ -371,18 +455,17 @@ int main(int argc, char** argv) {
 
         bool wasOver = game.over;
         int bossesBefore = 0;
-        bool beamBefore[2] = {};
+        bool beamBefore[MAX_BOSSES] = {}, laughBefore[MAX_BOSSES] = {};
         for (size_t i = 0; i < game.bosses.size(); i++) {
             bossesBefore += game.bosses[i].alive;
-            if (i < 2) beamBefore[i] = game.bosses[i].beamTimer > 0;
+            beamBefore[i] = game.bosses[i].beamTimer > 0;
+            laughBefore[i] = game.bosses[i].laughTimer > 0;
         }
         bool clearBefore = game.levelClear;
         int waveBefore = game.wave;
         int levelBefore = game.level;
         size_t mistsBefore = game.mists.size();
         size_t fishBefore = game.fish.size();
-        bool laughBefore[2] = {};
-        for (size_t i = 0; i < game.bosses.size() && i < 2; i++) laughBefore[i] = game.bosses[i].laughTimer > 0;
         int livesBefore[MAX_PLAYERS] = {};
         bool slidingBefore[MAX_PLAYERS] = {}, frozenBefore[MAX_PLAYERS] = {}, scorchedBefore[MAX_PLAYERS] = {}, hookedBefore[MAX_PLAYERS] = {};
         for (size_t p = 0; p < game.players.size(); p++) {
@@ -406,7 +489,8 @@ int main(int argc, char** argv) {
         while (accumulator >= STEP && steps < MAX_STEPS_PER_FRAME) {
             if (scene == SCENE_PLAYING) updateGame(game, actions, STEP);
             else if (scene == SCENE_QUEST && frameScene == SCENE_QUEST) questUpdate(quest, actions[0], STEP);
-            else if (scene == SCENE_MAIN_MENU || scene == SCENE_LEVEL_PICKER || (scene == SCENE_SETTINGS && settingsBack == SCENE_MAIN_MENU))
+            else if (scene == SCENE_MAIN_MENU || scene == SCENE_CLASSIC_MENU || scene == SCENE_CONTROLLERS ||
+                     scene == SCENE_LEVEL_PICKER || (scene == SCENE_SETTINGS && settingsBack == SCENE_MAIN_MENU))
                 updateBackground(game, STEP);
             if (pickerSpin > 0) pickerSpin = SDL_max(0.0f, pickerSpin - STEP / PICKER_SPIN_TIME);
             if (pickerSpin < 0) pickerSpin = SDL_min(0.0f, pickerSpin + STEP / PICKER_SPIN_TIME);
@@ -424,8 +508,8 @@ int main(int argc, char** argv) {
                 debugNetPrintf(INFO, "level %d wave %d start at %.0f s: player %d lives %d, rockets %d, weapon %d, score %d\n", game.level,
                                game.wave, game.time, (int)p + 1, game.players[p].lives, game.players[p].rockets, game.players[p].weaponLevel,
                                game.players[p].score);
-            if (heavyCount(game.level, game.wave) > 0)
-                debugNetPrintf(INFO, "wave %d: %d heavies\n", game.wave, heavyCount(game.level, game.wave));
+            int heavies = heavyCount(game.level, game.wave, game.variant);
+            if (heavies > 0) debugNetPrintf(INFO, "wave %d: %d heavies\n", game.wave, heavies);
         }
         for (size_t p = 0; p < game.players.size(); p++)
             if (game.players[p].slideTimer > 0 && !slidingBefore[p]) debugNetPrintf(INFO, "player %d slipped on a peel\n", (int)p + 1);
@@ -459,7 +543,7 @@ int main(int argc, char** argv) {
         if (game.mists.size() > mistsBefore)
             debugNetPrintf(INFO, "stink mist at %.0f,%.0f\n", game.mists.back().x, game.mists.back().y);
         if (game.fish.size() > fishBefore) debugNetPrintf(INFO, "live fish landed, %d out\n", (int)game.fish.size());
-        for (size_t i = 0; i < game.bosses.size() && i < 2; i++)
+        for (size_t i = 0; i < game.bosses.size(); i++)
             if (game.bosses[i].laughTimer > 0 && !laughBefore[i]) debugNetPrintf(INFO, "gorilla healed to %d hp\n", game.bosses[i].hp);
         for (size_t p = 0; p < game.players.size(); p++)
             if (game.players[p].lives < livesBefore[p])
@@ -473,10 +557,11 @@ int main(int argc, char** argv) {
         }
         if (bossesAlive < bossesBefore)
             debugNetPrintf(INFO, "boss down at wave %d after %.0f s, %d left\n", game.wave, game.time - bossStart, bossesAlive);
-        for (size_t i = 0; i < game.bosses.size() && i < 2; i++)
+        for (size_t i = 0; i < game.bosses.size(); i++)
             if (game.bosses[i].beamTimer > 0 && !beamBefore[i])
                 debugNetPrintf(INFO, "%s at x %.0f\n", game.bosses[i].type == BOSS_FIRELORD ? "eruption" : "mage beam", game.bosses[i].ballX);
         if (game.levelClear && !clearBefore) debugNetPrintf(INFO, "level %d clear at %.1f s\n", game.level, game.time);
+        int& highScore = highScores[game.variant];
         if (game.over && !wasOver) {
             audioStopMusic();
             int best = 0;
@@ -484,7 +569,7 @@ int main(int argc, char** argv) {
             if (best > highScore) {
                 highScore = best;
                 game.newHighScore = true;
-                bool saved = highScoreSave(highScorePath.c_str(), highScore);
+                bool saved = highScoreSave(highScorePaths[game.variant].c_str(), highScore);
                 debugNetPrintf(INFO, "high score: %d (%s)\n", highScore, saved ? "saved" : "SAVE FAILED");
             }
             for (size_t p = 0; p < game.players.size(); p++)
@@ -509,29 +594,70 @@ int main(int argc, char** argv) {
         quest.reduceFlashing = settings.reduceFlashing;
 
         // Rumble: a short buzz for a lost life or a popped shield, a long one for a boss kill, and the screen shake's strength between.
-        for (size_t p = 0; p < game.players.size(); p++)
+        unsigned activePorts = 0;
+        for (size_t p = 0; scene == SCENE_PLAYING && p < game.players.size(); p++) {
+            int port = playerPorts[p];
+            activePorts |= 1u << port;
             if (game.players[p].lives < livesBefore[p] || (shieldBefore[p] && !game.players[p].shield && game.players[p].alive))
-                inputRumblePulse((int)p, 0.8f, 0.25f);
-        if (bossesAlive < bossesBefore)
-            for (size_t p = 0; p < game.players.size(); p++) inputRumblePulse((int)p, 1.0f, 1.5f);
-        inputRumbleUpdate(scene == SCENE_PLAYING ? game.trauma * settings.shake / 100.0f : 0, steps * STEP);
+                inputRumblePulse(port, 0.8f, 0.25f);
+            if (bossesAlive < bossesBefore) inputRumblePulse(port, 1.0f, 1.5f);
+        }
+        inputRumbleUpdate(activePorts, game.trauma * settings.shake / 100.0f, steps * STEP);
 
         game.highScore = highScore;
         game.shakeStrength = settings.shake / 100.0f;
         game.reduceFlashing = settings.reduceFlashing;
         stage = "draw";
-        // NAME QUEST and the menus over it draw into the 640x360 picture, everything else into the 320x180 one.
         bool questFrame = scene == SCENE_QUEST || questPaused;
-        bool targetChanged = (screenTarget == questPixels) != questFrame;
-        if (questFrame) screenSetTarget(questPixels, QUEST_W, QUEST_H);
-        else screenSetTarget(screenPixels, SCREEN_W, SCREEN_H);
+        bool shooterFrame = scene == SCENE_PLAYING || scene == SCENE_PAUSED || (scene == SCENE_SETTINGS && settingsBack == SCENE_PAUSED);
+        bool expandedFrame = shooterFrame && game.variant == CLASSIC_EXPANDED;
+        const uint32_t* previousTarget = screenTarget;
+        SDL_Texture* shown = picture;
+        const SDL_Rect* destination = &pictureRect;
+        if (questFrame) {
+            screenSetTarget(questPixels, QUEST_W, QUEST_H);
+            shown = questPicture;
+            destination = &questRect;
+        } else if (expandedFrame) {
+            screenSetTarget(expandedPixels, EXPANDED_W, EXPANDED_H);
+            shown = expandedPicture;
+            destination = &expandedRect;
+        } else {
+            screenSetTarget(screenPixels, SCREEN_W, SCREEN_H);
+        }
         if (scene == SCENE_MAIN_MENU) {
             drawBackground(game);
             drawMenu("NAME GAME", MAIN_ITEMS, SETTINGS_ITEM + 1, selected, "X SELECT");
             char best[24];
-            snprintf(best, sizeof best, "HI %07d", highScore);
+            snprintf(best, sizeof best, "HI %07d", highScores[CLASSIC_STANDARD]);
             drawText((SCREEN_W - textWidth(best)) / 2, 150, best, paletteColor('y'));
             drawText(SCREEN_W - 2 - textWidth("V" GAME_VERSION), SCREEN_H - 7, "V" GAME_VERSION, paletteColor('s'));
+        } else if (scene == SCENE_CLASSIC_MENU) {
+            drawBackground(game);
+            drawMenu("CLASSIC", CLASSIC_ITEMS, 2, selected, "X SELECT  O BACK");
+        } else if (scene == SCENE_CONTROLLERS) {
+            drawBackground(game);
+            const int panelW = 174, panelH = 124, panelX = (SCREEN_W - panelW) / 2, panelY = (SCREEN_H - panelH) / 2;
+            fillRect(panelX, panelY, panelW, panelH, paletteColor('n'));
+            fillRect(panelX + 1, panelY + 1, panelW - 2, panelH - 2, paletteColor('k'));
+            drawText((SCREEN_W - textWidth("1-4 PLAYERS", 2)) / 2, panelY + 9, "1-4 PLAYERS", paletteColor('w'), 2);
+            char status[32];
+            snprintf(status, sizeof status, "%d CONNECTED", connectedCount);
+            drawText((SCREEN_W - textWidth(status)) / 2, panelY + 25, status, paletteColor('w'));
+            for (int p = 0; p < MAX_PLAYERS; p++) {
+                int y = panelY + 40 + 11 * p;
+                snprintf(status, sizeof status, "PLAYER %d", p + 1);
+                drawText(panelX + 24, y, status, paletteColor(p < available ? 'w' : 's'));
+                if (p < available) snprintf(status, sizeof status, "CONTROLLER %d", connectedPorts[p] + 1);
+                else snprintf(status, sizeof status, "WAITING");
+                drawText(panelX + panelW - 24 - textWidth(status), y, status, paletteColor(p < available ? 'c' : 's'));
+            }
+            bool ready = available >= EXPANDED_MIN_CONTROLLERS;
+            if (ready) snprintf(status, sizeof status, "<  START WITH %d  >", lobbyPlayers);
+            else snprintf(status, sizeof status, "%d CONTROLLERS REQUIRED", EXPANDED_MIN_CONTROLLERS);
+            drawText((SCREEN_W - textWidth(status)) / 2, panelY + 90, status, paletteColor('y'));
+            const char* hint = ready ? "X PLAY  O BACK" : "O BACK";
+            drawText((SCREEN_W - textWidth(hint)) / 2, panelY + 108, hint, paletteColor('s'));
         } else if (scene == SCENE_LEVEL_PICKER) {
             // A wheel: the picked level big in the middle, two levels above and below it smaller, wrapping around.
             drawBackground(game);
@@ -581,16 +707,15 @@ int main(int argc, char** argv) {
         stage = "present";
         bool visible = false;   // an all-black picture counts towards the watchdog's black-screen exit
         for (int i = 0; i < screenW * screenH && !visible; i++) visible = (screenTarget[i] & 0xFFFFFF) != 0;
-        SDL_Texture* shown = questFrame ? questPicture : picture;
         SDL_UpdateTexture(shown, NULL, screenTarget, screenW * sizeof(uint32_t));
         static int bordersToClear = 2;   // both screen buffers, at the start and whenever the picture size changes
-        if (targetChanged) bordersToClear = 2;
+        if (screenTarget != previousTarget) bordersToClear = 2;
         if (bordersToClear > 0) {
             SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
             SDL_RenderClear(renderer);
             bordersToClear--;
         }
-        SDL_RenderCopy(renderer, shown, NULL, questFrame ? &questRect : &pictureRect);
+        SDL_RenderCopy(renderer, shown, NULL, destination);
         float workMs = (float)((SDL_GetPerformanceCounter() - frameStart) * 1000.0 / counterHz);
         SDL_RenderPresent(renderer);
         if (visible) visibleFrames++;
@@ -616,7 +741,9 @@ int main(int argc, char** argv) {
     }
 
     debugNetPrintf(INFO, "nameGame exiting\n");
-    inputRumbleStop();
+#ifndef NAMEGAME_MAC
+    inputClose();
+#endif
     audioClose();
     SDL_Quit();
     debugNetFinish();

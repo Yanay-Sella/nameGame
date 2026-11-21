@@ -25,6 +25,7 @@ os.makedirs(SHOTS, exist_ok=True)
 os.makedirs(ART, exist_ok=True)
 subprocess.run(["c++", "-std=c++14", "-O1", "-I" + os.path.join(ROOT, "source"), os.path.join(HERE, "render_scenes.cpp"),
                 os.path.join(ROOT, "source", "game.cpp"), os.path.join(ROOT, "source", "screen.cpp"),
+                os.path.join(ROOT, "source", "formations.cpp"),
                 "-o", os.path.join(WORK, "render_scenes")], check=True)
 subprocess.run([os.path.join(WORK, "render_scenes"), SHOTS], check=True)
 for name in os.listdir(SHOTS):   # BMP to PNG, magnified with hard pixels so Chrome never smooths them

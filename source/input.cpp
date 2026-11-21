@@ -1,117 +1,126 @@
-// Reads the PS3 controllers through SDL's joystick API; player n uses controller n.
+// Reads PS3 pads by physical port so disconnects never move another player's controls.
 #include "input.h"
-#include <SDL.h>
 #include <debugnet.h>
 #include <io/pad.h>
 
-// Button indices from SDL_PSL1GHT's joystick driver (src/joystick/psl1ght/SDL_sysjoystick.c), see CLAUDE.md.
-enum { BTN_LEFT = 0, BTN_DOWN = 1, BTN_RIGHT = 2, BTN_UP = 3, BTN_START = 4, BTN_L3 = 6, BTN_SELECT = 7, BTN_SQUARE = 8, BTN_CROSS = 9, BTN_CIRCLE = 10, BTN_TRIANGLE = 11, BTN_R1 = 12, BTN_L1 = 13, BTN_R2 = 14, BTN_L2 = 15,
-       BUTTON_COUNT = 16 };
+static_assert(CONTROLLER_PORTS == MAX_PORT_NUM, "PS3 controller port count");
+const unsigned DIGITAL2_SHIFT = 8;
+const unsigned PORT_CONNECTED = 1;
 
-static SDL_Joystick* joysticks[MAX_PLAYERS];
-static bool pressed[MAX_PLAYERS][BUTTON_COUNT];   // set by button-down events, cleared by inputRead
-static int stickFlick[MAX_PLAYERS][2];   // last flick direction of the left stick per axis: -1, 0 or 1
+struct PadState {
+    bool connected;
+    unsigned buttons;
+    float stick[2];
+    int flick[2];
+    float pulseStrength, pulseLeft;
+    int sentLarge, sentSmall;
+};
+static PadState pads[CONTROLLER_PORTS];
 
-void inputHandleEvent(const SDL_Event& event) {
-    if (event.type == SDL_JOYBUTTONDOWN && event.jbutton.button < BUTTON_COUNT) {
-        for (int p = 0; p < MAX_PLAYERS; p++)
-            if (joysticks[p] && SDL_JoystickInstanceID(joysticks[p]) == event.jbutton.which) pressed[p][event.jbutton.button] = true;
-        debugNetPrintf(DEBUG, "button %d\n", event.jbutton.button);
-    }
+bool inputOpen() {
+    int result = ioPadInit(CONTROLLER_PORTS);
+    if (result != PAD_OK) debugNetPrintf(ERROR, "controller init failed: 0x%x\n", (unsigned)result);
+    return result == PAD_OK;
 }
 
-Actions inputRead(int player) {
-    // This SDL port sends no controller added/removed events, so controllers are opened and closed by count.
-    bool connected = player < SDL_NumJoysticks();
-    if (connected && !joysticks[player]) {
-        joysticks[player] = SDL_JoystickOpen(player);
-        debugNetPrintf(INFO, "controller %d %s\n", player, joysticks[player] ? "connected" : "failed to open");
-    } else if (!connected && joysticks[player]) {
-        SDL_JoystickClose(joysticks[player]);
-        joysticks[player] = NULL;
-        debugNetPrintf(INFO, "controller %d disconnected\n", player);
-    }
-
-    Actions a = {};
-    SDL_Joystick* joystick = joysticks[player];
-    if (!joystick) return a;
-    a.connected = true;
-
-    // The D-pad wins over the stick and always gives full speed.
-    float dx = SDL_JoystickGetButton(joystick, BTN_RIGHT) - SDL_JoystickGetButton(joystick, BTN_LEFT);
-    float dy = SDL_JoystickGetButton(joystick, BTN_DOWN) - SDL_JoystickGetButton(joystick, BTN_UP);
-    if (dx || dy) {
-        float length = sqrtf(dx * dx + dy * dy);
-        a.moveX = dx / length;
-        a.moveY = dy / length;
-    } else {
-        a.moveX = SDL_JoystickGetAxis(joystick, 0) / 32768.0f;
-        a.moveY = SDL_JoystickGetAxis(joystick, 1) / 32768.0f;
-        applyDeadzone(a.moveX, a.moveY, STICK_DEADZONE);
-    }
-    a.fire = SDL_JoystickGetButton(joystick, BTN_R1);
-    a.rocket = pressed[player][BTN_R2];
-    a.pause = pressed[player][BTN_START];
-    a.confirm = pressed[player][BTN_CROSS] || pressed[player][BTN_START];
-    a.stress = pressed[player][BTN_TRIANGLE];
-    a.autopilot = pressed[player][BTN_SELECT];
-    a.screenshot = pressed[player][BTN_L1];
-    // L2+L3 held together; counts on the frame the last of them goes down
-    a.godMode = (pressed[player][BTN_L2] || pressed[player][BTN_L3])
-        && SDL_JoystickGetButton(joystick, BTN_L2) && SDL_JoystickGetButton(joystick, BTN_L3);
-    a.cycle = pressed[player][BTN_SQUARE];
-    a.jump = pressed[player][BTN_CROSS];
-    a.jumpHeld = SDL_JoystickGetButton(joystick, BTN_CROSS);
-    a.item = pressed[player][BTN_TRIANGLE];
-    a.up = pressed[player][BTN_UP];
-    a.down = pressed[player][BTN_DOWN];
-    a.left = pressed[player][BTN_LEFT];
-    a.right = pressed[player][BTN_RIGHT];
-    a.back = pressed[player][BTN_CIRCLE];
-    // A stick flick counts as one menu press; the hysteresis stops a held stick from repeating.
-    for (int axis = 0; axis < 2; axis++) {
-        float v = SDL_JoystickGetAxis(joystick, axis) / 32768.0f;
-        int dir = v < -0.6f ? -1 : v > 0.6f ? 1 : fabsf(v) < 0.3f ? 0 : stickFlick[player][axis];
-        if (dir != 0 && dir != stickFlick[player][axis]) {
-            if (axis == 0) (dir < 0 ? a.left : a.right) = true;
-            else (dir < 0 ? a.up : a.down) = true;
+void inputRead(Actions* actions) {
+    padInfo2 info = {};
+    bool haveStatus = ioPadGetInfo2(&info) == PAD_OK;
+    for (int port = 0; port < CONTROLLER_PORTS; port++) {
+        Actions& a = actions[port];
+        a = {};
+        PadState& pad = pads[port];
+        bool connected = haveStatus && (info.port_status[port] & PORT_CONNECTED) && info.device_type[port] != PAD_TYPE_REMOTE;
+        if (connected != pad.connected)
+            debugNetPrintf(INFO, "controller %d %s\n", port, connected ? "connected" : "disconnected");
+        if (!connected) {
+            pad = {};
+            continue;
         }
-        stickFlick[player][axis] = dir;
+        pad.connected = a.connected = true;
+
+        unsigned previous = pad.buttons;
+        padData data = {};
+        if (ioPadGetData(port, &data) == PAD_OK && data.len > PAD_BUTTON_OFFSET_ANALOG_LEFT_Y) {
+            pad.buttons = data.button[PAD_BUTTON_OFFSET_DIGITAL1] | (unsigned)data.button[PAD_BUTTON_OFFSET_DIGITAL2] << DIGITAL2_SHIFT;
+            pad.stick[0] = ((int)data.button[PAD_BUTTON_OFFSET_ANALOG_LEFT_X] - 128) / 128.0f;
+            pad.stick[1] = ((int)data.button[PAD_BUTTON_OFFSET_ANALOG_LEFT_Y] - 128) / 128.0f;
+        }
+        unsigned pressed = pad.buttons & ~previous;
+        auto down = [&](unsigned mask) { return (pad.buttons & mask) != 0; };
+        auto press = [&](unsigned mask) { return (pressed & mask) != 0; };
+        auto down2 = [&](unsigned mask) { return down(mask << DIGITAL2_SHIFT); };
+        auto press2 = [&](unsigned mask) { return press(mask << DIGITAL2_SHIFT); };
+
+        float dx = down(PAD_CTRL_RIGHT) - down(PAD_CTRL_LEFT);
+        float dy = down(PAD_CTRL_DOWN) - down(PAD_CTRL_UP);
+        if (dx || dy) {
+            float length = sqrtf(dx * dx + dy * dy);
+            a.moveX = dx / length;
+            a.moveY = dy / length;
+        } else {
+            a.moveX = pad.stick[0];
+            a.moveY = pad.stick[1];
+            applyDeadzone(a.moveX, a.moveY, STICK_DEADZONE);
+        }
+        a.fire = down2(PAD_CTRL_R1);
+        a.rocket = press2(PAD_CTRL_R2);
+        a.pause = press(PAD_CTRL_START);
+        a.stress = a.item = press2(PAD_CTRL_TRIANGLE);
+        a.autopilot = press(PAD_CTRL_SELECT);
+        a.screenshot = press2(PAD_CTRL_L1);
+        a.godMode = (press2(PAD_CTRL_L2) || press(PAD_CTRL_L3)) && down2(PAD_CTRL_L2) && down(PAD_CTRL_L3);
+        a.cycle = press2(PAD_CTRL_SQUARE);
+        a.jump = press2(PAD_CTRL_CROSS);
+        a.confirm = a.jump || a.pause;
+        a.jumpHeld = down2(PAD_CTRL_CROSS);
+        a.selectHeld = down(PAD_CTRL_SELECT);
+        a.up = press(PAD_CTRL_UP);
+        a.down = press(PAD_CTRL_DOWN);
+        a.left = press(PAD_CTRL_LEFT);
+        a.right = press(PAD_CTRL_RIGHT);
+        a.back = press2(PAD_CTRL_CIRCLE);
+        for (int axis = 0; axis < 2; axis++) {
+            float v = pad.stick[axis];
+            int dir = v < -0.6f ? -1 : v > 0.6f ? 1 : fabsf(v) < 0.3f ? 0 : pad.flick[axis];
+            if (dir != 0 && dir != pad.flick[axis]) {
+                if (axis == 0) (dir < 0 ? a.left : a.right) = true;
+                else (dir < 0 ? a.up : a.down) = true;
+            }
+            pad.flick[axis] = dir;
+        }
     }
-    for (bool& b : pressed[player]) b = false;
-    return a;
 }
 
-static float pulseStrength[MAX_PLAYERS], pulseLeft[MAX_PLAYERS];   // the running rumble pulse: 0..1 and s left
-static int sentLarge[MAX_PLAYERS], sentSmall[MAX_PLAYERS];          // what the motors were last told
-
-void inputRumblePulse(int player, float strength, float seconds) {
-    if (player < 0 || player >= MAX_PLAYERS) return;
-    if (pulseLeft[player] <= 0 || strength >= pulseStrength[player]) {   // a weaker buzz never cuts a stronger one short
-        pulseStrength[player] = strength;
-        pulseLeft[player] = seconds;
+void inputRumblePulse(int port, float strength, float seconds) {
+    PadState& pad = pads[port];
+    if (pad.pulseLeft <= 0 || strength >= pad.pulseStrength) {
+        pad.pulseStrength = strength;
+        pad.pulseLeft = seconds;
     }
 }
 
-void inputRumbleUpdate(float shake, float dt) {
-    for (int p = 0; p < MAX_PLAYERS; p++) {
-        pulseLeft[p] = fmaxf(0, pulseLeft[p] - dt);
-        float level = fmaxf(pulseLeft[p] > 0 ? pulseStrength[p] : 0, shake < 0.1f ? 0 : shake);
-        int large = (int)(fminf(level, 1) * 255) / 16 * 16;   // steps of 16, so a changing shake doesn't resend every frame
-        int small = pulseLeft[p] > 0 ? 1 : 0;
-        if (large == sentLarge[p] && small == sentSmall[p]) continue;
+void inputRumbleUpdate(unsigned activePorts, float shake, float dt) {
+    for (int port = 0; port < CONTROLLER_PORTS; port++) {
+        PadState& pad = pads[port];
+        if (!pad.connected) continue;
+        bool active = (activePorts & (1u << port)) != 0;
+        pad.pulseLeft = active ? fmaxf(0, pad.pulseLeft - dt) : 0;
+        float pulse = pad.pulseLeft > 0 ? pad.pulseStrength : 0;
+        float level = fmaxf(pulse, active && shake >= 0.1f ? shake : 0);
+        int large = (int)(fminf(level, 1) * 255) / 16 * 16;
+        int small = pad.pulseLeft > 0 ? 1 : 0;
+        if (large == pad.sentLarge && small == pad.sentSmall) continue;
         padActParam act = {};
         act.small_motor = small;
         act.large_motor = large;
-        ioPadSetActDirect(p, &act);
-        sentLarge[p] = large;
-        sentSmall[p] = small;
+        ioPadSetActDirect(port, &act);
+        pad.sentLarge = large;
+        pad.sentSmall = small;
     }
 }
 
-void inputRumbleStop() {
-    for (int p = 0; p < MAX_PLAYERS; p++) {
-        padActParam act = {};
-        ioPadSetActDirect(p, &act);
-    }
+void inputClose() {
+    inputRumbleUpdate(0, 0, 0);
+    ioPadEnd();
 }

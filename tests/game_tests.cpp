@@ -497,9 +497,10 @@ static void weaponLevelsFireTheirPattern() {
     CHECK(volleys == 13);
 }
 
-static void killDropsFollowTheRoll() {
+static void killDropsFollowTheRoll(ClassicVariant variant) {
     Game game;
-    startSafeGame(game);
+    startGame(game, 1, 7, 1, false, variant);
+    game.players[0].invincibleTimer = 1e9f;
     game.swayDirection = 0;
     int rockets = 0, upgrades = 0;
     const int KILLS = 20000;
@@ -517,7 +518,8 @@ static void killDropsFollowTheRoll() {
         game.pickups.clear();
     }
     CHECK(rockets > KILLS * 0.015 && rockets < KILLS * 0.025);    // about 2 %
-    CHECK(upgrades > KILLS * 0.007 && upgrades < KILLS * 0.013);  // about 1 %
+    if (variant == CLASSIC_EXPANDED) CHECK(upgrades > KILLS * 0.016 && upgrades < KILLS * 0.024);
+    else CHECK(upgrades > KILLS * 0.007 && upgrades < KILLS * 0.013);
 }
 
 static void upgradePickupRaisesLevelUpToFour() {
@@ -1979,6 +1981,73 @@ static void classicKeepsBuffsIntoTheNextLevel() {
     CHECK(game.level == 2 && (game.players[0].buffs & BUFF_SPACE));
 }
 
+static void classicVariantsCapThePartyAndReadPlayerFour() {
+    Game game;
+    startGame(game, 1, 7);
+    CHECK(game.arenaWidth() == 320 && game.arenaHeight() == 180);
+    CHECK(joinGame(game));
+    CHECK(!joinGame(game) && game.players.size() == 2);
+
+    startGame(game, 1, 7, 1, false, CLASSIC_EXPANDED);
+    CHECK(game.arenaWidth() == 384 && game.arenaHeight() == 216);
+    CHECK(joinGame(game) && joinGame(game) && joinGame(game));
+    if (game.players.size() != 4) return;
+    CHECK(!joinGame(game));
+    Player& fourth = game.players[3];
+    fourth.x = (float)(EXPANDED_W - 17);
+    fourth.y = (float)(EXPANDED_H - 15);
+    Actions actions[MAX_PLAYERS] = {};
+    actions[3].fire = true;
+    actions[3].moveX = actions[3].moveY = 1;
+    float firstX = game.players[0].x;
+    updateGame(game, actions, DT);
+    CHECK(game.players[0].x == firstX && fourth.x == EXPANDED_W - 16 && fourth.y == EXPANDED_H - 14);
+    CHECK(game.bullets.size() == 1 && game.bullets[0].owner == 3);
+}
+
+static void expandedClassicScalesEveryWave() {
+    Game standard, expanded;
+    startGame(standard, 1, 7);
+    startGame(expanded, 4, 7, 1, false, CLASSIC_EXPANDED);
+    Actions actions[MAX_PLAYERS] = {};
+    for (int level = 1; level <= LEVEL_COUNT; level++) {
+        for (int wave = 1; wave <= 20; wave++) {
+            CHECK(standard.level == level && expanded.level == level && standard.wave == wave && expanded.wave == wave);
+            if (isBossWave(wave)) {
+                CHECK(expanded.aliens.empty() && expanded.bosses.size() == standard.bosses.size() + 1);
+                float lane = (float)EXPANDED_W / expanded.bosses.size();
+                for (size_t i = 0; i < expanded.bosses.size(); i++) {
+                    const Boss& boss = expanded.bosses[i];
+                    CHECK(boss.type == bossType(level, wave) && boss.hp == (bossHealth(level, wave) * 9 + 3) / 4);
+                    CHECK(boss.minX == i * lane && boss.maxX + 32 == (i + 1) * lane);
+                }
+            } else {
+                int standardCounts[4] = {}, expandedCounts[4] = {};
+                int standardHp[4] = {0, 0, 0, 12 + alienHpBonus(difficultyWave(level, wave))};
+                for (const Alien& a : standard.aliens) {
+                    standardCounts[a.type]++;
+                    standardHp[a.type] = a.maxHp;
+                }
+                for (const Alien& a : expanded.aliens) {
+                    expandedCounts[a.type]++;
+                    CHECK(a.slotX >= 40 && a.slotX + (a.type == ALIEN_HEAVY ? 16 : 12) + 40 <= EXPANDED_W);
+                    CHECK(a.hp == (standardHp[a.type] * 9 + 3) / 4 && a.hp == a.maxHp);
+                }
+                for (int type = ALIEN_GREEN; type <= ALIEN_RED; type++) CHECK(expandedCounts[type] == standardCounts[type] * 3 / 2);
+                CHECK(expandedCounts[ALIEN_HEAVY] == standardCounts[ALIEN_HEAVY] + (wave >= 11 ? 2 : 1));
+            }
+            for (Game* game : {&standard, &expanded}) {
+                for (Player& p : game->players) p.invincibleTimer = 1e9f;
+                for (Alien& alien : game->aliens) alien.alive = false;
+                for (Boss& boss : game->bosses) boss.alive = false;
+                updateGame(*game, actions, DT);
+                updateGame(*game, actions, 3.05f);
+            }
+        }
+    }
+    CHECK(standard.won && expanded.won && expanded.players.size() == 4 && expanded.variant == CLASSIC_EXPANDED);
+}
+
 int main() {
     spritesHaveTheirSize();
     settingsDefaultToMizrahit();
@@ -2013,7 +2082,8 @@ int main() {
     lateDifficultyAddsHpAndMovement();
     wavesUseRandomPatterns();
     tracedShapesFit();
-    killDropsFollowTheRoll();
+    killDropsFollowTheRoll(CLASSIC_STANDARD);
+    killDropsFollowTheRoll(CLASSIC_EXPANDED);
     upgradePickupRaisesLevelUpToFour();
     deathLosesOneWeaponLevel();
     everyFifthWaveIsABoss();
@@ -2101,6 +2171,8 @@ int main() {
     volcanoBuffFiresAQuarterFaster();
     bubbleShieldTakesAHitAndChains();
     classicKeepsBuffsIntoTheNextLevel();
+    classicVariantsCapThePartyAndReadPlayerFour();
+    expandedClassicScalesEveryWave();
     printf(failures ? "%d check(s) failed\n" : "all tests passed\n", failures);
     return failures ? 1 : 0;
 }

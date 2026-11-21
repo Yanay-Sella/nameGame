@@ -19,6 +19,7 @@ struct Actions {
     bool cycle;                  // Square pressed: arm the next held strong attack (level buffs)
     bool jump;                    // X pressed (NAME QUEST: jump and confirm; Start is not a confirm there)
     bool jumpHeld;                // X held: a full-height jump
+    bool selectHeld;              // Select held (NAME QUEST dev: held 2 s → TEST GROUNDS)
     bool item;                    // Triangle pressed (NAME QUEST: select the next item)
     bool connected;               // this player's controller is open
 };
@@ -39,6 +40,8 @@ enum Sound {
 
 // Level buffs: bit (level - 1) of Player::buffs (docs/features/level-buffs).
 const int BUFF_SPACE = 1, BUFF_JUNGLE = 2, BUFF_GLACIER = 4, BUFF_VOLCANO = 8, BUFF_SEA = 16, BUFF_ALL = 31;
+const int STANDARD_PLAYERS = 2, MAX_PLAYERS = 4, MAX_BOSSES = 3;
+enum ClassicVariant { CLASSIC_STANDARD, CLASSIC_EXPANDED };
 
 // One ship and its owner's run state; players are an array so co-op only adds entries (GDD D-007).
 struct Player {
@@ -116,7 +119,7 @@ enum HookState { HOOK_NONE, HOOK_DOWN, HOOK_WAIT, HOOK_HOLD, HOOK_REEL };
 struct Boss {
     BossType type;
     float x, y, vx;          // top-left of the sprite; vx is the signed sway speed
-    float minX, maxX;        // sway range: the full width alone, its own half as a twin
+    float minX, maxX;        // sway range within this boss's lane
     float attackTimer;       // s until the next attack
     float burstTimer;        // s until the next shot of a burst
     int hp, maxHp;
@@ -173,6 +176,10 @@ struct Game {
     std::vector<Star> stars;
     int wave;
     int level;   // 1 space, 2 jungle, 3 glacier, 4 volcano, 5 deep sea
+    ClassicVariant variant = CLASSIC_STANDARD;
+    int arenaWidth() const;
+    int arenaHeight() const;
+    int playerLimit() const { return variant == CLASSIC_EXPANDED ? MAX_PLAYERS : STANDARD_PLAYERS; }
     bool singleLevel;      // a level picker run: it ends on this level's clear instead of going on to the next
     float time;            // game time, s
     float swayOffset, swayDirection;
@@ -205,11 +212,11 @@ struct Game {
 
 const float GAME_OVER_INPUT_LOCK = 1.5f;   // s before X or Start can start a new run
 const int MAX_SCORE = 9999999;             // the score display and the saved high score stop here
-const int MAX_PLAYERS = 2;                 // player 2 drops in from a second controller (co-op)
 const int LEVEL_COUNT = 5;                 // level 1, jungle, glacier, volcano, deep sea; a classic run goes through them in order
 
-void startGame(Game& game, int playerCount, uint32_t seed, int level = 1, bool singleLevel = false);   // classic from level 1, or one picked level
-void joinGame(Game& game);   // adds the next player to a running game, arriving like a respawn
+void startGame(Game& game, int playerCount, uint32_t seed, int level = 1, bool singleLevel = false,
+               ClassicVariant variant = CLASSIC_STANDARD);
+bool joinGame(Game& game);   // adds the next player to a running game, arriving like a respawn
 void updateGame(Game& game, const Actions* actions, float dt);   // actions: one per player
 void drawGame(const Game& game);
 void updateBackground(Game& game, float dt);   // scrolls the starfield
@@ -228,6 +235,6 @@ int bossHealth(int level, int wave);       // HP of each boss, from the level's 
 int bossCount(int wave);            // 2 on waves 10 and 20, else 1
 BossType bossType(int level, int wave);    // the level's small boss on waves 5 and 10, its big boss from wave 15
 int difficultyWave(int level, int wave);   // the wave whose formation numbers a wave uses: n + 5 per level after the first
-int heavyCount(int level, int wave);       // roaming heavies on a formation wave: wave / the level's step, at most 3
+int heavyCount(int level, int wave, ClassicVariant variant = CLASSIC_STANDARD);
 const char* levelName(int level);          // banner and clear name: LEVEL 1, JUNGLE, GLACIER, VOLCANO, DEEP SEA
 const char* levelLabel(int level);         // HUD and end-screen label before the wave: WAVE, JUNGLE, GLACIER ...

@@ -65,7 +65,7 @@ const int BOSS_BURST_SHOTS = 3, BOSS_FAN_SHOTS = 5;
 const float BOSS_BURST_GAP = 0.15f;    // s
 const float BOSS_AIMED_SPEED = 90, BOSS_FAN_DOWN_SPEED = 70, BOSS_FAN_SIDEWAYS = 60;   // px/s
 const int BIG_BOSS_WAVE = 15;          // waves 15 and 20 bring each level's big boss
-const float TWIN_FIRST_ATTACK = 1.5f;      // x the interval: the second twin's first attack
+const float BOSS_FIRST_ATTACK_STEP = 0.5f;  // x the interval between each boss's first attack
 const float MAGE_BURST_CHANCE = 0.35f, MAGE_FAN_CHANCE = 0.35f;   // the rest is a power ball
 const float MAGE_GAP_MIN = 0.6f, MAGE_GAP_MAX = 1.4f;             // x the attack interval
 const int WAND_TIP_X = 30, WAND_TIP_Y = 8;    // px in the mage sprite: the wand's star, where the power ball appears
@@ -94,6 +94,13 @@ const int EXTRA_LIFE_EVERY = 50000;
 const float SHIP_EXPLOSION_RADIUS = 24;   // px
 // Co-op (co-op/design.md)
 const float CO_OP_SPAWN_OFFSET = 40;     // px right of the centre for player 2
+// Expanded Classic (co-op/design.md)
+const int EXPANDED_COLUMNS = 12;
+const int SECOND_EXTRA_HEAVY_WAVE = 11;
+const float EXPANDED_SPAWN_SPACING = 60;  // px
+const float EXPANDED_UPGRADE_CHANCE = 0.02f;
+const float EXPANDED_HP_SCALE[MAX_PLAYERS] = {1.5f, 1.75f, 2.0f, 2.25f};
+const char PLAYER_COLORS[MAX_PLAYERS] = {'w', 'Y', 'c', 'p'};
 // Level 1 (level-1/design.md)
 const int LEVEL_LAST_WAVE = 20;        // the level boss's wave; killing it ends the run
 const float LEVEL_BANNER_TIME = 2;     // s of "LEVEL 1" before "WAVE 1"
@@ -167,17 +174,17 @@ const float EMBER_RISE_SPEED = 20;     // px/s
 const float SEA_CURRENT = 18, CURRENT_RATE = 0.45f;      // px/s, rad/s: 18 sin(0.45 t) sideways
 const int STREAM_BUBBLES = 5;
 const float STREAM_GAP = 0.12f, BUBBLE_SPEED = 70, BUBBLE_WOBBLE = 25;   // s, px/s, px/s
-const float BIG_BUBBLE_SPEED = 45, BIG_BUBBLE_POP_TIME = 1.4f, BIG_BUBBLE_POP_Y = 150, POP_SPEED = 60;   // px/s, s, px, px/s
+const float BIG_BUBBLE_SPEED = 45, BIG_BUBBLE_POP_TIME = 1.4f, BIG_BUBBLE_POP_MARGIN = 30, POP_SPEED = 60;   // px/s, s, px, px/s
 const int POP_BUBBLES = 8, BUBBLE_FAN = 7;
 const float BUBBLE_FAN_DOWN_SPEED = 65, BUBBLE_FAN_SIDEWAYS = 70;       // px/s
 const float FISHER_STREAM_CHANCE = 0.3f, FISHER_BIG_CHANCE = 0.15f, FISHER_FAN_CHANCE = 0.15f, FISHER_FISH_CHANCE = 0.2f;   // the rest casts the hook
 const int ROD_TIP_X = 31, ROD_TIP_Y = 0;   // px in the fisherman sprite
 const int BUCKET_X = 16, BUCKET_Y = 17;    // px in the fisherman sprite: live fish are thrown from here
-const int FISH_PER_THROW = 2, MAX_FISH = 3;   // live fish out: landed plus in flight
+const int FISH_PER_THROW = 2, MAX_FISH = 3, EXPANDED_MAX_FISH = 5;   // live fish out: landed plus in flight
 const float FISH_SPEED = 35, FISH_LIFE = 6, FISH_BLINK = 1, FISH_THROW_GAP = 0.2f;   // px/s, s, s, s
 const int FISH_W = 9, FISH_H = 6, FISH_SCORE = 200;
 const float TRAIL_GAP = 0.05f, TRAIL_RISE = 15, TRAIL_LIFE = 0.6f;   // s between bubbles, px/s, s
-const float HOOK_DOWN_SPEED = 110, HOOK_REEL_SPEED = 160, HOOK_WAIT_TIME = 0.3f, HOOK_BOTTOM = SCREEN_H - 16;   // px/s, s, px
+const float HOOK_DOWN_SPEED = 110, HOOK_REEL_SPEED = 160, HOOK_WAIT_TIME = 0.3f, HOOK_BOTTOM_MARGIN = 16;   // px/s, s, px
 const float HOOK_LIFT = 24, HOOK_LIFT_SPEED = 60, HOOK_STUN = 1.6f;   // px, px/s, s
 const float BOOT_CHANCE = 0.35f, BOOT_SPEED = 85, GOT_ONE_TIME = 1, BOOT_TEXT_TIME = 0.8f;   // per empty cast, px/s, s, s
 const int SEA_BUBBLES = 16;
@@ -288,9 +295,12 @@ int difficultyWave(int level, int wave) {
     return wave + LEVEL_WAVE_STEP * (level - 1);
 }
 
-int heavyCount(int level, int wave) {
+int heavyCount(int level, int wave, ClassicVariant variant) {
+    if (isBossWave(wave)) return 0;
     int every = HEAVY_EVERY[level - 1];
-    return every > 0 && !isBossWave(wave) ? std::min(wave / every, MAX_HEAVIES) : 0;
+    int count = every > 0 ? std::min(wave / every, MAX_HEAVIES) : 0;
+    if (variant == CLASSIC_EXPANDED) count += wave >= SECOND_EXTRA_HEAVY_WAVE ? 2 : 1;
+    return count;
 }
 
 const char* levelName(int level) {
@@ -305,32 +315,43 @@ static float bossAttackInterval(int level, int wave) {
     return LEVEL_BOSS_INTERVAL[level - 1][wave / 5 - 1];
 }
 
+int Game::arenaWidth() const { return variant == CLASSIC_EXPANDED ? EXPANDED_W : SCREEN_W; }
+int Game::arenaHeight() const { return variant == CLASSIC_EXPANDED ? EXPANDED_H : SCREEN_H; }
+
 static void startWave(Game& game, int wave) {
     game.wave = wave;
     game.aliens.clear();
-    auto scaleHp = [&](int hp) { return game.players.size() == 2 ? (hp * 3 + 1) / 2 : hp; };   // co-op: enemies have 1.5x HP, rounded up
+    bool expanded = game.variant == CLASSIC_EXPANDED;
+    int arenaW = game.arenaWidth(), extraHeight = game.arenaHeight() - SCREEN_H;
+    int playerCount = (int)game.players.size();
+    auto scaleHp = [&](int hp) {
+        if (expanded) return (int)ceilf(hp * EXPANDED_HP_SCALE[playerCount - 1]);
+        return playerCount == 2 ? (hp * 3 + 1) / 2 : hp;
+    };
     int dw = difficultyWave(game.level, wave);
     int rows = formationRows(dw);
+    int columns = expanded ? EXPANDED_COLUMNS : FORMATION_COLUMNS;
     game.bosses.clear();
     if (isBossWave(wave)) {
-        int count = bossCount(wave);
+        int count = bossCount(wave) + (expanded ? 1 : 0);
+        float laneWidth = (float)arenaW / count;
         float speed = LEVEL_BOSS_SPEED[game.level - 1][wave / 5 - 1];
         for (int i = 0; i < count; i++) {
             Boss boss = {};
             boss.type = bossType(game.level, wave);
-            boss.minX = count == 1 ? 0 : i * SCREEN_W / 2.0f;
-            boss.maxX = count == 1 ? SCREEN_W - BOSS_W : boss.minX + SCREEN_W / 2.0f - BOSS_W;
+            boss.minX = i * laneWidth;
+            boss.maxX = (i + 1) * laneWidth - BOSS_W;
             boss.x = (boss.minX + boss.maxX) / 2;
             boss.y = -BOSS_H;
-            boss.vx = count == 2 && i == 0 ? -speed : speed;   // twins move apart first
+            boss.vx = count > 1 && i == 0 ? -speed : speed;
             boss.hp = boss.maxHp = scaleHp(bossHealth(game.level, wave));
-            boss.attackTimer = bossAttackInterval(game.level, wave) * (i == 0 ? 1 : TWIN_FIRST_ATTACK);
+            boss.attackTimer = bossAttackInterval(game.level, wave) * (1 + i * BOSS_FIRST_ATTACK_STEP);
             boss.alive = true;
             game.bosses.push_back(boss);
         }
         rows = 0;
     }
-    std::vector<Slot> tracedSlots;   // the slots of a traced shape, rows of 8
+    std::vector<Slot> tracedSlots;
     if (rows > 0) {
         static const char* const WORDS[] = {"GO", "ZAP", "PEW", "WIN", "UFO", "NAME", "GAME", "BOOM", "FIRE"};
         game.formationShape = SHAPE_BLOCK;
@@ -343,37 +364,39 @@ static void startWave(Game& game, int wave) {
             } else if (shape == SHAPE_WORD) {
                 word = WORDS[(int)(randomUnit(game) * (sizeof(WORDS) / sizeof(WORDS[0])))];
             }
-            if (shape < SHAPE_FIRST_TRACED || traceFormation(shape, word, rows * FORMATION_COLUMNS, tracedSlots)) {
+            if (shape < SHAPE_FIRST_TRACED ||
+                traceFormation(shape, word, rows * columns, tracedSlots, columns, arenaW - SCREEN_W, extraHeight / 2.0f)) {
                 game.formationShape = shape;
                 break;
             }
         }
         game.entryStyle = (int)(randomUnit(game) * ENTRY_COUNT);
     }
-    float left = (SCREEN_W - (FORMATION_COLUMNS - 1) * COLUMN_SPACING - ALIEN_WIDTH[ALIEN_GREEN]) / 2;
+    float halfColumns = (columns - 1) / 2.0f;
+    float left = (arenaW - (columns - 1) * COLUMN_SPACING - ALIEN_WIDTH[ALIEN_GREEN]) / 2;
     for (int row = 0; row < rows; row++) {
         // Tougher aliens take the top rows: red from wave 7, blue from wave 4, two of each from wave 13.
         int redRows = dw >= MORE_ARMOUR_WAVE ? 2 : dw >= 7 ? 1 : 0;
         int blueEnd = dw >= MORE_ARMOUR_WAVE ? 4 : dw >= 4 ? 2 : 0;   // rows above this that aren't red are blue
         AlienType type = row < redRows ? ALIEN_RED : row < blueEnd ? ALIEN_BLUE : ALIEN_GREEN;
-        for (int col = 0; col < FORMATION_COLUMNS; col++) {
+        for (int col = 0; col < columns; col++) {
             Alien alien = {};
             alien.type = type;
             alien.state = ALIEN_ENTERING;
-            float fromCentre = col - (FORMATION_COLUMNS - 1) / 2.0f;   // -3.5..3.5
+            float fromCentre = col - halfColumns;
             alien.slotX = left + col * COLUMN_SPACING;
             alien.slotY = FORMATION_TOP + row * ROW_SPACING;
-            switch (game.formationShape) {   // every shape keeps the aliens above y 100, sway and bob included
+            switch (game.formationShape) {
                 case SHAPE_STAGGER: alien.slotX += row % 2 ? STAGGER_X : -STAGGER_X; break;
                 case SHAPE_V: alien.slotY += (fabsf(fromCentre) - 0.5f) * SHAPE_STEP_Y; break;
-                case SHAPE_ARROW: alien.slotY += (3.5f - fabsf(fromCentre)) * SHAPE_STEP_Y; break;
+                case SHAPE_ARROW: alien.slotY += (halfColumns - fabsf(fromCentre)) * SHAPE_STEP_Y; break;
                 case SHAPE_WAVE: alien.slotY += 4 + 4 * sinf(col * 1.3f); break;
                 case SHAPE_SPLIT: alien.slotX += fromCentre < 0 ? -SPLIT_GAP : SPLIT_GAP; break;
             }
             if (game.formationShape >= SHAPE_FIRST_TRACED) {
-                alien.slotX = tracedSlots[row * FORMATION_COLUMNS + col].x;
-                alien.slotY = tracedSlots[row * FORMATION_COLUMNS + col].y;
-                fromCentre = (alien.slotX + ALIEN_WIDTH[type] / 2.0f - SCREEN_W / 2.0f) / COLUMN_SPACING;
+                alien.slotX = tracedSlots[row * columns + col].x;
+                alien.slotY = tracedSlots[row * columns + col].y;
+                fromCentre = (alien.slotX + ALIEN_WIDTH[type] / 2.0f - arenaW / 2.0f) / COLUMN_SPACING;
             }
             alien.x = alien.slotX + game.swayOffset;
             alien.y = alien.slotY - ENTRY_DISTANCE;
@@ -382,9 +405,9 @@ static void startWave(Game& game, int wave) {
             if (game.entryStyle == ENTRY_SCATTER) {
                 alien.entryDelay = randomUnit(game) * SCATTER_DELAY;
             } else if (game.entryStyle != ENTRY_TOP) {   // a stream from the side, the far slots first
-                int order = game.entryStyle == ENTRY_PINCER ? row * FORMATION_COLUMNS / 2 + (int)fabsf(fromCentre)
-                                                            : row * FORMATION_COLUMNS + (fromLeft ? FORMATION_COLUMNS - 1 - col : col);
-                alien.x = fromLeft ? -ALIEN_WIDTH[type] : SCREEN_W;
+                int order = game.entryStyle == ENTRY_PINCER ? row * columns / 2 + (int)fabsf(fromCentre)
+                                                            : row * columns + (fromLeft ? columns - 1 - col : col);
+                alien.x = fromLeft ? -ALIEN_WIDTH[type] : arenaW;
                 alien.y = SIDE_ENTRY_Y;
                 alien.entryDelay = order * STREAM_DELAY;
             }
@@ -395,15 +418,16 @@ static void startWave(Game& game, int wave) {
             game.aliens.push_back(alien);
         }
     }
-    for (int i = 0; i < heavyCount(game.level, wave); i++) {   // roaming heavies (jungle rule, later levels too)
+    int heavies = heavyCount(game.level, wave, game.variant);
+    for (int i = 0; i < heavies; i++) {
         Alien heavy = {};
         heavy.type = ALIEN_HEAVY;
         heavy.state = ALIEN_ENTERING;
-        heavy.slotX = HEAVY_SLOT_X[i];
-        heavy.slotY = 70;
+        heavy.slotX = expanded ? (i + 1) * arenaW / (heavies + 1.0f) - ALIEN_WIDTH[ALIEN_HEAVY] / 2.0f : HEAVY_SLOT_X[i];
+        heavy.slotY = expanded ? HEAVY_MAX_Y + extraHeight / 2.0f : 70;
         heavy.x = heavy.slotX + game.swayOffset;
         heavy.y = heavy.slotY - ENTRY_DISTANCE;
-        heavy.vx = i == 1 ? -HEAVY_SPEED_X : HEAVY_SPEED_X;
+        heavy.vx = (expanded ? i % 2 != 0 : i == 1) ? -HEAVY_SPEED_X : HEAVY_SPEED_X;
         heavy.vy = HEAVY_SPEED_Y;
         heavy.entryDelay = 0.6f + 0.4f * i;
         heavy.hp = heavy.maxHp = scaleHp(ALIEN_HP[ALIEN_HEAVY] + alienHpBonus(dw));
@@ -416,15 +440,16 @@ static void startWave(Game& game, int wave) {
     game.soundRequested[SOUND_WAVE_START] = true;
 }
 
-// Player 1 starts at the bottom centre, player 2 to its right.
-static void placeShipAtStart(Player& player, int index) {
-    player.x = (SCREEN_W - SHIP_W) / 2.0f + index * CO_OP_SPAWN_OFFSET;
-    player.y = SCREEN_H - SHIP_H - 6;
+static void placeShipAtStart(const Game& game, Player& player, int index) {
+    float offset = game.variant == CLASSIC_EXPANDED ? (index - (game.players.size() - 1) / 2.0f) * EXPANDED_SPAWN_SPACING
+                                                    : index * CO_OP_SPAWN_OFFSET;
+    player.x = (game.arenaWidth() - SHIP_W) / 2.0f + offset;
+    player.y = game.arenaHeight() - SHIP_H - 6;
 }
 
-static Player newPlayer(int index) {
+static Player newPlayer(const Game& game, int index) {
     Player player = {};
-    placeShipAtStart(player, index);
+    placeShipAtStart(game, player, index);
     player.alive = true;
     player.rocketPressedAt = -1;
     player.lives = START_LIVES;
@@ -434,26 +459,32 @@ static Player newPlayer(int index) {
     return player;
 }
 
-void startGame(Game& game, int playerCount, uint32_t seed, int level, bool singleLevel) {
+void startGame(Game& game, int playerCount, uint32_t seed, int level, bool singleLevel, ClassicVariant variant) {
     game = Game();
     game.level = level;
     game.singleLevel = singleLevel;
+    game.variant = singleLevel ? CLASSIC_STANDARD : variant;
     game.random = seed ? seed : 1;
     game.swayDirection = 1;
-    for (int i = 0; i < playerCount; i++) game.players.push_back(newPlayer(i));
+    playerCount = std::max(1, std::min(playerCount, game.playerLimit()));
+    game.players.resize(playerCount);
+    for (int i = 0; i < playerCount; i++) game.players[i] = newPlayer(game, i);
     for (int layer = 0; layer < 3; layer++)
         for (int i = 0; i < STAR_COUNTS[layer]; i++) {
-            Star star = {randomUnit(game) * SCREEN_W, randomUnit(game) * SCREEN_H, layer};
+            Star star = {randomUnit(game) * game.arenaWidth(), randomUnit(game) * game.arenaHeight(), layer};
             game.stars.push_back(star);
         }
     startWave(game, 1);
 }
 
-void joinGame(Game& game) {
-    Player player = newPlayer((int)game.players.size());
-    player.invincibleTimer = INVINCIBLE_TIME;
-    game.players.push_back(player);
+bool joinGame(Game& game) {
+    int index = (int)game.players.size();
+    if (index >= game.playerLimit() || game.over || game.levelClear) return false;
+    game.players.emplace_back();
+    game.players.back() = newPlayer(game, index);
+    game.players.back().invincibleTimer = INVINCIBLE_TIME;
     game.soundRequested[SOUND_EXTRA_LIFE] = true;
+    return true;
 }
 
 // One event's feel: trauma adds (capped), the longest hit-stop wins, a screen flash is dropped inside the rate limit.
@@ -527,8 +558,9 @@ static void damageAlien(Game& game, Alien& alien, int damage, int owner) {
     if (owner >= 0) addScore(game, game.players[owner], ALIEN_SCORE[alien.type]);
     float cx = alien.x + ALIEN_WIDTH[alien.type] / 2.0f, cy = alien.y + ALIEN_HEIGHT[alien.type] / 2.0f;
     spawnParticles(game, cx, cy, 8, paletteColor(ALIEN_COLORS[game.level - 1][alien.type]), 50);
-    float roll = randomUnit(game);   // below 2 %: rocket pickup, below 3 %: upgrade pickup
-    if (roll < PICKUP_CHANCE + UPGRADE_CHANCE) {
+    float roll = randomUnit(game);
+    float upgradeChance = game.variant == CLASSIC_EXPANDED ? EXPANDED_UPGRADE_CHANCE : UPGRADE_CHANCE;
+    if (roll < PICKUP_CHANCE + upgradeChance) {
         Pickup pickup = {cx - 4, cy - 4, roll < PICKUP_CHANCE ? PICKUP_ROCKET : PICKUP_UPGRADE, 0};
         game.pickups.push_back(pickup);
     }
@@ -648,7 +680,7 @@ static void updatePlayer(Game& game, Player& player, int index, const Actions& a
     if (!player.alive) {
         player.respawnTimer -= dt;
         if (player.respawnTimer <= 0 && player.lives > 0) {
-            placeShipAtStart(player, index);
+            placeShipAtStart(game, player, index);
             player.alive = true;
             player.invincibleTimer = INVINCIBLE_TIME;
             player.fireTimer = 0;
@@ -723,8 +755,8 @@ static void updatePlayer(Game& game, Player& player, int index, const Actions& a
             game.soundRequested[SOUND_STUN] = true;
         }
     }
-    player.x = std::max(0.0f, std::min(player.x + vx * dt, (float)(SCREEN_W - SHIP_W)));
-    player.y = std::max(MOVE_ZONE_TOP, std::min(player.y + vy * dt, (float)(SCREEN_H - SHIP_H)));
+    player.x = std::max(0.0f, std::min(player.x + vx * dt, (float)(game.arenaWidth() - SHIP_W)));
+    player.y = std::max(MOVE_ZONE_TOP, std::min(player.y + vy * dt, (float)(game.arenaHeight() - SHIP_H)));
     if (game.level == 5 && a.moveX * a.moveX + a.moveY * a.moveY > 0.04f) {   // the deep sea: a moving ship leaves bubbles
         player.trailTimer -= dt;
         if (player.trailTimer <= 0) {
@@ -841,24 +873,27 @@ static void updateAlien(Game& game, Alien& alien, float dt) {
             alien.vx = std::max(-DIVE_MAX_SIDEWAYS, std::min(alien.vx, DIVE_MAX_SIDEWAYS));
             alien.x += alien.vx * dt;
             alien.y += DIVE_SPEED * dt;
-            if (alien.y > SCREEN_H) {   // out the bottom, back in from the top
+            if (alien.y > game.arenaHeight()) {   // out the bottom, back in from the top
                 alien.y = -ALIEN_HEIGHT[alien.type];
                 alien.state = ALIEN_RETURNING;
             }
             break;
         }
-        case ALIEN_ROAMING:   // the heavy beetle bounces around its box
+        case ALIEN_ROAMING: {
+            float right = (float)(game.arenaWidth() - ALIEN_WIDTH[ALIEN_HEAVY]);
+            float bottom = HEAVY_MAX_Y + (game.arenaHeight() - SCREEN_H) / 2.0f;
             alien.x += alien.vx * dt;
             alien.y += alien.vy * dt;
-            if (alien.x < 0 || alien.x > SCREEN_W - ALIEN_WIDTH[ALIEN_HEAVY]) {
-                alien.x = std::max(0.0f, std::min(alien.x, (float)(SCREEN_W - ALIEN_WIDTH[ALIEN_HEAVY])));
+            if (alien.x < 0 || alien.x > right) {
+                alien.x = std::max(0.0f, std::min(alien.x, right));
                 alien.vx = -alien.vx;
             }
-            if (alien.y < HEAVY_MIN_Y || alien.y > HEAVY_MAX_Y) {
-                alien.y = std::max(HEAVY_MIN_Y, std::min(alien.y, HEAVY_MAX_Y));
+            if (alien.y < HEAVY_MIN_Y || alien.y > bottom) {
+                alien.y = std::max(HEAVY_MIN_Y, std::min(alien.y, bottom));
                 alien.vy = -alien.vy;
             }
             break;
+        }
     }
     bool canShoot = alien.state == ALIEN_IN_FORMATION || alien.state == ALIEN_DIVING || alien.state == ALIEN_ROAMING;
     float chance = shotChance(dw) * (alien.type == ALIEN_HEAVY ? HEAVY_SHOT_FACTOR : 1);
@@ -889,10 +924,11 @@ static void throwFan(Game& game, ThrownKind kind, float x, float y, int count, f
 static void updateHook(Game& game, Boss& boss, const Player* target, float dt) {
     float rodX = boss.x + ROD_TIP_X, rodY = boss.y + ROD_TIP_Y;
     if (boss.hookState == HOOK_DOWN || boss.hookState == HOOK_WAIT) {
+        float hookBottom = game.arenaHeight() - HOOK_BOTTOM_MARGIN;
         if (boss.hookState == HOOK_DOWN) {
             boss.hookY += HOOK_DOWN_SPEED * dt;
-            if (boss.hookY >= HOOK_BOTTOM) {
-                boss.hookY = HOOK_BOTTOM;
+            if (boss.hookY >= hookBottom) {
+                boss.hookY = hookBottom;
                 boss.hookState = HOOK_WAIT;
                 boss.hookTimer = HOOK_WAIT_TIME;
             }
@@ -938,6 +974,8 @@ static void updateHook(Game& game, Boss& boss, const Player* target, float dt) {
 
 // Flies in, sways in its range and attacks; holds new attacks with no living ship.
 static void updateBoss(Game& game, Boss& boss, float dt) {
+    int arenaW = game.arenaWidth(), arenaH = game.arenaHeight();
+    int fishLimit = game.variant == CLASSIC_EXPANDED ? EXPANDED_MAX_FISH : MAX_FISH;
     boss.flash = std::max(0.0f, boss.flash - dt);
     if (boss.hp * 2 < boss.maxHp && randomUnit(game) < BOSS_SMOKE_RATE * dt) {   // a wounded boss throws sparks off its body
         game.particles.push_back({boss.x + randomUnit(game) * BOSS_W, boss.y + randomUnit(game) * BOSS_H, (randomUnit(game) - 0.5f) * 20,
@@ -966,12 +1004,12 @@ static void updateBoss(Game& game, Boss& boss, float dt) {
     } else {
         float before = boss.beamTimer;
         boss.beamTimer = std::max(0.0f, boss.beamTimer - dt);
-        if (before > 0 && boss.beamTimer == 0 && boss.type != BOSS_FIRELORD) spawnBeamShards(game, boss.ballX, boss.ballY, SCREEN_H, BEAM_W, paletteColor('m'));
+        if (before > 0 && boss.beamTimer == 0 && boss.type != BOSS_FIRELORD) spawnBeamShards(game, boss.ballX, boss.ballY, arenaH, BEAM_W, paletteColor('m'));
     }
     if (boss.beamTimer > 0) {   // a firing beam or eruption rumbles; the mage's throws sparks
         game.trauma = std::max(game.trauma, BEAM_RUMBLE);
         if (boss.type != BOSS_FIRELORD)
-            beamSpark(game, boss.ballX, boss.ballY, boss.ballY + beamReach(BEAM_TIME - boss.beamTimer) * (SCREEN_H - boss.ballY), BEAM_W, paletteColor('m'), dt);
+            beamSpark(game, boss.ballX, boss.ballY, boss.ballY + beamReach(BEAM_TIME - boss.beamTimer) * (arenaH - boss.ballY), BEAM_W, paletteColor('m'), dt);
     }
 
     const Player* target = NULL;
@@ -982,7 +1020,7 @@ static void updateBoss(Game& game, Boss& boss, float dt) {
         boss.windupTimer -= dt;
         if (boss.windupTimer <= 0 && boss.type == BOSS_GORILLA) {   // the pound shakes coconuts loose: one in each fifth
             boss.windupTimer = 0;
-            float lane = (SCREEN_W - THROWN_SIZE) / (float)COCONUTS;
+            float lane = (arenaW - THROWN_SIZE) / (float)COCONUTS;
             for (int i = 0; i < COCONUTS; i++)
                 game.thrown.push_back({(i + randomUnit(game)) * lane, (float)-THROWN_SIZE, 0, COCONUT_SPEED, THROWN_COCONUT, 0, 0});
             feedback(game, TRAUMA_POUND, 0, 0);
@@ -1046,7 +1084,7 @@ static void updateBoss(Game& game, Boss& boss, float dt) {
             attack = roll < FISHER_STREAM_CHANCE ? 0 : roll < FISHER_STREAM_CHANCE + FISHER_BIG_CHANCE ? 12
                    : roll < FISHER_STREAM_CHANCE + FISHER_BIG_CHANCE + FISHER_FAN_CHANCE ? 1
                    : roll < FISHER_STREAM_CHANCE + FISHER_BIG_CHANCE + FISHER_FAN_CHANCE + FISHER_FISH_CHANCE ? 14 : 13;
-            if ((attack == 13 && boss.hookState != HOOK_NONE) || (attack == 14 && fishOut >= MAX_FISH)) attack = 0;
+            if ((attack == 13 && boss.hookState != HOOK_NONE) || (attack == 14 && fishOut >= fishLimit)) attack = 0;
         }
         if (big) boss.attackTimer *= MAGE_GAP_MIN + (MAGE_GAP_MAX - MAGE_GAP_MIN) * randomUnit(game);
 
@@ -1054,8 +1092,8 @@ static void updateBoss(Game& game, Boss& boss, float dt) {
             boss.burstShotsLeft = sea ? STREAM_BUBBLES : BOSS_BURST_SHOTS;
             boss.burstTimer = 0;
             if (jungle) {   // the banana throw also lobs a peel into the ship zone
-                float toX = 8 + randomUnit(game) * (SCREEN_W - 16);
-                float toY = MOVE_ZONE_TOP + 7 + randomUnit(game) * (SCREEN_H - MOVE_ZONE_TOP - 14);
+                float toX = 8 + randomUnit(game) * (arenaW - 16);
+                float toY = MOVE_ZONE_TOP + 7 + randomUnit(game) * (arenaH - MOVE_ZONE_TOP - 14);
                 game.lobs.push_back({centreX, bottomY, toX, toY, -PEEL_DELAY, false, false});
                 game.soundRequested[boss.type == BOSS_MONKEY ? SOUND_SCREECH : SOUND_BANANA_THROW] = true;
             }
@@ -1085,8 +1123,8 @@ static void updateBoss(Game& game, Boss& boss, float dt) {
             boss.ballY = boss.y + WAND_TIP_Y;
             boss.ballTimer = BALL_CHARGE_TIME;
         } else if (attack == 3) {   // poop lobbed at the nearest ship
-            float toX = std::max(8.0f, std::min(targetX, SCREEN_W - 8.0f));
-            float toY = std::max(MOVE_ZONE_TOP + 7, std::min(targetY, SCREEN_H - 7.0f));
+            float toX = std::max(8.0f, std::min(targetX, arenaW - 8.0f));
+            float toY = std::max(MOVE_ZONE_TOP + 7, std::min(targetY, arenaH - 7.0f));
             game.lobs.push_back({centreX, bottomY, toX, toY, 0, true, false});
             game.soundRequested[SOUND_BANANA_THROW] = true;
         } else if (attack == 4) {
@@ -1095,8 +1133,8 @@ static void updateBoss(Game& game, Boss& boss, float dt) {
         } else if (attack == 5 || attack == 7) {   // ice blocks: one at the nearest ship, the golem adds one anywhere
             throwAt(game, THROWN_ICE_BLOCK, centreX, bottomY, targetX, targetY, ICE_BLOCK_SPEED);
             if (attack == 7) {
-                float toX = 8 + randomUnit(game) * (SCREEN_W - 16);
-                float toY = MOVE_ZONE_TOP + 7 + randomUnit(game) * (SCREEN_H - MOVE_ZONE_TOP - 14);
+                float toX = 8 + randomUnit(game) * (arenaW - 16);
+                float toY = MOVE_ZONE_TOP + 7 + randomUnit(game) * (arenaH - MOVE_ZONE_TOP - 14);
                 throwAt(game, THROWN_ICE_BLOCK, centreX, bottomY, toX, toY, ICE_BLOCK_SPEED);
             }
             game.soundRequested[SOUND_CRACK] = true;
@@ -1105,7 +1143,7 @@ static void updateBoss(Game& game, Boss& boss, float dt) {
             boss.say = "AH...";
             boss.sayTimer = SNEEZE_WINDUP;
         } else if (attack == 8) {   // icicles hang shaking at the top, one in each sixth of the screen, then fall
-            float lane = (SCREEN_W - THROWN_W[THROWN_ICICLE]) / (float)ICICLES;
+            float lane = (arenaW - THROWN_W[THROWN_ICICLE]) / (float)ICICLES;
             for (int i = 0; i < ICICLES; i++)
                 game.thrown.push_back({(i + randomUnit(game)) * lane, 0, 0, ICICLE_SPEED, THROWN_ICICLE, ICICLE_HANG, 0});
             game.soundRequested[SOUND_CRACK] = true;
@@ -1113,27 +1151,27 @@ static void updateBoss(Game& game, Boss& boss, float dt) {
             game.thrown.push_back({centreX - THROWN_W[THROWN_BIG_LAVA] / 2.0f, bottomY, 0, LAVA_DROP_SPEED, THROWN_BIG_LAVA, 0, 0});
             game.soundRequested[SOUND_BANANA_THROW] = true;
         } else if (attack == 10) {   // lava rain: one drop in each fifth of the screen
-            float lane = (SCREEN_W - THROWN_W[THROWN_LAVA_DROP]) / (float)LAVA_RAIN_DROPS;
+            float lane = (arenaW - THROWN_W[THROWN_LAVA_DROP]) / (float)LAVA_RAIN_DROPS;
             for (int i = 0; i < LAVA_RAIN_DROPS; i++)
                 game.thrown.push_back({(i + randomUnit(game)) * lane, (float)-THROWN_H[THROWN_LAVA_DROP], 0, LAVA_RAIN_SPEED,
                                        THROWN_LAVA_DROP, 0, 0});
         } else if (attack == 11) {   // eruption under the nearest ship
-            boss.ballX = std::max(ERUPTION_W / 2.0f, std::min(targetX, SCREEN_W - ERUPTION_W / 2.0f));
-            boss.ballY = SCREEN_H;
+            boss.ballX = std::max(ERUPTION_W / 2.0f, std::min(targetX, arenaW - ERUPTION_W / 2.0f));
+            boss.ballY = arenaH;
             boss.ballTimer = ERUPTION_WARN;
         } else if (attack == 12) {
             throwAt(game, THROWN_BIG_BUBBLE, centreX, bottomY, targetX, targetY, BIG_BUBBLE_SPEED);
             game.soundRequested[SOUND_BUBBLE] = true;
         } else if (attack == 14) {   // live fish lobbed from the bucket to random points of the ship zone
-            for (int i = 0; i < std::min(FISH_PER_THROW, MAX_FISH - fishOut); i++) {
-                float toX = 8 + randomUnit(game) * (SCREEN_W - 16);
-                float toY = MOVE_ZONE_TOP + 7 + randomUnit(game) * (SCREEN_H - MOVE_ZONE_TOP - 14);
+            for (int i = 0; i < std::min(FISH_PER_THROW, fishLimit - fishOut); i++) {
+                float toX = 8 + randomUnit(game) * (arenaW - 16);
+                float toY = MOVE_ZONE_TOP + 7 + randomUnit(game) * (arenaH - MOVE_ZONE_TOP - 14);
                 game.lobs.push_back({boss.x + BUCKET_X, boss.y + BUCKET_Y, toX, toY, -FISH_THROW_GAP * i, false, true});
             }
             game.soundRequested[SOUND_BANANA_THROW] = true;
         } else {   // 13: the hook drops at the nearest ship's x
             boss.hookState = HOOK_DOWN;
-            boss.hookX = std::max(4.0f, std::min(targetX, SCREEN_W - 4.0f));
+            boss.hookX = std::max(4.0f, std::min(targetX, arenaW - 4.0f));
             boss.hookY = boss.y + ROD_TIP_Y;
             boss.hookCaught = false;
             game.soundRequested[SOUND_CAST] = true;
@@ -1163,7 +1201,8 @@ static void startDive(Game& game) {
         if (alien.alive && alien.state == ALIEN_DIVING) divers++;
         if (alien.alive && alien.state == ALIEN_IN_FORMATION) candidates.push_back(&alien);
     }
-    if (divers >= maxDivers(difficultyWave(game.level, game.wave)) || candidates.empty()) return;
+    int limit = maxDivers(difficultyWave(game.level, game.wave)) + (game.variant == CLASSIC_EXPANDED ? 1 : 0);
+    if (divers >= limit || candidates.empty()) return;
     Alien* diver = candidates[(size_t)(randomUnit(game) * candidates.size())];
     diver->state = ALIEN_DIVING;
     diver->vx = 0;
@@ -1178,17 +1217,19 @@ static void spawnShieldBubbles(Game& game, float x, float y, int size, int owner
 }
 
 void updateBackground(Game& game, float dt) {
+    int arenaW = game.arenaWidth(), arenaH = game.arenaHeight();
     game.sceneryTime += dt;
     for (Star& star : game.stars) {
         star.y += STAR_SPEEDS[star.layer] * dt;
-        if (star.y >= SCREEN_H) {
-            star.y -= SCREEN_H;
-            star.x = randomUnit(game) * SCREEN_W;
+        if (star.y >= arenaH) {
+            star.y -= arenaH;
+            star.x = randomUnit(game) * arenaW;
         }
     }
 }
 
 void updateGame(Game& game, const Actions* actions, float dt) {
+    int arenaW = game.arenaWidth(), arenaH = game.arenaHeight();
     game.feelTime += dt;
     game.trauma = std::max(0.0f, game.trauma - TRAUMA_DECAY * dt);
     game.flashTimer = std::max(0.0f, game.flashTimer - dt);
@@ -1388,8 +1429,8 @@ void updateGame(Game& game, const Actions* actions, float dt) {
     }
     for (size_t i = 0; i < game.thrown.size(); i++) {   // a big bubble pops into a ring of small ones (by index: this adds)
         Thrown big = game.thrown[i];
-        if (big.kind != THROWN_BIG_BUBBLE || (big.age < BIG_BUBBLE_POP_TIME && big.y < BIG_BUBBLE_POP_Y)) continue;
-        game.thrown[i].y = SCREEN_H + 100;   // popped; removed below
+        if (big.kind != THROWN_BIG_BUBBLE || (big.age < BIG_BUBBLE_POP_TIME && big.y < arenaH - BIG_BUBBLE_POP_MARGIN)) continue;
+        game.thrown[i].y = arenaH + 100;   // popped; removed below
         float cx = big.x + THROWN_W[THROWN_BIG_BUBBLE] / 2.0f, cy = big.y + THROWN_H[THROWN_BIG_BUBBLE] / 2.0f;
         for (int k = 0; k < POP_BUBBLES; k++) {
             float angle = k * 6.2831853f / POP_BUBBLES;
@@ -1445,21 +1486,21 @@ void updateGame(Game& game, const Actions* actions, float dt) {
                 spawnParticles(game, t.x + THROWN_W[t.kind] / 2.0f, t.y + THROWN_H[t.kind] / 2.0f, 6, paletteColor('O'), 30);
                 game.soundRequested[SOUND_SIZZLE] = true;
             }
-            t.y = SCREEN_H + 100;   // spent; removed below
+            t.y = arenaH + 100;   // spent; removed below
         }
         if (player.invincibleTimer == 0) {
             bool hit = false;
             for (Shot& shot : game.enemyShots) {
                 if (!hit && overlap(shot.x, shot.y, 2, 4, hx, hy, HITBOX, HITBOX)) {
                     hit = true;
-                    shot.y = SCREEN_H + 100;   // spent; removed below
+                    shot.y = arenaH + 100;   // spent; removed below
                 }
             }
             for (Thrown& t : game.thrown) {   // the deadly box is 1 px inside the sprite
                 if (t.kind == THROWN_ICE_BLOCK || t.kind == THROWN_LAVA_DROP || t.kind == THROWN_BIG_LAVA) continue;
                 if (!hit && overlap(t.x + 1, t.y + 1, THROWN_W[t.kind] - 2, THROWN_H[t.kind] - 2, hx, hy, HITBOX, HITBOX)) {
                     hit = true;
-                    t.y = SCREEN_H + 100;   // spent; removed below
+                    t.y = arenaH + 100;   // spent; removed below
                 }
             }
             for (Fish& f : game.fish) {   // the deadly box is 1 px inside the sprite
@@ -1475,7 +1516,7 @@ void updateGame(Game& game, const Actions* actions, float dt) {
                 if (boss.alive && boss.beamTimer > 0) {   // only the part of the beam or eruption that has grown kills
                     bool lord = boss.type == BOSS_FIRELORD;
                     float reach = beamReach((lord ? ERUPTION_TIME : BEAM_TIME) - boss.beamTimer);
-                    float top = lord ? SCREEN_H * (1 - reach) : boss.ballY, length = lord ? SCREEN_H - top : reach * (SCREEN_H - boss.ballY);
+                    float top = lord ? arenaH * (1 - reach) : boss.ballY, length = lord ? arenaH - top : reach * (arenaH - boss.ballY);
                     int beamW = lord ? ERUPTION_W : BEAM_W;
                     if (overlap(boss.ballX - beamW / 2.0f, top, beamW, length, hx, hy, HITBOX, HITBOX)) hit = true;
                 }
@@ -1519,7 +1560,7 @@ void updateGame(Game& game, const Actions* actions, float dt) {
                 addScore(game, player, UPGRADE_MAX_POINTS);
             }
             spawnParticles(game, pickup.x + size / 2.0f, pickup.y + size / 2.0f, PICKUP_PARTICLES, paletteColor(pickup.type == PICKUP_ROCKET ? 'p' : 'y'), 30);
-            pickup.y = SCREEN_H + 100;   // collected; removed below
+            pickup.y = arenaH + 100;   // collected; removed below
             game.soundRequested[pickup.type == PICKUP_BUFF ? SOUND_EXTRA_LIFE : SOUND_PICKUP] = true;
         }
     }
@@ -1534,15 +1575,15 @@ void updateGame(Game& game, const Actions* actions, float dt) {
     game.bullets.erase(std::remove_if(game.bullets.begin(), game.bullets.end(),
                                       [](const Shot& s) { return s.y < -8; }), game.bullets.end());
     game.enemyShots.erase(std::remove_if(game.enemyShots.begin(), game.enemyShots.end(),
-                                         [](const Shot& s) { return s.y > SCREEN_H; }), game.enemyShots.end());
-    game.thrown.erase(std::remove_if(game.thrown.begin(), game.thrown.end(), [](const Thrown& t) {
-                          return t.y > SCREEN_H || t.y < -20 || t.x < -20 || t.x > SCREEN_W + 20; }), game.thrown.end());
+                                         [arenaH](const Shot& s) { return s.y > arenaH; }), game.enemyShots.end());
+    game.thrown.erase(std::remove_if(game.thrown.begin(), game.thrown.end(), [arenaW, arenaH](const Thrown& t) {
+                          return t.y > arenaH || t.y < -20 || t.x < -20 || t.x > arenaW + 20; }), game.thrown.end());
     game.lobs.erase(std::remove_if(game.lobs.begin(), game.lobs.end(),
                                    [](const Lob& l) { return l.age >= LOB_TIME; }), game.lobs.end());
     game.fish.erase(std::remove_if(game.fish.begin(), game.fish.end(),
                                    [](const Fish& f) { return f.life <= 0; }), game.fish.end());
-    game.shieldBubbles.erase(std::remove_if(game.shieldBubbles.begin(), game.shieldBubbles.end(), [](const ShieldBubble& b) {
-                                 return b.age >= SHIELD_BUBBLE_LIFE || b.x < -20 || b.x > SCREEN_W + 20 || b.y < -20 || b.y > SCREEN_H + 20; }),
+    game.shieldBubbles.erase(std::remove_if(game.shieldBubbles.begin(), game.shieldBubbles.end(), [arenaW, arenaH](const ShieldBubble& b) {
+                                 return b.age >= SHIELD_BUBBLE_LIFE || b.x < -20 || b.x > arenaW + 20 || b.y < -20 || b.y > arenaH + 20; }),
                              game.shieldBubbles.end());
     game.peels.erase(std::remove_if(game.peels.begin(), game.peels.end(),
                                     [](const Peel& p) { return p.life <= 0; }), game.peels.end());
@@ -1551,7 +1592,7 @@ void updateGame(Game& game, const Actions* actions, float dt) {
     game.rockets.erase(std::remove_if(game.rockets.begin(), game.rockets.end(),
                                       [](const Rocket& r) { return r.y < -100; }), game.rockets.end());
     game.pickups.erase(std::remove_if(game.pickups.begin(), game.pickups.end(),
-                                      [](const Pickup& p) { return p.y > SCREEN_H; }), game.pickups.end());
+                                      [arenaH](const Pickup& p) { return p.y > arenaH; }), game.pickups.end());
     game.explosions.erase(std::remove_if(game.explosions.begin(), game.explosions.end(),
                                          [](const Explosion& e) { return e.age > EXPLOSION_GROW + EXPLOSION_FADE; }),
                           game.explosions.end());
@@ -1610,7 +1651,7 @@ void updateGame(Game& game, const Actions* actions, float dt) {
 }
 
 static void drawCentredText(int y, const char* text, uint32_t color, int scale) {
-    drawText((SCREEN_W - textWidth(text, scale)) / 2, y, text, color, scale);
+    drawText((screenW - textWidth(text, scale)) / 2, y, text, color, scale);
 }
 
 // Grows to full size, then dissolves pixel by pixel; white core, yellow middle, orange edge.
@@ -1628,7 +1669,8 @@ static void drawExplosion(const Explosion& e) {
         }
 }
 
-static uint32_t sceneryFar[TILE_H][SCREEN_W], sceneryMid[TILE_H][SCREEN_W];   // the level's two layers; mid: 0 is see-through
+static int sceneryWidth = SCREEN_W;
+static uint32_t sceneryFar[TILE_H][EXPANDED_W], sceneryMid[TILE_H][EXPANDED_W];   // the level's two layers; mid: 0 is see-through
 
 // The scenery's own xorshift, so the tests' game.random stays untouched and every run draws the same picture.
 static float sceneryUnit(uint32_t& seed) {
@@ -1639,13 +1681,13 @@ static float sceneryUnit(uint32_t& seed) {
 }
 
 // A dithered blob (leaf cluster, rock, frost) in a scenery tile; y wraps around the tile.
-static void ditherBlob(uint32_t tile[][SCREEN_W], int cx, int cy, float r, char ink, char light) {
+static void ditherBlob(uint32_t tile[][EXPANDED_W], int cx, int cy, float r, char ink, char light) {
     int ri = (int)r;
     for (int dy = -ri; dy <= ri; dy++)
         for (int dx = -ri; dx <= ri; dx++) {
             float d2 = (float)(dx * dx + dy * dy);
             int x = cx + dx, y = ((cy + dy) % TILE_H + TILE_H) % TILE_H;
-            if (d2 > r * r || x < 0 || x >= SCREEN_W) continue;
+            if (d2 > r * r || x < 0 || x >= sceneryWidth) continue;
             if ((x * 7 + y * 3) % 11 == 0 && d2 < r * r * 0.4f) tile[y][x] = paletteColor(light);
             else if ((x + y) % 2 == 0 || d2 < r * r * 0.3f) tile[y][x] = paletteColor(ink);
         }
@@ -1654,7 +1696,7 @@ static void ditherBlob(uint32_t tile[][SCREEN_W], int cx, int cy, float r, char 
 // Fills the far tile with one colour and clears the near one.
 static void clearScenery(char far) {
     for (int y = 0; y < TILE_H; y++)
-        for (int x = 0; x < SCREEN_W; x++) {
+        for (int x = 0; x < sceneryWidth; x++) {
             sceneryFar[y][x] = paletteColor(far);
             sceneryMid[y][x] = 0;
         }
@@ -1667,7 +1709,7 @@ static void buildJungle() {
     const float TWO_PI = 6.2831853f;
     const int H = TILE_H;
     for (int y = 0; y < H; y++)
-        for (int x = 0; x < SCREEN_W; x++) {
+        for (int x = 0; x < sceneryWidth; x++) {
             sceneryFar[y][x] = paletteColor('J');
             sceneryMid[y][x] = 0;
         }
@@ -1678,14 +1720,14 @@ static void buildJungle() {
         float phase = unit() * TWO_PI;
         for (int y = 0; y < H; y++) {
             int left = (int)(cx + 3 * sinf(TWO_PI * 2 * y / H + phase) - width / 2.0f);
-            for (int x = std::max(left, 0); x < std::min(left + width, SCREEN_W); x++) {
+            for (int x = std::max(left, 0); x < std::min(left + width, sceneryWidth); x++) {
                 bool groove = (x - left) % 4 == 1 && (y / 3 + i) % 5 != 0;
                 sceneryFar[y][x] = paletteColor(groove ? 'J' : 'j');
             }
         }
     }
     for (int i = 0; i < 70; i++) {
-        int cx = (int)(unit() * SCREEN_W);
+        int cx = (int)(unit() * sceneryWidth);
         int cy = (int)(unit() * H);
         float r = 5 + unit() * 9;
         ditherBlob(sceneryFar, cx, cy, r, 'f', 'F');
@@ -1696,7 +1738,7 @@ static void buildJungle() {
         for (int y = 0; y < H; y++) {
             int width = (int)(26 + 6 * sinf(TWO_PI * 2 * y / H + phase) + 3 * sinf(TWO_PI * 5 * y / H + phase * 2));
             for (int i = 0; i < width; i++) {
-                int x = side == 0 ? i : SCREEN_W - 1 - i;
+                int x = side == 0 ? i : sceneryWidth - 1 - i;
                 bool bark = (i + (y / 6) * 2) % 7 == 0;
                 sceneryMid[y][x] = paletteColor(i >= width - 3 ? 'T' : bark ? 'J' : 't');
             }
@@ -1704,7 +1746,7 @@ static void buildJungle() {
         for (int k = 0; k < 2; k++) {
             int hy = (int)(unit() * H);
             int hx = 8 + (int)(unit() * 10);
-            if (side == 1) hx = SCREEN_W - 1 - hx;
+            if (side == 1) hx = sceneryWidth - 1 - hx;
             for (int dy = -4; dy <= 4; dy++)
                 for (int dx = -2; dx <= 2; dx++)
                     if (dx * dx * 16 + dy * dy * 4 <= 64) sceneryMid[((hy + dy) % H + H) % H][hx + dx] = paletteColor('J');
@@ -1742,7 +1784,7 @@ static void buildJungle() {
     }
     // Leaf clumps on the trunks' inner edges.
     for (int i = 0; i < 22; i++) {
-        int cx = i % 2 == 0 ? 30 + (int)(unit() * 8) : SCREEN_W - 31 - (int)(unit() * 8);
+        int cx = i % 2 == 0 ? 30 + (int)(unit() * 8) : sceneryWidth - 31 - (int)(unit() * 8);
         int cy = (int)(unit() * H);
         float r = 6 + unit() * 6;
         ditherBlob(sceneryMid, cx, cy, r, 'f', 'F');
@@ -1763,14 +1805,14 @@ static void buildGlacier() {
         for (int y = 0; y < H; y++) {
             int w = width + (int)(2 * sinf(TWO_PI * 3 * y / H + phase)), left = (int)cx - w / 2;
             bool crack = (y + i * 17) % 47 == 0;
-            for (int x = std::max(left, 0); x < std::min(left + w, SCREEN_W); x++) {
+            for (int x = std::max(left, 0); x < std::min(left + w, sceneryWidth); x++) {
                 int col = x - left;
                 sceneryFar[y][x] = paletteColor(crack ? 'a' : col == 0 || (col + y / 5) % 6 == 0 ? 'e' : 'A');
             }
         }
     }
     for (int i = 0; i < 40; i++) {   // frost patches
-        int cx = (int)(unit() * SCREEN_W);
+        int cx = (int)(unit() * sceneryWidth);
         int cy = (int)(unit() * H);
         float r = 3 + unit() * 5;
         ditherBlob(sceneryFar, cx, cy, r, 'A', 'e');
@@ -1780,7 +1822,7 @@ static void buildGlacier() {
         for (int y = 0; y < H; y++) {
             int width = (int)(18 + 5 * sinf(TWO_PI * 2 * y / H + phase) + 3 * sinf(TWO_PI * 7 * y / H + phase * 3));
             for (int i = 0; i < width; i++) {
-                int x = side == 0 ? i : SCREEN_W - 1 - i;
+                int x = side == 0 ? i : sceneryWidth - 1 - i;
                 sceneryMid[y][x] = paletteColor(i >= width - 2 ? 'E' : (i + y / 3) % 5 == 0 ? 'e' : 'A');
             }
         }
@@ -1788,14 +1830,14 @@ static void buildGlacier() {
     for (int k = 0; k < 6; k++) {   // ice shelves from the walls, icicles hanging under them
         int y0 = 30 + k * 60, length = 30 + (int)(unit() * 30);
         for (int j = 0; j < length; j++) {
-            int x = k % 2 == 0 ? j : SCREEN_W - 1 - j;
+            int x = k % 2 == 0 ? j : sceneryWidth - 1 - j;
             sceneryMid[y0 % H][x] = paletteColor('E');
             for (int y = y0 + 1; y < y0 + 4; y++) sceneryMid[y % H][x] = paletteColor('e');
             if (j % 4 != 1) continue;
             int icicle = 3 + (int)(unit() * 7);
             for (int t = 0; t < icicle; t++) {
                 sceneryMid[(y0 + 4 + t) % H][x] = paletteColor('E');
-                if (t < icicle / 2 && x > 0 && x < SCREEN_W - 1) {
+                if (t < icicle / 2 && x > 0 && x < sceneryWidth - 1) {
                     sceneryMid[(y0 + 4 + t) % H][x - 1] = paletteColor('e');
                     sceneryMid[(y0 + 4 + t) % H][x + 1] = paletteColor('e');
                 }
@@ -1812,7 +1854,7 @@ static void buildVolcano() {
     const int H = TILE_H;
     clearScenery('v');
     for (int i = 0; i < 70; i++) {   // rock blobs
-        int cx = (int)(unit() * SCREEN_W);
+        int cx = (int)(unit() * sceneryWidth);
         int cy = (int)(unit() * H);
         float r = 4 + unit() * 8;
         ditherBlob(sceneryFar, cx, cy, r, 'V', 'K');
@@ -1825,17 +1867,17 @@ static void buildVolcano() {
             int cx = (int)(x0 + amplitude * sinf(TWO_PI * 2 * y / H + phase) + 4 * sinf(TWO_PI * 5 * y / H + phase * 2));
             for (int dx = -3; dx <= 3; dx++) {
                 int x = cx + dx;
-                if (x >= 0 && x < SCREEN_W) sceneryFar[y][x] = paletteColor(abs(dx) <= 1 ? 'C' : abs(dx) == 2 ? 'D' : 'K');
+                if (x >= 0 && x < sceneryWidth) sceneryFar[y][x] = paletteColor(abs(dx) <= 1 ? 'C' : abs(dx) == 2 ? 'D' : 'K');
             }
         }
     }
     for (int i = 0; i < 40; i++) {   // glowing cracks: short random walks downward
-        int x = (int)(unit() * SCREEN_W);
+        int x = (int)(unit() * sceneryWidth);
         int y = (int)(unit() * H);
         int length = 8 + (int)(unit() * 16);
         for (int t = 0; t < length; t++, y++) {
             x += unit() < 0.5f ? -1 : 1;
-            if (x >= 0 && x < SCREEN_W) sceneryFar[y % H][x] = paletteColor('D');
+            if (x >= 0 && x < sceneryWidth) sceneryFar[y % H][x] = paletteColor('D');
         }
     }
     for (int side = 0; side < 2; side++) {   // rock walls lit by the lava along their inner edge
@@ -1843,7 +1885,7 @@ static void buildVolcano() {
         for (int y = 0; y < H; y++) {
             int width = (int)(20 + 5 * sinf(TWO_PI * 2 * y / H + phase) + 3 * sinf(TWO_PI * 6 * y / H + phase * 2));
             for (int i = 0; i < width; i++) {
-                int x = side == 0 ? i : SCREEN_W - 1 - i;
+                int x = side == 0 ? i : sceneryWidth - 1 - i;
                 sceneryMid[y][x] = paletteColor(i == width - 1 ? 'D' : i == width - 2 ? 'K' : (i * 3 + y) % 9 == 0 ? 'K' : 'V');
             }
         }
@@ -1853,7 +1895,7 @@ static void buildVolcano() {
             int length = 10 + (int)(unit() * 15);
             for (int t = 0; t < length; t++) {
                 int x = x0 + (t / 3) % 2;
-                sceneryMid[(y0 + t) % H][side == 0 ? x : SCREEN_W - 1 - x] = paletteColor('D');
+                sceneryMid[(y0 + t) % H][side == 0 ? x : sceneryWidth - 1 - x] = paletteColor('D');
             }
         }
     }
@@ -1867,10 +1909,10 @@ static void buildSea() {
     const int H = TILE_H;
     clearScenery('1');
     for (int y = 0; y < H; y++)   // dithered light rays slanting down (90 px apart, seamless over the tile)
-        for (int x = 0; x < SCREEN_W; x++)
+        for (int x = 0; x < sceneryWidth; x++)
             if ((x + y / 2) % 90 < 14 && (x + y) % 2 == 0) sceneryFar[y][x] = paletteColor('2');
     for (int i = 0; i < 30; i++) {   // distant rocks
-        int cx = (int)(unit() * SCREEN_W);
+        int cx = (int)(unit() * sceneryWidth);
         int cy = (int)(unit() * H);
         float r = 6 + unit() * 8;
         ditherBlob(sceneryFar, cx, cy, r, '2', '3');
@@ -1880,13 +1922,13 @@ static void buildSea() {
         for (int y = 0; y < H; y++) {
             int width = (int)(12 + 4 * sinf(TWO_PI * 2 * y / H + phase) + 2 * sinf(TWO_PI * 5 * y / H + phase * 2));
             for (int i = 0; i < width; i++) {
-                int x = side == 0 ? i : SCREEN_W - 1 - i;
+                int x = side == 0 ? i : sceneryWidth - 1 - i;
                 sceneryMid[y][x] = paletteColor(i == width - 1 || (i + y / 4) % 7 == 0 ? '5' : '2');
             }
         }
     }
     for (int k = 0; k < 16; k++) {   // kelp stalks with leaves, near the walls
-        int baseX = k % 2 == 0 ? 14 + (int)(unit() * 30) : SCREEN_W - 16 - (int)(unit() * 30);
+        int baseX = k % 2 == 0 ? 14 + (int)(unit() * 30) : sceneryWidth - 16 - (int)(unit() * 30);
         float phase = unit() * TWO_PI;
         for (int y = 0; y < H; y++) {
             int x = baseX + (int)(3 * sinf(TWO_PI * 5 * y / H + phase));
@@ -1894,7 +1936,7 @@ static void buildSea() {
             if ((y + k * 7) % 9 != 0) continue;
             for (int d = 1; d <= 3; d++) {
                 int leafX = (y / 9 + k) % 2 == 0 ? x + 1 + d : x - d;
-                if (leafX >= 0 && leafX < SCREEN_W) sceneryMid[(y + d / 2) % H][leafX] = paletteColor('4');
+                if (leafX >= 0 && leafX < sceneryWidth) sceneryMid[(y + d / 2) % H][leafX] = paletteColor('4');
             }
         }
     }
@@ -1903,7 +1945,8 @@ static void buildSea() {
 void drawBackground(const Game& game) {
     if (game.level >= 2) {
         static int built = 0;   // the level whose scenery is in the tiles
-        if (built != game.level) {
+        if (built != game.level || sceneryWidth != screenW) {
+            sceneryWidth = screenW;
             if (game.level == 2) buildJungle();
             else if (game.level == 3) buildGlacier();
             else if (game.level == 4) buildVolcano();
@@ -1912,39 +1955,39 @@ void drawBackground(const Game& game) {
         }
         int farOffset = (int)(game.sceneryTime * FAR_SPEED[game.level - 1]) % TILE_H;
         int midOffset = (int)(game.sceneryTime * MID_SPEED[game.level - 1]) % TILE_H;
-        for (int y = 0; y < SCREEN_H; y++) {   // two layers scrolling down; the near one is drawn where it isn't 0
+        for (int y = 0; y < screenH; y++) {   // two layers scrolling down; the near one is drawn where it isn't 0
             const uint32_t* far = sceneryFar[(y - farOffset + TILE_H) % TILE_H];
             const uint32_t* mid = sceneryMid[(y - midOffset + TILE_H) % TILE_H];
-            uint32_t* row = screenPixels + y * SCREEN_W;
-            for (int x = 0; x < SCREEN_W; x++) row[x] = mid[x] ? mid[x] : far[x];
+            uint32_t* row = screenTarget + y * screenW;
+            for (int x = 0; x < screenW; x++) row[x] = mid[x] ? mid[x] : far[x];
         }
         // Dim drifting specks (fireflies, snow, embers, bubbles): slow and in background colours, never shot-like.
         float t = game.sceneryTime;
         if (game.level == 2) {
             for (int i = 0; i < FIREFLIES; i++) {
                 if (sinf(t * 2.5f + i * 1.7f) <= 0.2f) continue;
-                int x = (int)((i * 97 + 13) % SCREEN_W + 6 * sinf(t * 0.5f + i));
-                int y = (int)fmodf(i * 53 + 29 + t * FIREFLY_SPEED + 4 * sinf(t * 0.7f + i * 1.3f), (float)SCREEN_H);
+                int x = (int)((i * 97 + 13) % screenW + 6 * sinf(t * 0.5f + i));
+                int y = (int)fmodf(i * 53 + 29 + t * FIREFLY_SPEED + 4 * sinf(t * 0.7f + i * 1.3f), (float)screenH);
                 fillRect(x, y, 1, 1, paletteColor('L'));
             }
         } else if (game.level == 3) {
             for (int i = 0; i < SNOWFLAKES; i++) {
-                int x = (int)((i * 61 + 7) % SCREEN_W + 5 * sinf(t * 0.6f + i));
-                int y = (int)fmodf(i * 37 + 11 + t * SNOW_SPEED * (0.7f + 0.3f * (i % 3)), (float)SCREEN_H);
+                int x = (int)((i * 61 + 7) % screenW + 5 * sinf(t * 0.6f + i));
+                int y = (int)fmodf(i * 37 + 11 + t * SNOW_SPEED * (0.7f + 0.3f * (i % 3)), (float)screenH);
                 fillRect(x, y, 1, 1, paletteColor('E'));
             }
         } else if (game.level == 4) {
             for (int i = 0; i < EMBERS; i++) {
                 if (sinf(t * 6 + i * 2.3f) < -0.3f) continue;   // flicker
-                int x = (int)((i * 83 + 29) % SCREEN_W + 3 * sinf(t * 1.3f + i));
-                int y = SCREEN_H - 1 - (int)fmodf(i * 41 + 17 + t * EMBER_RISE_SPEED, (float)SCREEN_H);
+                int x = (int)((i * 83 + 29) % screenW + 3 * sinf(t * 1.3f + i));
+                int y = screenH - 1 - (int)fmodf(i * 41 + 17 + t * EMBER_RISE_SPEED, (float)screenH);
                 fillRect(x, y, 1, 1, paletteColor('C'));
             }
         } else {
             float drift = -SEA_CURRENT / CURRENT_RATE * cosf(CURRENT_RATE * game.time);   // where the current has carried them
             for (int i = 0; i < SEA_BUBBLES; i++) {
-                int x = (int)(fmodf(i * 113 + 41 + drift + 2 * sinf(t * 2 + i) + 4 * SCREEN_W, (float)SCREEN_W));
-                int y = SCREEN_H - 1 - (int)fmodf(i * 67 + 5 + t * SEA_BUBBLE_SPEED, (float)SCREEN_H);
+                int x = (int)(fmodf(i * 113 + 41 + drift + 2 * sinf(t * 2 + i) + 4 * screenW, (float)screenW));
+                int y = screenH - 1 - (int)fmodf(i * 67 + 5 + t * SEA_BUBBLE_SPEED, (float)screenH);
                 fillRect(x - 1, y, 1, 1, paletteColor('5'));
                 fillRect(x + 1, y, 1, 1, paletteColor('5'));
                 fillRect(x, y - 1, 1, 1, paletteColor('5'));
@@ -1953,13 +1996,15 @@ void drawBackground(const Game& game) {
         }
         return;
     }
-    fillRect(0, 0, SCREEN_W, SCREEN_H, paletteColor('k'));
-    for (const Star& star : game.stars) fillRect((int)star.x, (int)star.y, 1, 1, paletteColor(STAR_COLORS[star.layer]));
+    fillRect(0, 0, screenW, screenH, paletteColor('k'));
+    float sx = (float)screenW / game.arenaWidth(), sy = (float)screenH / game.arenaHeight();
+    for (const Star& star : game.stars) fillRect((int)(star.x * sx), (int)(star.y * sy), 1, 1, paletteColor(STAR_COLORS[star.layer]));
 }
 
 void drawGame(const Game& game) {
     drawBackground(game);
 
+    bool expanded = game.variant == CLASSIC_EXPANDED;
     int frame = (int)(game.time / ANIMATION_FRAME) % 2;
     for (const Mist& mist : game.mists) {   // a dithered sickly-green circle that grows, shimmers and thins out
         float r = MIST_RADIUS * std::min(mist.age / MIST_GROW, 1.0f);
@@ -1989,6 +2034,8 @@ void drawGame(const Game& game) {
         if (!alien.alive) continue;
         const Sprite& sprite = *ALIEN_SPRITES[game.level - 1][alien.type][frame];
         if (alien.flash > 0) drawSpriteSolid(sprite, (int)alien.x, (int)alien.y, paletteColor('w'));
+        else if (expanded && game.level == 1 && alien.type == ALIEN_HEAVY)
+            drawSpriteEx(sprite, (int)alien.x, (int)alien.y, false, 'x', paletteColor('q'));
         else drawSprite(sprite, (int)alien.x, (int)alien.y);
         if (iceShown)   // frozen by the frost wave
             drawSprite(ICE_CUBE, (int)(alien.x + ALIEN_WIDTH[alien.type] / 2.0f) - 9, (int)(alien.y + ALIEN_HEIGHT[alien.type] / 2.0f) - 8);
@@ -2079,7 +2126,8 @@ void drawGame(const Game& game) {
         bool shaking = player.slideTimer > 0 || player.stunTimer > 0 || player.hookedTimer > 0;
         int shipShake = shaking && (int)(game.feelTime * 30) % 2 ? 1 : 0;
         if (player.alive && !blinkOff) {
-            drawSprite(ship, (int)player.x + shipShake, (int)player.y);
+            if (i < STANDARD_PLAYERS) drawSprite(ship, (int)player.x + shipShake, (int)player.y);
+            else drawSpriteEx(ship, (int)player.x + shipShake, (int)player.y, false, 'Y', paletteColor(PLAYER_COLORS[i]));
             const Sprite* wand = player.strongAttack == 1 ? &WAND : player.strongAttack == 3 ? &WAND_ICE : player.strongAttack == 5 ? &WAND_BUBBLE : NULL;
             if (wand) drawSprite(*wand, (int)player.x + 13 + shipShake, (int)player.y + 2);   // holds the armed strong attack's wand
             if (player.muzzleTimer > 0) {   // a white core over an orange flare at each gun
@@ -2141,7 +2189,7 @@ void drawGame(const Game& game) {
         int bx = (int)boss.ballX, by = (int)boss.ballY;
         if (boss.laughTimer > 0) drawText((int)boss.x + 6, (int)boss.y + BOSS_H + 3, "HA HA", paletteColor('M'));
         if (boss.sayTimer > 0 && boss.say) {   // beside the head, clear of the attack below; on the side with room
-            int sayX = boss.x + BOSS_W + 2 + textWidth(boss.say) <= SCREEN_W ? (int)boss.x + BOSS_W + 2 : (int)boss.x - 2 - textWidth(boss.say);
+            int sayX = boss.x + BOSS_W + 2 + textWidth(boss.say) <= screenW ? (int)boss.x + BOSS_W + 2 : (int)boss.x - 2 - textWidth(boss.say);
             drawText(sayX, (int)boss.y + 3, boss.say, paletteColor('w'));
         }
         if (boss.hookState != HOOK_NONE) {   // the fishing line from the rod tip, then the hook
@@ -2153,30 +2201,30 @@ void drawGame(const Game& game) {
         }
         if (boss.type == BOSS_FIRELORD) {   // the eruption: a bubbling pool and a guide line, then a column of fire
             if (boss.ballTimer > 0) {
-                for (int y = SCREEN_H - 8; y > 0; y -= 4) fillRect(bx, y, 1, 2, paletteColor('m'));
-                fillRect(bx - ERUPTION_W / 2, SCREEN_H - 3, ERUPTION_W, 3, paletteColor('O'));
+                for (int y = screenH - 8; y > 0; y -= 4) fillRect(bx, y, 1, 2, paletteColor('m'));
+                fillRect(bx - ERUPTION_W / 2, screenH - 3, ERUPTION_W, 3, paletteColor('O'));
                 for (int i = 0; i < 4; i++)
-                    fillRect(bx - 6 + i * 4 + (int)(game.time * 12 + i) % 3, SCREEN_H - 4 - (int)(game.time * 9 + i * 2) % 3, 1, 1, paletteColor('N'));
+                    fillRect(bx - 6 + i * 4 + (int)(game.time * 12 + i) % 3, screenH - 4 - (int)(game.time * 9 + i * 2) % 3, 1, 1, paletteColor('N'));
             }
             if (boss.beamTimer > 0) {
                 float reach = beamReach(ERUPTION_TIME - boss.beamTimer);
-                int tip = (int)(SCREEN_H * (1 - reach));
-                fillRect(bx - ERUPTION_W / 2, tip, ERUPTION_W, SCREEN_H - tip, paletteColor('m'));
-                fillRect(bx - ERUPTION_W / 2 + 1, tip, ERUPTION_W - 2, SCREEN_H - tip, paletteColor('O'));
-                fillRect(bx - 3, tip, 6, SCREEN_H - tip, paletteColor('N'));
+                int tip = (int)(screenH * (1 - reach));
+                fillRect(bx - ERUPTION_W / 2, tip, ERUPTION_W, screenH - tip, paletteColor('m'));
+                fillRect(bx - ERUPTION_W / 2 + 1, tip, ERUPTION_W - 2, screenH - tip, paletteColor('O'));
+                fillRect(bx - 3, tip, 6, screenH - tip, paletteColor('N'));
                 if (reach < 1) fillRect(bx - ERUPTION_W / 2, tip, ERUPTION_W, 2, paletteColor('N'));
             }
             continue;
         }
         if (boss.ballTimer > 0) {
-            for (int y = by + BALL_MAX_RADIUS + 2; y < SCREEN_H; y += 4) fillRect(bx, y, 1, 2, paletteColor('m'));   // guide line
+            for (int y = by + BALL_MAX_RADIUS + 2; y < screenH; y += 4) fillRect(bx, y, 1, 2, paletteColor('m'));   // guide line
             int radius = 1 + (int)((1 - boss.ballTimer / BALL_CHARGE_TIME) * (BALL_MAX_RADIUS - 1));
             fillCircle(bx, by, radius, paletteColor('m'));
             if (radius >= 3) fillCircle(bx, by, radius - 2, paletteColor('w'));
         }
         if (boss.beamTimer > 0) {
             float reach = beamReach(BEAM_TIME - boss.beamTimer);
-            int length = (int)(reach * (SCREEN_H - by));
+            int length = (int)(reach * (screenH - by));
             fillRect(bx - BEAM_W / 2, by, BEAM_W, length, paletteColor('m'));
             fillRect(bx - BEAM_CORE_W / 2, by, BEAM_CORE_W, length, paletteColor('w'));
             if (reach < 1) fillRect(bx - BEAM_W / 2, by + length - 2, BEAM_W, 2, paletteColor('w'));
@@ -2198,52 +2246,57 @@ void drawGame(const Game& game) {
 
     // Screen flash: the play field halfway to white; reduce flashing turns it off.
     if (game.flashTimer > 0 && !game.reduceFlashing)
-        for (uint32_t& pixel : screenPixels) pixel = 0xFF000000 | (((pixel >> 1) & 0x7F7F7F) + 0x808080);
+        for (int i = 0; i < screenW * screenH; i++)
+            screenTarget[i] = 0xFF000000 | (((screenTarget[i] >> 1) & 0x7F7F7F) + 0x808080);
 
     // Shake: shift the play field picture by a whole pixel offset; the HUD below is drawn after, so it stays still.
     float shake = game.trauma * game.trauma * game.shakeStrength;
     int dx = (int)lroundf(SHAKE_X * shake * sinf(game.feelTime * 41)), dy = (int)lroundf(SHAKE_Y * shake * sinf(game.feelTime * 57));
     if (dx != 0 || dy != 0) {
-        for (int i = 0; i < SCREEN_H; i++) {
-            int y = dy > 0 ? SCREEN_H - 1 - i : i, sourceY = y - dy;   // copy order: a row is read before it is overwritten
-            uint32_t* row = screenPixels + y * SCREEN_W;
-            if (sourceY < 0 || sourceY >= SCREEN_H) {
-                std::fill(row, row + SCREEN_W, paletteColor('k'));
+        for (int i = 0; i < screenH; i++) {
+            int y = dy > 0 ? screenH - 1 - i : i, sourceY = y - dy;   // copy order: a row is read before it is overwritten
+            uint32_t* row = screenTarget + y * screenW;
+            if (sourceY < 0 || sourceY >= screenH) {
+                std::fill(row, row + screenW, paletteColor('k'));
                 continue;
             }
-            memmove(row + std::max(dx, 0), screenPixels + sourceY * SCREEN_W + std::max(-dx, 0), (SCREEN_W - abs(dx)) * sizeof(uint32_t));
+            memmove(row + std::max(dx, 0), screenTarget + sourceY * screenW + std::max(-dx, 0), (screenW - abs(dx)) * sizeof(uint32_t));
             if (dx > 0) std::fill(row, row + dx, paletteColor('k'));
-            if (dx < 0) std::fill(row + SCREEN_W + dx, row + SCREEN_W, paletteColor('k'));
+            if (dx < 0) std::fill(row + screenW + dx, row + screenW, paletteColor('k'));
         }
     }
 
-    // HUD: the wave at the top centre; each player's score, spare lives and rockets on their side (1P left, 2P right).
+    // The wave and high score sit between the player HUDs.
     char text[48];
     const char* label = levelLabel(game.level);
     snprintf(text, sizeof text, "%s %d", label, game.wave);
     drawCentredText(2, text, paletteColor('w'), 1);
     snprintf(text, sizeof text, "HI %07d", game.highScore);
     drawCentredText(9, text, paletteColor('s'), 1);
-    bool coOp = game.players.size() > 1;
+    int playerCount = (int)game.players.size();
+    bool coOp = playerCount > 1;
+    const int HUD_SPACING = 80;
     for (size_t p = 0; p < game.players.size(); p++) {
         const Player& player = game.players[p];
-        bool right = p == 1;
-        snprintf(text, sizeof text, "%s %07d", coOp ? (right ? "2P" : "1P") : "SCORE", player.score);
-        drawText(right ? SCREEN_W - 2 - textWidth(text) : 2, 2, text, paletteColor('w'));
-        for (int i = 0; i < player.lives - 1; i++) drawSprite(LIFE_ICON, right ? SCREEN_W - 9 - i * 9 : 2 + i * 9, 9);
-        for (int i = 0; i < player.rockets; i++) drawSprite(ROCKET_ICON, right ? SCREEN_W - 5 - i * 5 : 2 + i * 5, SCREEN_H - 7);
+        bool right = expanded ? p >= 2 : p == 1;
+        int inset = expanded && (p == 1 || p == 2) ? HUD_SPACING + 2 : 2;
+        auto hudX = [&](int offset, int w) { return right ? screenW - inset - offset - w : inset + offset; };
+        if (expanded || coOp) snprintf(text, sizeof text, "%dP %07d", (int)p + 1, player.score);
+        else snprintf(text, sizeof text, "SCORE %07d", player.score);
+        drawText(hudX(0, textWidth(text)), 2, text, paletteColor(expanded ? PLAYER_COLORS[p] : 'w'));
+        for (int i = 0; i < player.lives - 1; i++) drawSprite(LIFE_ICON, hudX(i * 9, LIFE_ICON.w), 9);
+        for (int i = 0; i < player.rockets; i++) drawSprite(ROCKET_ICON, hudX(i * 5, ROCKET_ICON.w), screenH - 7);
         int strongHeld = 0, passiveHeld = 0;
         for (int level = 1; level <= LEVEL_COUNT; level++) {   // strong attacks just above the rockets (armed one underlined), passive buffs above them
             if (!(player.buffs & (1 << (level - 1)))) continue;
             bool strong = level == 1 || level == 3 || level == 5;
             int slot = strong ? strongHeld++ : passiveHeld++;
-            int x = right ? SCREEN_W - 7 - slot * 7 : 2 + slot * 7;
-            drawSprite(*BUFF_ICONS[level - 1], x, SCREEN_H - (strong ? 14 : 21));
-            if (level == player.strongAttack) fillRect(x, SCREEN_H - 8, 5, 1, paletteColor('y'));
+            int x = hudX(slot * 7, 5);
+            drawSprite(*BUFF_ICONS[level - 1], x, screenH - (strong ? 14 : 21));
+            if (level == player.strongAttack) fillRect(x, screenH - 8, 5, 1, paletteColor('y'));
         }
         // Weapon gauge above the buffs: four rising bars for the level, then one pip per pickup the next level takes.
-        auto hudX = [&](int offset, int w) { return right ? SCREEN_W - 2 - offset - w : 2 + offset; };
-        int gaugeY = SCREEN_H - 28;
+        int gaugeY = screenH - 28;
         bool pulse = player.upgradeTimer > 0 && (int)(game.feelTime * 16) % 2;
         for (int bar = 0; bar < MAX_WEAPON_LEVEL; bar++)
             fillRect(hudX(bar * 3, 2), gaugeY + 3 - bar, 2, 2 + bar,
@@ -2267,28 +2320,43 @@ void drawGame(const Game& game) {
         anyBossAlive |= boss.alive;
     }
     if (anyBossAlive) {
-        int barX = (SCREEN_W - BOSS_HEALTH_BAR_W) / 2;
+        int barX = (screenW - BOSS_HEALTH_BAR_W) / 2;
         fillRect(barX, BOSS_HEALTH_BAR_Y, BOSS_HEALTH_BAR_W, 3, paletteColor('R'));
         fillRect(barX, BOSS_HEALTH_BAR_Y, BOSS_HEALTH_BAR_W * bossHp / bossMaxHp, 3, paletteColor(anyLaughing ? 'l' : 'r'));
     }
-    if (!coOp && !game.over && !game.levelClear) drawText(SCREEN_W - 2 - textWidth("2P PRESS START"), 2, "2P PRESS START", paletteColor('s'));
+    if (playerCount < game.playerLimit() && !game.over && !game.levelClear) {
+        snprintf(text, sizeof text, "%dP PRESS START", playerCount + 1);
+        drawText(screenW - 2 - textWidth(text), 2, text, paletteColor('s'));
+    }
 
     if (game.over) {
-        fillRect(SCREEN_W / 2 - 72, 58, 144, 62, paletteColor('n'));   // panel so passing aliens don't hide the text
-        fillRect(SCREEN_W / 2 - 71, 59, 142, 60, paletteColor('k'));
+        int panelY = screenH / 2 - (expanded ? 40 : 32), panelHeight = expanded ? 78 : 62;
+        fillRect(screenW / 2 - 72, panelY, 144, panelHeight, paletteColor('n'));
+        fillRect(screenW / 2 - 71, panelY + 1, 142, panelHeight - 2, paletteColor('k'));
         snprintf(text, sizeof text, "%s CLEAR", levelName(game.level));
-        drawCentredText(66, game.won ? text : "GAME OVER", paletteColor(game.won ? 'y' : 'r'), 2);
-        if (coOp) snprintf(text, sizeof text, "1P %d   2P %d   %s %d", game.players[0].score, game.players[1].score, label, game.wave);
-        else snprintf(text, sizeof text, "SCORE %d   %s %d", game.players[0].score, label, game.wave);
-        drawCentredText(86, text, paletteColor('w'), 1);
-        if (game.newHighScore) drawCentredText(96, "NEW HIGH SCORE", paletteColor('y'), 1);
-        if (game.time - game.overTime > GAME_OVER_INPUT_LOCK) drawCentredText(108, "X PLAY AGAIN   O MENU", paletteColor('y'), 1);
+        drawCentredText(panelY + 8, game.won ? text : "GAME OVER", paletteColor(game.won ? 'y' : 'r'), 2);
+        if (expanded) {
+            for (int p = 0; p < playerCount; p++) {
+                snprintf(text, sizeof text, "%dP %07d", p + 1, game.players[p].score);
+                int x = screenW / 2 + (p % 2 ? 34 : -34) - textWidth(text) / 2;
+                drawText(x, panelY + 24 + p / 2 * 10, text, paletteColor(PLAYER_COLORS[p]));
+            }
+            snprintf(text, sizeof text, "%s %d", label, game.wave);
+            drawCentredText(panelY + 44, text, paletteColor('w'), 1);
+        } else {
+            if (coOp) snprintf(text, sizeof text, "1P %d   2P %d   %s %d", game.players[0].score, game.players[1].score, label, game.wave);
+            else snprintf(text, sizeof text, "SCORE %d   %s %d", game.players[0].score, label, game.wave);
+            drawCentredText(panelY + 28, text, paletteColor('w'), 1);
+        }
+        if (game.newHighScore) drawCentredText(panelY + panelHeight - 24, "NEW HIGH SCORE", paletteColor('y'), 1);
+        if (game.time - game.overTime > GAME_OVER_INPUT_LOCK)
+            drawCentredText(panelY + panelHeight - 12, "X PLAY AGAIN   O MENU", paletteColor('y'), 1);
     } else if (game.levelClear) {
         snprintf(text, sizeof text, "%s CLEAR", levelName(game.level));
-        drawCentredText(84, text, paletteColor('y'), 2);
+        drawCentredText(screenH / 2 - 6, text, paletteColor('y'), 2);
     } else if (game.bannerTimer > 0) {
         const char* banner = game.wave == 1 && game.bannerTimer > BANNER_TIME ? levelName(game.level) : isBossWave(game.wave) ? "BOSS" : "WAVE %d";
         snprintf(text, sizeof text, banner, game.wave);
-        drawCentredText(84, text, paletteColor('y'), 2);
+        drawCentredText(screenH / 2 - 6, text, paletteColor('y'), 2);
     }
 }

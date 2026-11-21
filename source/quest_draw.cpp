@@ -17,6 +17,8 @@ float questDrawMs[3];
 const float SHAKE_X = 4 * DP, SHAKE_Y = 3 * DP;   // at trauma 1 and full strength, like the shooter
 const float WALK_FRAME = 0.1f, IDLE_FRAME = 0.6f, CLIMB_FRAME = 0.2f, SHIMMER_FRAME = 0.25f, FLAME_FRAME = 0.15f;
 const float LIQUID_FRAME = 0.2f, FALL_SPEED = 40 * DP;
+const float ENEMY_FRAME = 0.25f, TELL_FLASH = 0.1f, IFRAME_BLINK = 0.1f, ATTACK_FRAME = 0.07f, ROLL_FRAME = 0.1f;
+const float NUMBER_RISE = 12 * DP, ECHO_BOB = 2 * DP, PARTNER_BEHIND = 10 * DP;
 const char TRIM_BY_JOB[4] = {'h', 'b', 'Y', 'N'};
 const uint32_t HEARTH_LIGHT = 0xFFA05018, BRAZIER_LIGHT = 0xFF804010;
 const int HEARTH_LIGHT_RADIUS = 48 * DP, BRAZIER_LIGHT_RADIUS = 28 * DP;
@@ -32,11 +34,6 @@ static const Sprite* const HERO_FRAMES[CLASS_COUNT][HERO_FRAME_COUNT] = {HERO_RO
 const int CLASS_BARS[CLASS_COUNT][3] = {{3, 5, 1}, {3, 2, 5}, {5, 1, 4}, {2, 3, 2}};
 const char* const CLASS_TEXT[CLASS_COUNT][2] = {
     {"HEAVY ARMOUR,", "A WIDE SWORD."}, {"ARROWS FROM", "FAR AWAY."}, {"BOLTS THAT HIT", "HARD. FRAGILE."}, {"FAST DAGGERS,", "QUICK FEET."}};
-const char* const JOB_NAMES[CLASS_COUNT][4] = {{"KNIGHT", "VANGUARD", "WARDEN", "LIONHEART"},
-                                               {"ARCHER", "RANGER", "SHARPSHOOTER", "STORMBOW"},
-                                               {"MAGICIAN", "ADEPT", "ELEMENTALIST", "ARCHMAGE"},
-                                               {"THIEF", "ROGUE", "SHADOW", "NIGHTBLADE"}};
-
 static void drawCentred(int y, const char* text, uint32_t color, int scale = 1) {
     drawText((QUEST_W - textWidth(text, scale * DP)) / 2, y, text, color, scale * DP);
 }
@@ -109,13 +106,21 @@ static void drawTileFlat(const Quest& q, char t, int tx, int ty, int sx, int sy)
         fillRect(sx, sy, TILE, TILE, paletteColor('&'));
         fillRect(sx + DP, sy + DP, TILE - 2 * DP, TILE - 2 * DP, paletteColor('h'));
         break;
-    case 'z':
+    case 'z': {   // bright while on, flickering 0.4 s before (spec §9)
+        float cycle = q.area.def->band >= 2 ? 3.0f : 3.5f, t = fmodf(q.time, cycle);
+        bool flicker = t > cycle - 0.4f && (int)(q.time * 20) % 2;
         fillRect(sx, sy, TILE, TILE, paletteColor('n'));
-        for (int i = 0; i < 8; i++) fillRect(sx + i * DP, sy + (3 + i % 2) * DP, DP, DP, paletteColor('c'));
+        for (int i = 0; i < 8; i++) fillRect(sx + i * DP, sy + (3 + i % 2) * DP, DP, DP, paletteColor(panelOn(q) || flicker ? 'c' : 'd'));
         break;
-    case 'f':
+    }
+    case 'f':   // sparks while warning, then a flame 3 tiles tall
         fillRect(sx, sy, TILE, TILE, paletteColor('K'));
         fillRect(sx + 2 * DP, sy, 4 * DP, 2 * DP, paletteColor('O'));
+        if (jetWarning(q) > 0 && (int)(q.time * 16) % 2) fillRect(sx + (2 + (int)(q.time * 30) % 4) * DP, sy - 2 * DP, DP, DP, paletteColor('o'));
+        if (jetBurning(q)) {
+            fillRect(sx + DP, sy - 3 * TILE, TILE - 2 * DP, 3 * TILE, paletteColor('o'));
+            fillRect(sx + 3 * DP, sy - 3 * TILE + 4 * DP, 2 * DP, 3 * TILE - 4 * DP, paletteColor('N'));
+        }
         break;
     case '<':
     case '>': {
@@ -268,16 +273,125 @@ static void drawObject(const Quest& q, char letter, int tx, int ty, int camX, in
 static void drawHero(const Quest& q, int camX, int camY) {
     const Hero& h = q.hero;
     HeroFrame frame;
-    if (q.mode == QMODE_DEAD) frame = FRAME_HURT;
+    if (q.mode == QMODE_DEAD || h.hurtTimer > 0) frame = FRAME_HURT;
+    else if (h.rollTimer > 0) frame = (int)(q.time / ROLL_FRAME) % 2 ? FRAME_ROLL_2 : FRAME_ROLL_1;
+    else if (h.attackTimer > 0 || h.skill >= 0) frame = (HeroFrame)(FRAME_ATTACK_1 + (int)(q.time / ATTACK_FRAME) % 3);
     else if (h.climbing) frame = h.vy != 0 && (int)(q.time / CLIMB_FRAME) % 2 ? FRAME_CLIMB_2 : FRAME_CLIMB_1;
     else if (!h.onGround) frame = h.vy > FALL_SPEED ? FRAME_FALL : FRAME_JUMP;
     else if (fabsf(h.vx) > 10 * DP) frame = (HeroFrame)(FRAME_WALK_1 + (int)(q.time / WALK_FRAME) % 4);
     else frame = (int)(q.time / IDLE_FRAME) % 2 ? FRAME_IDLE_2 : FRAME_IDLE_1;
     int job = q.save.job >= 0 && q.save.job < 4 ? q.save.job : 0;
     const Sprite& sprite = *HERO_FRAMES[q.save.heroClass][frame];
+    int x = (int)floorf(h.x - 3 * DP) - camX, y = (int)floorf(h.y - 3 * DP) - camY;
+    if (h.partnerTimer > 0) drawSpriteSolid(sprite, x + (int)(h.facingLeft ? PARTNER_BEHIND : -PARTNER_BEHIND), y, paletteColor('x'), h.facingLeft);
+    if (h.iframes > 0 && q.mode != QMODE_DEAD && (int)(h.iframes / IFRAME_BLINK) % 2) return;   // blinks during i-frames
     // Small old-school heroes (the user's choice): the outline is part of the sprite.
-    drawSpriteEx(sprite, (int)floorf(h.x - 3 * DP) - camX, (int)floorf(h.y - 3 * DP) - camY, h.facingLeft, job ? 'h' : 0,
-                 paletteColor(TRIM_BY_JOB[job]));
+    drawSpriteEx(sprite, x, y, h.facingLeft, job ? 'h' : 0, paletteColor(TRIM_BY_JOB[job]));
+}
+
+// A crescent filling the box: the outer half-ellipse centred on the box's side nearest the hero (sword arcs).
+static void drawArc(int x, int y, int w, int h, bool flipped, uint32_t color) {
+    for (int row = 0; row < h; row += DP)
+        for (int col = 0; col < w; col += DP) {
+            float nx = (col + DP / 2.0f) / w, ny = (row + DP / 2.0f) / h * 2 - 1;
+            if (flipped) nx = 1 - nx;
+            float d = nx * nx + ny * ny;
+            if (d <= 1 && d >= 0.45f) fillRect(x + col, y + row, DP, DP, color);
+        }
+}
+
+static void drawRing(int cx, int cy, int radius, uint32_t color) {
+    for (int a = 0; a < 48; a++) fillRect(cx + (int)(cosf(a * 0.1309f) * radius), cy + (int)(sinf(a * 0.1309f) * radius), DP, DP, color);
+}
+
+// Enemies (2 frames, white while flashing, tells flash or shake), shots, skill shapes and the name echo (spec §7, §8, §21).
+static void drawCombat(const Quest& q, int camX, int camY) {
+    const SaveData& s = q.save;
+    if (s.echoNames > 0 && s.echoWorld == q.area.world && s.echoArea == q.area.index) {   // 8 x 8 wisp, bobbing 2 px
+        int ex = (int)s.echoX - camX, ey = (int)(s.echoY + ECHO_BOB * sinf(q.time * 3)) - camY;
+        fillRect(ex + 2 * DP, ey + 2 * DP, 4 * DP, 5 * DP, paletteColor('y'));
+        fillRect(ex + DP, ey + 4 * DP, 6 * DP, 3 * DP, paletteColor('y'));
+        fillRect(ex + 3 * DP, ey, 2 * DP, 2 * DP, paletteColor('y'));
+        fillRect(ex + 3 * DP, ey + 4 * DP, 2 * DP, 2 * DP, paletteColor('w'));
+    }
+    for (const Enemy& e : q.enemies) {
+        if (!e.alive) continue;
+        const EnemyType& type = rosterType(e.world, e.type);
+        const Sprite& sprite = *type.frames[(int)(q.time / ENEMY_FRAME) % 2];
+        int x = (int)floorf(e.x - 2 * DP) - camX, y = (int)floorf(e.y - 2 * DP) - camY;
+        if (x + sprite.w < 0 || x >= QUEST_W || y + sprite.h < 0 || y >= QUEST_H) continue;
+        if (e.state == ES_EMBER) {   // the phoenix's ember pulses before it revives
+            int r = (int)((2 + 2 * fabsf(sinf(q.time * 8))) * DP);
+            fillCircle(x + sprite.w / 2, y + sprite.h / 2, r, paletteColor('o'));
+            fillCircle(x + sprite.w / 2, y + sprite.h / 2, r / 2, paletteColor('N'));
+            continue;
+        }
+        bool tell = e.state == ES_TELL && (int)(e.stateTimer / TELL_FLASH) % 2 == 0;
+        if (e.state == ES_TELL && type.behaviour == BEH_CHARGER) x += (int)(q.time * 60) % 2 ? DP : -DP;   // the charger shakes
+        if (e.flash > 0 || (tell && type.behaviour != BEH_SHOOTER)) drawSpriteSolid(sprite, x, y, paletteColor('w'), e.facingLeft);
+        else if (tell) drawSpriteSolid(sprite, x, y, paletteColor('o'), e.facingLeft);   // the shooter glows
+        else drawSpriteOutlined(sprite, x, y, e.facingLeft, paletteColor(type.trait == TRAIT_INFLATE && e.state == ES_ACT ? 'w' : 'x'));
+        if (type.behaviour == BEH_ARMORED && e.state == ES_ACT)   // the swing, 28 x 16 in front
+            drawArc((int)(e.facingLeft ? e.x - 28 * DP : e.x + e.w) - camX, (int)(e.y + e.h - 16 * DP) - camY, (int)(28 * DP), (int)(16 * DP),
+                    e.facingLeft, paletteColor('m'));
+    }
+    for (const Projectile& p : q.projectiles) {
+        int x = (int)p.x - camX, y = (int)p.y - camY;
+        if (!p.fromHero) {
+            fillRect(x, y, p.w, p.h, paletteColor('m'));
+        } else if (p.kind == PROJ_WAVE) {
+            fillRect(x, y + p.h / 2, p.w, p.h / 2, paletteColor('o'));
+            fillRect(x + DP, y, p.w - 2 * DP, p.h / 2, paletteColor('N'));
+        } else if (p.kind == PROJ_ORB) {
+            fillCircle(x + p.w / 2, y + p.h / 2, p.w / 2, paletteColor('c'));
+            fillCircle(x + p.w / 2, y + p.h / 2, p.w / 4, paletteColor('w'));
+        } else {
+            fillRect(x, y, p.w, p.h, paletteColor('y'));
+        }
+    }
+    const Hero& h = q.hero;
+    for (const Effect& f : q.effects) {
+        int x = (int)f.x - camX, y = (int)f.y - camY;
+        uint32_t color = paletteColor(f.color);
+        switch (f.kind) {
+        case FX_SWING: {   // the basic sword arc follows the hero while the swing plays
+            if (h.attackTimer <= 0) break;
+            int bx = (int)(h.facingLeft ? h.x - f.w : h.x + HERO_W) - camX, by = (int)(h.y + HERO_H / 2 - f.h / 2) - camY;
+            drawArc(bx, by, (int)f.w, (int)f.h, h.facingLeft, color);
+            break;
+        }
+        case FX_ARC: drawArc(x, y, (int)f.w, (int)f.h, f.flip, color); break;
+        case FX_BURST:
+            fillCircle(x, y, (int)(f.w * (0.5f + 0.5f * f.age / f.life)), color);
+            fillCircle(x, y, (int)(f.w * 0.4f * (1 - f.age / f.life)), paletteColor('w'));
+            break;
+        case FX_SPIN: drawRing((int)(h.x + HERO_W / 2) - camX, (int)(h.y + HERO_H / 2) - camY, (int)f.w, color); break;
+        case FX_CHAIN: {   // a jagged bolt between two points
+            int x2 = (int)f.x2 - camX, y2 = (int)f.y2 - camY;
+            for (int k = 0; k <= 12; k++)
+                fillRect(x + (x2 - x) * k / 12, y + (y2 - y) * k / 12 + (k % 2 ? DP : -DP) * (k % 3), DP, DP, color);
+            break;
+        }
+        case FX_METEOR: {   // the marker on the floor and the rock falling onto it
+            if ((int)(f.age * 10) % 2) for (int k = -(int)f.w; k <= (int)f.w; k += 4 * DP) fillRect(x + k, y - DP, 2 * DP, DP, color);
+            int fallY = y - (int)((1 - f.age / f.life) * 120 * DP);
+            fillCircle(x, fallY - 6 * DP, 6 * DP, color);
+            fillCircle(x, fallY - 6 * DP, 3 * DP, paletteColor('N'));
+            break;
+        }
+        }
+    }
+}
+
+// Particles and floating numbers: damage white, crits orange, the hero's red, "+n NAMES" pale yellow.
+static void drawNumbers(const Quest& q, int camX, int camY) {
+    for (const Particle& p : q.particles) fillRect((int)p.x - camX, (int)p.y - camY, DP, DP * p.h, p.color);
+    char text[24];
+    for (const DamageNumber& n : q.numbers) {
+        if (n.names) snprintf(text, sizeof text, "+%d NAMES", n.value);
+        else snprintf(text, sizeof text, "%d", n.value);
+        drawText((int)n.x - camX - textWidth(text, DP) / 2, (int)(n.y - 6 * DP - NUMBER_RISE * n.age / n.life) - camY, text, n.color, DP);
+    }
 }
 
 // Shake: shift the play picture by whole pixels; the HUD drawn after stays still.
@@ -356,6 +470,7 @@ static void drawPlay(const Quest& q) {
             if (letter == 'C' || letter == 'P' || letter == 'T') drawObject(q, letter, tx, ty, camX, camY, lights);
         }
 
+    drawCombat(q, camX, camY);
     drawHero(q, camX, camY);
     // Grass fringe in front of the hero's feet: only its lowest 2 dp above the top line.
     if (art) {
@@ -371,6 +486,7 @@ static void drawPlay(const Quest& q) {
     }
     double t3 = questClock ? questClock() : 0;
     if (art) applyLights(lights, (int)(q.hero.x + HERO_W / 2) - camX, (int)(q.hero.y + HERO_H / 2) - camY);
+    drawNumbers(q, camX, camY);
     shakePicture(q);
     if (q.area.world != WORLD_SECRET) applyVignette();
     if (questClock) {
@@ -380,12 +496,23 @@ static void drawPlay(const Quest& q) {
         questDrawMs[2] = std::max(questDrawMs[2], (float)((t4 - t3) * 1000));
     }
 
-    // HUD: level and the HP bar (full until combat comes in phase 2), then the banner.
+    // HUD (spec §15): level, HP and MP bars, HP numbers, names with the wisp icon; then the banner.
     char text[32];
+    const Hero& h = q.hero;
     snprintf(text, sizeof text, "LV %d", q.save.level);
     drawText(4 * DP, 4 * DP, text, paletteColor('w'), DP);
     fillRect(4 * DP, 11 * DP, 64 * DP, 4 * DP, paletteColor('R'));
-    fillRect(4 * DP, 11 * DP, 64 * DP, 4 * DP, paletteColor('r'));
+    fillRect(4 * DP, 11 * DP, 64 * DP * std::max(0, h.hp) / std::max(1, q.stats.maxHp), 4 * DP, paletteColor('r'));
+    snprintf(text, sizeof text, "HP %d/%d", std::max(0, h.hp), q.stats.maxHp);
+    drawText(72 * DP, 10 * DP, text, paletteColor('s'), DP);
+    fillRect(4 * DP, 17 * DP, 64 * DP, 3 * DP, paletteColor('U'));
+    fillRect(4 * DP, 17 * DP, 64 * DP * std::max(0, h.mp) / std::max(1, q.stats.maxMp), 3 * DP, paletteColor('u'));
+    snprintf(text, sizeof text, "%d", q.save.names);
+    int namesX = 316 * DP - textWidth(text, DP);
+    drawText(namesX, 4 * DP, text, paletteColor('w'), DP);
+    fillRect(namesX - 6 * DP + DP, 4 * DP, 3 * DP, 5 * DP, paletteColor('y'));   // the 5 x 5 wisp icon
+    fillRect(namesX - 6 * DP, 6 * DP, 5 * DP, 3 * DP, paletteColor('y'));
+    fillRect(namesX - 6 * DP + 2 * DP, 6 * DP, DP, 2 * DP, paletteColor('w'));
     if (q.bannerTimer > 0 && q.banner)
         drawCentred((q.bannerScale == 2 ? 40 : 30) * DP, q.banner, paletteColor(q.bannerScale == 2 ? 'w' : 'b'), q.bannerScale);
     if (q.mode == QMODE_DEAD) drawCentred(80 * DP, "YOU FADED", paletteColor('r'), 2);

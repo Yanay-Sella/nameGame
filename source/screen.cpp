@@ -4,6 +4,7 @@
 #include <string.h>
 
 uint32_t screenPixels[SCREEN_W * SCREEN_H];
+uint32_t expandedPixels[EXPANDED_W * EXPANDED_H];
 uint32_t questPixels[QUEST_W * QUEST_H];
 uint32_t* screenTarget = screenPixels;
 int screenW = SCREEN_W, screenH = SCREEN_H;
@@ -95,10 +96,10 @@ void drawSpriteOutlined(const Sprite& sprite, int x, int y, bool flip, uint32_t 
     drawSpriteEx(sprite, x, y, flip, swapFrom, swapTo);
 }
 
-void drawSpriteSolid(const Sprite& sprite, int x, int y, uint32_t color) {
+void drawSpriteSolid(const Sprite& sprite, int x, int y, uint32_t color, bool flip) {
     for (int row = 0; row < sprite.h; row++)
         for (int col = 0; col < sprite.w; col++)
-            if (paletteColor(sprite.pixels[row * sprite.w + col])) fillRect(x + col, y + row, 1, 1, color);
+            if (paletteColor(sprite.pixels[row * sprite.w + col])) fillRect(x + (flip ? sprite.w - 1 - col : col), y + row, 1, 1, color);
 }
 
 void drawText(int x, int y, const char* text, uint32_t color, int scale) {
@@ -132,7 +133,7 @@ void drawMenu(const char* title, const char* const* items, int count, int select
 }
 
 bool screenSaveBmp(const char* path) {
-    const int imageSize = screenW * screenH * 3;   // rows are 960 or 1920 bytes, so no row padding
+    const int imageSize = screenW * screenH * 3;   // all three widths give rows aligned to 4 bytes
     uint8_t header[54] = {};
     auto put32 = [&](int offset, uint32_t value) {
         for (int i = 0; i < 4; i++) header[offset + i] = (uint8_t)(value >> (8 * i));
