@@ -1,7 +1,7 @@
 # Handoff: state of the work and how Claude and Codex share it
 
 **Read this first, update it before you stop.** Rules and commands are in `AGENTS.md`; conventions, questions between agents and the small-change lane are in `docs/COLLAB.md`; this file holds what changes between sessions.
-Updated: 2026-11-21 (Classic ship roles; NAME QUEST phase 4 built, phase 5 in progress).
+Updated: 2026-11-21 (Classic boss-wave revives and Magic Beam tuning, NAME QUEST phase 5 in progress).
 
 ## Classic shooter
 
@@ -28,7 +28,7 @@ Updated: 2026-11-21 (Classic ship roles; NAME QUEST phase 4 built, phase 5 in pr
 1. PS3 check per `phase-4-world-1.md` step 10 (ask the user first): travel to world 1 from slot 1; then the Star Mage from a dev save (`NAMEGAME_QUEST='slot=3 class=0 world=1 area=19 level=8 gear=1'` writes `build/mac/quest3.txt`; copy it to `pkgfiles/USRDIR/quest3.txt` (gitignored), `make ps3`, and delete the copy after).
 2. The user's world 1 playtest: record their notes in `docs/features/name-quest/testing.md`; don't retune before phase 9 unless something is broken.
 3. For the user to confirm: the Overseer's hover height is read as its centre 50 dp above the floor (see `implementation.md` › Deviations).
-4. Then phase 5 (worlds 2-3). It replaces world 2's placeholder room (`WORLD2_AREAS` in `quest_areas.cpp`); its rosters must be drawn at least 12 dp tall (extend `arrowsHitEveryGroundEnemy`).
+4. Phase 5 is in progress. Once the user approves world 3's look, build areas 1–19 (step 6), then continue with steps 7–10.
 5. Unused `AreaDef::npcs` entries must be written as eight -1s (0 is Ilsa); the area test checks it.
 
 ## Working split (suggestion, the user decides)
@@ -50,10 +50,14 @@ Updated: 2026-11-21 (Classic ship roles; NAME QUEST phase 4 built, phase 5 in pr
 - Spec examples that disagree with the spec formula `round(100 * 1.2^(L-1))`: 39→40 is 102,067 (spec 102,064), 29→30 is 16,484 (spec 10,646). The code follows the formula; the user decides.
 
 ## Session log (newest first; add a line per session: date, agent, what changed, what is next)
+- 2026-11-21, Codex: resolved the GDD and handoff conflicts for the merge of `codex/work` into `main`, keeping the Classic decisions and NAME QUEST phase 5 progress.
 - 2026-11-21, Claude: phase 5 steps 0-2 for world 2: art generator `world2.py` (palette, tiles, branch platforms, vines, water, thorns `^`, the thorn-root gate `g` via new `WorldArt::spikes/gate`, 13 props, 6 landmarks, coconut palms), the redrawn roster (leafhopper, beetle, stag, tree monkey, rhino) and both bosses; layers and details; coconuts `R`, banana throws, peels, stink mist; the Monkey King and the Silverback; area 0 in new `quest_world2.cpp` (placeholder removed). 7 new quest checks; `make ps3` builds. Next: the user's OK on the world 2 style frame (`shots/style-w2-*.png`), then step 3 (areas 1-19).
 - 2026-11-21, Claude: the user approved world 2's look; phase 5 step 3: world 2 areas 1-19 in `quest_world2.cpp` (graph block at the top; main path 0-1-2-3-4-5-6-7-8-9-10-18-19, Monkey King in 6, thorn gate in 7, DEPTHS in 9, Garrick in dead end 12 by the statue head, shortcut hatch 14→9, portals 16→1 and 17→0). World 2 added to the reachability, gate, layout and chest tests (`gateGuardsTheSecondHalf(world)`, `chestsMatchTheWorldList(world, deadEnds)`); quest tests green; `make quest-maps` read. Next: world 3 art and style frame.
 - 2026-11-21, Claude: phase 5 steps 4-5 and world 3's style frame: art generator `world3.py` (palette, snow-capped rock, ice `i` and 3-stage cracked ice `c` via new `WorldArt::ice/crumble`, ice slabs, frozen rope ladders, freezing water, ice spikes, the ice-wall gate, 11 props, 6 landmarks), the roster (snowflake, ice bat, frost skull, yeti cub, ice knight), the Yeti and the Glacier Titan, the ice shard; layers and details (snow at 3 depths, crystal glints, mist). Mechanics: crumbling blocks for every world (`TileTrap::kind`), icicles `Y` (gone until rest via killed bits 40+), world 3/6 wind zones at 40 px/s flipping every 3 s (`AreaState::windFlipped`), the frozen status (`Hero::frozenTimer`), the Titan's blizzard (`AreaState::wind`). Area 0 THE COLD MOUTH in new `quest_world3.cpp`. 6 new quest checks; `make ps3` builds. Next: the user's OK on `shots/style-w3-*.png`, then step 6 (areas 1-19).
 - 2026-11-21, Claude: the Thief stabs up with R1 + up (`Hero::attackUp`, upright box and arc above the head, quest check `thiefStabsUp`); Mac screenshot checked. Open: the user judges the look (body keeps the sideways stab pose); PS3 not checked.
+- 2026-11-21, Codex: set the Space buff's Magic Beam to 100 damage in both Classic variants (D-060). The beam checks and NAME QUEST tests passed. The other 50 shooter failures matched the baseline. A headless Mac screenshot confirmed the beam fired through a column of enemies in a three-player run.
+- 2026-11-21, Codex — Added boss-wave revives to Classic 1–2 Players. The focused regression and NAME QUEST passed, and shooter failures matched the baseline. Checked the returning ship and its two spare hearts in a Mac render. PS3 playtest pending.
+- 2026-11-21, Codex: checked the Classic Space buff tuning in code. The beam deals 60 damage per target in its column, and firing again during the charge restarts it and spends another rocket.
 - 2026-11-21, Claude: removed the square-wave hums under Namula and world 1 (the user's PS3 white noise); NAME QUEST music from the user's songs per place plus a boss song (D-057, `audioSetQuestSound`). PS3 listening checks open. Then: quitting the app now saves the NAME QUEST slot (spec §17); `scripts/ps3-lock.sh` leaves a game that was already running alone (new `make ps3-state`).
 - 2026-11-21, Codex — Added Classic ship roles for three- and four-player parties, with a per-controller chooser, role HUD, new sprites, and R2 specials. The new combat checks and NAME QUEST suite passed, and the shooter failures matched the baseline. Checked selection, drop-in and effects on the Mac and built the PS3 package. Next: PS3 couch playtest when requested.
 - 2026-11-21, Claude: the user approved world 1's look. World 1's 20 areas built (`quest_world1.cpp`), world 1 in the reachability test plus gate, layout-rule and chest checks; all 40 map screens read; the Overseer now hovers with its centre at 50 dp (was unreachable); a locked arena's ladder down no longer kills; boss fights measured with scratch bots. Next: step 10 on the PS3 when the user asks.

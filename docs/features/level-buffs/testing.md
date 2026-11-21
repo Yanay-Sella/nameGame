@@ -1,6 +1,6 @@
 # Level buffs: testing
 
-**Updated:** 2026-11-18 · [Design](design.md) · [Implementation](implementation.md)
+**Updated:** 2026-11-21 · [Design](design.md) · [Implementation](implementation.md)
 
 ## Acceptance criteria
 - [x] Every skin is 16×14 and player 2's skins have no cyan cockpit. *(`tests/game_tests.cpp` › shipSkinsKeepTheBody)*
@@ -8,7 +8,7 @@
 - [x] A buff is given once; a repeat pays 5,000; a strong-attack buff arms itself. *(buffPickupGivesTheBuffOnce)*
 - [x] Dying loses every buff. *(dyingLosesEveryBuff)*
 - [x] Square cycles the held strong attacks. *(squareCyclesHeldStrongAttacks)*
-- [x] The magic beam hits its column once for 30. *(magicBeamHitsItsColumnOnce)*
+- [x] The magic beam deals 100 damage once to each alien in its column when it reaches the top. *(magicBeamHitsItsColumnOnce, magicBeamHitsWhenItReachesTheTop)*
 - [x] The frost wave freezes, heals, shatters and thaws. *(frostWaveFreezesHealsAndShatters)*
 - [x] The volcano buff fires 25 % faster. *(volcanoBuffFiresAQuarterFaster)*
 - [x] The shield takes one hit and its bubbles chain for 78 damage. *(bubbleShieldTakesAHitAndChains)*
