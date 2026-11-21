@@ -12,11 +12,12 @@ The game opens on a main menu with room for more game modes, and a settings scre
 5. Start during a run opens the pause menu over the frozen game: RESUME, SETTINGS, RETURN TO MENU. Start or Circle also resume. RETURN TO MENU ends the run without confirmation and stops the music. A controller disconnect also opens it, with the hint CONNECT CONTROLLER n, and RESUME waits for that controller.
 6. OFF means no song plays; sound effects are unaffected. Changing the music while paused switches at once: a song starts from the beginning, OFF stops it. Changing it from the main menu plays nothing.
 7. At game over and on the level-clear end screen, X or Start replays the same variant, starting level and party size. Circle goes to the main menu. A 1–4 player replay goes to the controller lobby if fewer than three pads are connected or a party member's port is missing.
-8. Every connected controller drives the menus. Up/down is a D-pad press or a left-stick flick, and the cursor wraps around.
-9. X selects. Start selects too, except in the pause menu, where Start resumes.
+8. Every connected controller drives the shared menus. Up/down is a D-pad press or a left-stick flick, and the cursor wraps around.
+9. X selects. Start also selects in shared menus and resumes from pause.
 10. Circle goes back to the prior menu. In the pause menu it resumes once all joined controllers are connected.
 11. The level picker is a wheel titled `LEVEL` with SPACE, JUNGLE, GLACIER, VOLCANO and DEEP SEA. The picked level is in the middle at double size in yellow. The two levels above and the two below are at normal size, white nearest the selection and grey farthest away. Up and Down spin the wheel one row with wrapping, and the background previews the picked level. X plays just that level and its clear is the win. Circle returns to Classic with LEVEL PICKER selected. If the last run came from the picker, the wheel opens on that run's level.
 12. Classic 1–4 Players opens a lobby with the live count and the PS3 port available to each player. X or Start only starts play with at least three pads connected. The party defaults to the number of available pads, up to four. Left and right set the starting party size. Circle returns to the Classic menu.
+13. A three- or four-ship party opens CHOOSE YOUR ROLE. Left or right on each assigned controller changes that player's ship. X readies it. Circle unreadies it or backs out from an unready slot. The run starts or resumes once all assigned controllers are connected and ready. See [Co-op](../co-op/design.md) for drop-in and replay rules.
 
 ## Numbers
 | Name | Value | Unit | What to watch in playtests |

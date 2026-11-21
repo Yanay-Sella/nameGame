@@ -101,6 +101,15 @@ const float EXPANDED_SPAWN_SPACING = 60;  // px
 const float EXPANDED_UPGRADE_CHANCE = 0.02f;
 const float EXPANDED_HP_SCALE[MAX_PLAYERS] = {1.5f, 1.75f, 2.0f, 2.25f};
 const char PLAYER_COLORS[MAX_PLAYERS] = {'w', 'Y', 'c', 'p'};
+const char* const ROLE_NAMES[ROLE_COUNT] = {"FIGHTER", "TANK", "ASSASSIN", "MAGE"};
+const char* const ROLE_SPECIALS[ROLE_COUNT] = {"ROCKET", "HEAVY ROCKET", "PHASE FOR 5S", "ORB FAN"};
+const float ROLE_SPEED[ROLE_COUNT] = {1, 0.75f, 1.3f, 1};
+const float ROLE_FIRE_INTERVAL[ROLE_COUNT] = {1, 1.5f, 0.7f, 1};
+const float ROLE_BULLET_DAMAGE[ROLE_COUNT] = {0, 2, 0.75f, 1.5f};   // Fighter uses the stock bullet path
+const float TANK_ARMOR_GRACE = 0.75f, TANK_ROCKET_SPEED = 350, TANK_BLAST_RADIUS = 60;
+const float ASSASSIN_PHASE_TIME = 5;
+const int MAGE_ORB_COUNT = 7;
+const float MAGE_ORB_DAMAGE = 4, MAGE_ORB_SPEED = 215, MAGE_ORB_SPACING = 0.14f, MAGE_MAX_AIM = 0.4f;
 // Level 1 (level-1/design.md)
 const int LEVEL_LAST_WAVE = 20;        // the level boss's wave; killing it ends the run
 const float LEVEL_BANNER_TIME = 2;     // s of "LEVEL 1" before "WAVE 1"
@@ -320,6 +329,8 @@ int Game::arenaHeight() const { return variant == CLASSIC_EXPANDED ? EXPANDED_H 
 
 static void startWave(Game& game, int wave) {
     game.wave = wave;
+    for (Shot& bullet : game.bullets)
+        if (bullet.rolePower > 0) bullet.hitList.clear();   // the new enemies may reuse the old slots
     game.aliens.clear();
     bool expanded = game.variant == CLASSIC_EXPANDED;
     int arenaW = game.arenaWidth(), extraHeight = game.arenaHeight() - SCREEN_H;
@@ -459,7 +470,8 @@ static Player newPlayer(const Game& game, int index) {
     return player;
 }
 
-void startGame(Game& game, int playerCount, uint32_t seed, int level, bool singleLevel, ClassicVariant variant) {
+void startGame(Game& game, int playerCount, uint32_t seed, int level, bool singleLevel, ClassicVariant variant,
+               const ShipRole* roles) {
     game = Game();
     game.level = level;
     game.singleLevel = singleLevel;
@@ -468,7 +480,10 @@ void startGame(Game& game, int playerCount, uint32_t seed, int level, bool singl
     game.swayDirection = 1;
     playerCount = std::max(1, std::min(playerCount, game.playerLimit()));
     game.players.resize(playerCount);
-    for (int i = 0; i < playerCount; i++) game.players[i] = newPlayer(game, i);
+    for (int i = 0; i < playerCount; i++) {
+        game.players[i] = newPlayer(game, i);
+        if (roles && playerCount > STANDARD_PLAYERS) game.players[i].role = roles[i];
+    }
     for (int layer = 0; layer < 3; layer++)
         for (int i = 0; i < STAR_COUNTS[layer]; i++) {
             Star star = {randomUnit(game) * game.arenaWidth(), randomUnit(game) * game.arenaHeight(), layer};
@@ -477,12 +492,17 @@ void startGame(Game& game, int playerCount, uint32_t seed, int level, bool singl
     startWave(game, 1);
 }
 
-bool joinGame(Game& game) {
+bool joinGame(Game& game, const ShipRole* roles) {
     int index = (int)game.players.size();
     if (index >= game.playerLimit() || game.over || game.levelClear) return false;
     game.players.emplace_back();
     game.players.back() = newPlayer(game, index);
     game.players.back().invincibleTimer = INVINCIBLE_TIME;
+    if (roles && index >= STANDARD_PLAYERS) {
+        game.players.back().role = roles[index];
+        if (index == STANDARD_PLAYERS)
+            for (int i = 0; i < index; i++) game.players[i].role = roles[i];
+    }
     game.soundRequested[SOUND_EXTRA_LIFE] = true;
     return true;
 }
@@ -547,7 +567,7 @@ static void spawnBeamShards(Game& game, float x, float top, float bottom, int wi
     }
 }
 
-static void damageAlien(Game& game, Alien& alien, int damage, int owner) {
+static void damageAlien(Game& game, Alien& alien, float damage, int owner) {
     alien.hp -= damage;
     alien.flash = HIT_FLASH;
     if (alien.hp > 0) {
@@ -567,7 +587,7 @@ static void damageAlien(Game& game, Alien& alien, int damage, int owner) {
     game.soundRequested[SOUND_ALIEN_DEATH] = true;
 }
 
-static void damageBoss(Game& game, Boss& boss, int damage, int owner) {
+static void damageBoss(Game& game, Boss& boss, float damage, int owner) {
     boss.hp -= damage;
     boss.flash = HIT_FLASH;
     if (boss.hp > 0) {
@@ -598,13 +618,13 @@ static void damageBoss(Game& game, Boss& boss, int damage, int owner) {
 }
 
 // A rocket blast: every alien whose centre is within the radius (plus half an alien) takes the damage once.
-static void explode(Game& game, float x, float y, int owner) {
-    Explosion explosion = {x, y, 0, EXPLOSION_RADIUS};
+static void explode(Game& game, float x, float y, int owner, float radius) {
+    Explosion explosion = {x, y, 0, radius};
     game.explosions.push_back(explosion);
     spawnParticles(game, x, y, BLAST_PARTICLES, paletteColor('o'), 80);
     feedback(game, TRAUMA_BLAST, STOP_BLAST, FLASH_BLAST);
     for (Alien& alien : game.aliens) {
-        float reach = EXPLOSION_RADIUS + ALIEN_WIDTH[alien.type] / 2.0f;
+        float reach = radius + ALIEN_WIDTH[alien.type] / 2.0f;
         float dx = alien.x + ALIEN_WIDTH[alien.type] / 2.0f - x, dy = alien.y + ALIEN_HEIGHT[alien.type] / 2.0f - y;
         if (alien.alive && dx * dx + dy * dy <= reach * reach) damageAlien(game, alien, EXPLOSION_DAMAGE, owner);
     }
@@ -612,12 +632,12 @@ static void explode(Game& game, float x, float y, int owner) {
     for (Boss& boss : game.bosses) {
         float nearestX = std::max(boss.x, std::min(x, boss.x + BOSS_W));
         float nearestY = std::max(boss.y, std::min(y, boss.y + BOSS_H));
-        if (boss.alive && (nearestX - x) * (nearestX - x) + (nearestY - y) * (nearestY - y) <= EXPLOSION_RADIUS * EXPLOSION_RADIUS)
+        if (boss.alive && (nearestX - x) * (nearestX - x) + (nearestY - y) * (nearestY - y) <= radius * radius)
             damageBoss(game, boss, EXPLOSION_DAMAGE, owner);
     }
     for (Fish& f : game.fish) {   // live fish inside the blast die
         float dx = f.x + FISH_W / 2.0f - x, dy = f.y + FISH_H / 2.0f - y;
-        if (f.life <= 0 || dx * dx + dy * dy > EXPLOSION_RADIUS * EXPLOSION_RADIUS) continue;
+        if (f.life <= 0 || dx * dx + dy * dy > radius * radius) continue;
         f.life = 0;   // removed in updateGame
         if (owner >= 0) addScore(game, game.players[owner], FISH_SCORE);
         spawnParticles(game, f.x + FISH_W / 2.0f, f.y + FISH_H / 2.0f, 8, paletteColor('O'), 50);
@@ -637,6 +657,8 @@ static void killPlayer(Game& game, Player& player) {
     player.upgradeTimer = 0;
     player.buffs = player.strongAttack = 0;   // dying loses every buff
     player.shield = false;
+    player.armorSpent = false;
+    player.phaseTimer = 0;
     player.beamCharge = player.beamTimer = 0;
     feedback(game, TRAUMA_PLAYER_DEATH, STOP_PLAYER_DEATH, FLASH_PLAYER_DEATH);
     float cx = player.x + SHIP_W / 2.0f, cy = player.y + SHIP_H / 2.0f;
@@ -654,10 +676,10 @@ static void frostWave(Game& game, const Player& player) {
     game.frostX = player.x + SHIP_W / 2.0f;
     game.frostY = player.y + SHIP_H / 2.0f;
     for (Alien& alien : game.aliens)
-        if (alien.alive) alien.hp = std::min(alien.hp + (alien.maxHp + 3) / 4, alien.maxHp);
+        if (alien.alive) alien.hp = std::min(alien.hp + (alien.maxHp + 3) / 4, (float)alien.maxHp);
     for (Boss& boss : game.bosses) {
         if (!boss.alive) continue;
-        boss.hp = std::min(boss.hp + (boss.maxHp + 3) / 4, boss.maxHp);
+        boss.hp = std::min(boss.hp + (boss.maxHp + 3) / 4, (float)boss.maxHp);
         boss.burstShotsLeft = 0;
         boss.ballTimer = boss.beamTimer = boss.windupTimer = 0;
         boss.hookState = HOOK_NONE;
@@ -672,6 +694,31 @@ static void frostWave(Game& game, const Player& player) {
     game.fish.clear();
     feedback(game, TRAUMA_STRONG, 0, FLASH_BLAST);
     game.soundRequested[SOUND_FREEZE] = true;
+}
+
+static void launchMageOrbs(Game& game, const Player& player, int index) {
+    float x = player.x + SHIP_W / 2.0f, y = player.y - MAGE_ORB.h;
+    float best = (float)(game.arenaWidth() * game.arenaWidth() + game.arenaHeight() * game.arenaHeight());
+    float aim = 0;
+    auto consider = [&](float dx, float dy) {
+        float distance = dx * dx + dy * dy;
+        if (dy >= 0 || distance >= best) return;
+        best = distance;
+        aim = atan2f(dx, -dy);
+    };
+    for (const Alien& alien : game.aliens)
+        if (alien.alive && alien.y + ALIEN_HEIGHT[alien.type] >= 0)
+            consider(alien.x + ALIEN_WIDTH[alien.type] / 2.0f - x, alien.y + ALIEN_HEIGHT[alien.type] / 2.0f - y);
+    for (const Boss& boss : game.bosses)
+        if (boss.alive && boss.y + BOSS_H >= 0) consider(boss.x + BOSS_W / 2.0f - x, boss.y + BOSS_H / 2.0f - y);
+    aim = std::max(-MAGE_MAX_AIM, std::min(aim, MAGE_MAX_AIM));
+    for (int i = 0; i < MAGE_ORB_COUNT; i++) {
+        float angle = aim + (i - MAGE_ORB_COUNT / 2) * MAGE_ORB_SPACING;
+        game.bullets.emplace_back(x - MAGE_ORB.w / 2, y, -MAGE_ORB_SPEED * cosf(angle), index,
+                                  MAGE_ORB_SPEED * sinf(angle), MAGE_ORB_DAMAGE, true);
+    }
+    spawnParticles(game, x, y, 8, paletteColor('p'), 50);
+    game.soundRequested[SOUND_CAST] = true;
 }
 
 static void updatePlayer(Game& game, Player& player, int index, const Actions& a, float dt) {
@@ -720,6 +767,7 @@ static void updatePlayer(Game& game, Player& player, int index, const Actions& a
         }
     }
     player.invincibleTimer = std::max(0.0f, player.invincibleTimer - dt);
+    player.phaseTimer = std::max(0.0f, player.phaseTimer - dt);
     player.scorchTimer = std::max(0.0f, player.scorchTimer - dt);
     if (player.scorchTimer > 0 && randomUnit(game) < 0.3f)   // a scorched ship trails flames
         spawnParticles(game, player.x + SHIP_W / 2.0f, player.y + SHIP_H / 2.0f, 1, paletteColor('O'), 20);
@@ -737,7 +785,7 @@ static void updatePlayer(Game& game, Player& player, int index, const Actions& a
         player.rocketPressedAt = -1;
         return;
     }
-    float speed = SHIP_SPEED * (player.scorchTimer > 0 ? SCORCH_SPEED : 1);
+    float speed = SHIP_SPEED * ROLE_SPEED[player.role] * (player.scorchTimer > 0 ? SCORCH_SPEED : 1);
     float targetX = a.moveX * speed, targetY = a.moveY * speed;
     if (game.level == 5) targetX += SEA_CURRENT * sinf(game.time * CURRENT_RATE);   // the deep sea's current pushes every ship
     float grip = game.level == 3 ? std::min(1.0f, ICE_GRIP * dt) : 1;   // the glacier's ice: the speed eases toward the stick's
@@ -765,7 +813,7 @@ static void updatePlayer(Game& game, Player& player, int index, const Actions& a
             game.particles.push_back({nozzleX, player.y + SHIP_H, (randomUnit(game) - 0.5f) * 16, -TRAIL_RISE, TRAIL_LIFE, paletteColor('i'), 1});
         }
     }
-    if (player.slideTimer == 0 && player.stunTimer == 0) {
+    if (player.slideTimer == 0 && player.stunTimer == 0 && player.phaseTimer == 0) {
         for (Peel& peel : game.peels) {   // stepping on a peel starts a slide the way the stick points
             if (peel.life <= 0 || !overlap(peel.x, peel.y, PEEL_W, PEEL_H, player.x + HITBOX_X, player.y + HITBOX_Y, HITBOX, HITBOX)) continue;
             float length = sqrtf(a.moveX * a.moveX + a.moveY * a.moveY);
@@ -782,17 +830,19 @@ static void updatePlayer(Game& game, Player& player, int index, const Actions& a
     player.fireTimer -= dt;
     if (a.fire && player.fireTimer <= 0) {
         float noseX = player.x + SHIP_W / 2 - 1, noseY = player.y - 4;
+        float damage = ROLE_BULLET_DAMAGE[player.role];
         if (player.weaponLevel == 1) {
-            game.bullets.push_back({noseX, noseY, -BULLET_SPEED, index, 0});
+            game.bullets.emplace_back(noseX, noseY, -BULLET_SPEED, index, 0, damage);
         } else if (player.weaponLevel == 2) {
-            game.bullets.push_back({noseX - DOUBLE_OFFSET, noseY, -BULLET_SPEED, index, 0});
-            game.bullets.push_back({noseX + DOUBLE_OFFSET, noseY, -BULLET_SPEED, index, 0});
+            game.bullets.emplace_back(noseX - DOUBLE_OFFSET, noseY, -BULLET_SPEED, index, 0, damage);
+            game.bullets.emplace_back(noseX + DOUBLE_OFFSET, noseY, -BULLET_SPEED, index, 0, damage);
         } else {
-            game.bullets.push_back({noseX, noseY, -BULLET_SPEED, index, -SPREAD_SPEED});
-            game.bullets.push_back({noseX, noseY, -BULLET_SPEED, index, 0});
-            game.bullets.push_back({noseX, noseY, -BULLET_SPEED, index, SPREAD_SPEED});
+            game.bullets.emplace_back(noseX, noseY, -BULLET_SPEED, index, -SPREAD_SPEED, damage);
+            game.bullets.emplace_back(noseX, noseY, -BULLET_SPEED, index, 0, damage);
+            game.bullets.emplace_back(noseX, noseY, -BULLET_SPEED, index, SPREAD_SPEED, damage);
         }
-        player.fireTimer += (player.weaponLevel == MAX_WEAPON_LEVEL ? FAST_FIRE_INTERVAL : FIRE_INTERVAL) * (player.buffs & BUFF_VOLCANO ? VOLCANO_FIRE_FACTOR : 1);
+        player.fireTimer += (player.weaponLevel == MAX_WEAPON_LEVEL ? FAST_FIRE_INTERVAL : FIRE_INTERVAL) *
+                            ROLE_FIRE_INTERVAL[player.role] * (player.buffs & BUFF_VOLCANO ? VOLCANO_FIRE_FACTOR : 1);
         player.muzzleTimer = MUZZLE_TIME;
         game.soundRequested[SOUND_SHOOT] = true;
     }
@@ -805,7 +855,8 @@ static void updatePlayer(Game& game, Player& player, int index, const Actions& a
     if (player.rocketPressedAt >= 0 && player.rocketCooldown == 0) {
         player.rocketPressedAt = -1;
         bool shieldUp = player.strongAttack == 5 && player.shield;   // a second shield can't stack and costs nothing
-        if (player.rockets > 0 && !shieldUp) {
+        bool phaseUp = player.strongAttack == 0 && player.phaseTimer > 0;
+        if (player.rockets > 0 && !shieldUp && !phaseUp) {
             player.rockets--;
             player.rocketCooldown = ROCKET_COOLDOWN;
             if (player.strongAttack == 1) {
@@ -819,8 +870,17 @@ static void updatePlayer(Game& game, Player& player, int index, const Actions& a
             } else if (player.strongAttack == 5) {
                 player.shield = true;
                 game.soundRequested[SOUND_BUBBLE] = true;
+            } else if (player.role == ROLE_ASSASSIN) {
+                player.phaseTimer = ASSASSIN_PHASE_TIME;
+                spawnParticles(game, player.x + SHIP_W / 2, player.y + SHIP_H / 2, 12, paletteColor('i'), 50);
+                game.soundRequested[SOUND_BUBBLE] = true;
+            } else if (player.role == ROLE_MAGE) {
+                launchMageOrbs(game, player, index);
             } else {
-                Rocket rocket = {player.x + SHIP_W / 2 - 2, player.y - 8, ROCKET_START_SPEED, index};
+                bool heavy = player.role == ROLE_TANK;
+                const Sprite& sprite = heavy ? HEAVY_ROCKET : ROCKET;
+                Rocket rocket = {player.x + (SHIP_W - sprite.w) / 2.0f, player.y - sprite.h,
+                                 heavy ? TANK_ROCKET_SPEED : ROCKET_START_SPEED, index, heavy};
                 game.rockets.push_back(rocket);
                 game.soundRequested[SOUND_ROCKET_LAUNCH] = true;
             }
@@ -937,7 +997,7 @@ static void updateHook(Game& game, Boss& boss, const Player* target, float dt) {
         }
         for (size_t i = 0; i < game.players.size() && boss.hookState != HOOK_REEL; i++) {
             Player& p = game.players[i];
-            if (!p.alive || p.invincibleTimer > 0 || p.hookedTimer > 0) continue;
+            if (!p.alive || p.invincibleTimer > 0 || p.phaseTimer > 0 || p.hookedTimer > 0) continue;
             if (!overlap(boss.hookX - 2, boss.hookY, 5, 6, p.x + 3, p.y + 2, 10, 10)) continue;
             p.hookedTimer = HOOK_STUN;
             p.hookLiftTo = std::max(MOVE_ZONE_TOP, p.y - HOOK_LIFT);
@@ -1263,10 +1323,11 @@ void updateGame(Game& game, const Actions* actions, float dt) {
     for (size_t i = 0; i < game.players.size(); i++) updatePlayer(game, game.players[i], (int)i, actions[i], dt);
     for (Player& player : game.players) {   // a ship whose centre is in a stink mist makes its bullets heal gorillas
         player.inMist = false;
+        if (!player.alive || player.phaseTimer > 0) continue;
         float cx = player.x + SHIP_W / 2.0f, cy = player.y + SHIP_H / 2.0f;
         for (const Mist& mist : game.mists) {
             float r = MIST_RADIUS * std::min(mist.age / MIST_GROW, 1.0f);
-            if (player.alive && (cx - mist.x) * (cx - mist.x) + (cy - mist.y) * (cy - mist.y) <= r * r) player.inMist = true;
+            if ((cx - mist.x) * (cx - mist.x) + (cy - mist.y) * (cy - mist.y) <= r * r) player.inMist = true;
         }
     }
 
@@ -1302,33 +1363,39 @@ void updateGame(Game& game, const Actions* actions, float dt) {
     for (Shot& bullet : game.bullets) {
         bullet.x += bullet.vx * dt;
         bullet.y += bullet.vy * dt;
-        // Jungle bullets pierce: each enemy passed halves the damage (fractions carry in `owed`).
-        bool pierce = game.players[bullet.owner].buffs & BUFF_JUNGLE;
-        float power = (game.players[bullet.owner].scorchTimer > 0 ? SCORCH_DAMAGE : 1) / (float)(1 << std::min(bullet.pierced, 20));
-        for (Alien& alien : game.aliens) {
-            if (bullet.y <= -50 || !alien.alive || alien.y + ALIEN_HEIGHT[alien.type] < 0 || !overlap(bullet.x, bullet.y, 2, 4, alien.x, alien.y, ALIEN_WIDTH[alien.type], ALIEN_HEIGHT[alien.type])) continue;
-            if (std::find(bullet.hitList.begin(), bullet.hitList.end(), &alien) != bullet.hitList.end()) continue;
+        const Player& owner = game.players[bullet.owner];
+        bool pierce = bullet.magicBall || (owner.buffs & BUFF_JUNGLE);
+        float power = bullet.rolePower > 0 ? bullet.rolePower : 1;
+        if (!bullet.magicBall && owner.scorchTimer > 0) power *= SCORCH_DAMAGE;
+        power = ldexpf(power, bullet.magicBall ? -bullet.pierced : -std::min(bullet.pierced, 20));
+        int width = bullet.magicBall ? MAGE_ORB.w : 2, height = bullet.magicBall ? MAGE_ORB.h : 4;
+        auto hitDamage = [&]() -> float {
+            if (bullet.rolePower > 0) return power;
             bullet.owed += power;
-            int damage = (int)bullet.owed;
-            bullet.owed -= damage;
+            int whole = (int)bullet.owed;
+            bullet.owed -= whole;
+            return (float)whole;
+        };
+        for (Alien& alien : game.aliens) {
+            if (bullet.y <= -50 || !alien.alive || alien.y + ALIEN_HEIGHT[alien.type] < 0 || !overlap(bullet.x, bullet.y, width, height, alien.x, alien.y, ALIEN_WIDTH[alien.type], ALIEN_HEIGHT[alien.type])) continue;
+            if (std::find(bullet.hitList.begin(), bullet.hitList.end(), &alien) != bullet.hitList.end()) continue;
+            float damage = hitDamage();
             if (damage > 0) damageAlien(game, alien, damage, bullet.owner);
             spawnHitSparks(game, bullet.x + 1, bullet.y);
             if (pierce) { bullet.hitList.push_back(&alien); bullet.pierced++; power /= 2; }
             else bullet.y = -100;   // spent; removed below
         }
         for (Boss& boss : game.bosses) {
-            if (bullet.y <= -50 || !boss.alive || boss.y + BOSS_H < 0 || !overlap(bullet.x, bullet.y, 2, 4, boss.x, boss.y, BOSS_W, BOSS_H)) continue;
+            if (bullet.y <= -50 || !boss.alive || boss.y + BOSS_H < 0 || !overlap(bullet.x, bullet.y, width, height, boss.x, boss.y, BOSS_W, BOSS_H)) continue;
             if (std::find(bullet.hitList.begin(), bullet.hitList.end(), &boss) != bullet.hitList.end()) continue;
-            if (boss.type == BOSS_GORILLA && game.players[bullet.owner].inMist) {   // stink mist: the shot heals
-                boss.hp = std::min(boss.hp + 1, boss.maxHp);
+            if (!bullet.magicBall && boss.type == BOSS_GORILLA && owner.inMist) {   // stink mist: the shot heals
+                boss.hp = std::min(boss.hp + 1, (float)boss.maxHp);
                 if (boss.laughTimer == 0) game.soundRequested[SOUND_LAUGH] = true;
                 boss.laughTimer = LAUGH_TIME;
                 spawnParticles(game, bullet.x + 1, bullet.y, 2, paletteColor('l'), 30);
                 bullet.y = -100;   // spent; removed below
             } else {
-                bullet.owed += power;
-                int damage = (int)bullet.owed;
-                bullet.owed -= damage;
+                float damage = hitDamage();
                 if (damage > 0) damageBoss(game, boss, damage, bullet.owner);
                 spawnHitSparks(game, bullet.x + 1, bullet.y);
                 if (pierce) { bullet.hitList.push_back(&boss); bullet.pierced++; power /= 2; }
@@ -1336,26 +1403,30 @@ void updateGame(Game& game, const Actions* actions, float dt) {
             }
         }
         for (Fish& f : game.fish) {
-            if (bullet.y <= -50 || f.life <= 0 || !overlap(bullet.x, bullet.y, 2, 4, f.x, f.y, FISH_W, FISH_H)) continue;
+            if (bullet.y <= -50 || f.life <= 0 || !overlap(bullet.x, bullet.y, width, height, f.x, f.y, FISH_W, FISH_H)) continue;
             f.life = 0;   // removed below
             addScore(game, game.players[bullet.owner], FISH_SCORE);
             spawnParticles(game, f.x + FISH_W / 2.0f, f.y + FISH_H / 2.0f, 8, paletteColor('O'), 50);
             game.soundRequested[SOUND_ALIEN_DEATH] = true;
-            bullet.y = -100;   // spent; removed below
+            if (bullet.magicBall) bullet.pierced++;
+            else bullet.y = -100;   // spent; removed below
         }
     }
 
     for (Rocket& rocket : game.rockets) {
-        rocket.speed = std::min(rocket.speed + ROCKET_ACCEL * dt, ROCKET_TOP_SPEED);
+        const Sprite& sprite = rocket.heavy ? HEAVY_ROCKET : ROCKET;
+        if (!rocket.heavy) rocket.speed = std::min(rocket.speed + ROCKET_ACCEL * dt, ROCKET_TOP_SPEED);
         rocket.y -= rocket.speed * dt;
         bool hit = rocket.y < 0;
         for (const Alien& alien : game.aliens)
-            if (alien.alive && alien.y + ALIEN_HEIGHT[alien.type] >= 0 && overlap(rocket.x, rocket.y, 4, 8, alien.x, alien.y, ALIEN_WIDTH[alien.type], ALIEN_HEIGHT[alien.type])) hit = true;
+            if (alien.alive && alien.y + ALIEN_HEIGHT[alien.type] >= 0 && overlap(rocket.x, rocket.y, sprite.w, sprite.h, alien.x, alien.y, ALIEN_WIDTH[alien.type], ALIEN_HEIGHT[alien.type])) hit = true;
         for (const Boss& boss : game.bosses)
-            if (boss.alive && boss.y + BOSS_H >= 0 && overlap(rocket.x, rocket.y, 4, 8, boss.x, boss.y, BOSS_W, BOSS_H)) hit = true;
-        for (const Fish& f : game.fish) if (f.life > 0 && overlap(rocket.x, rocket.y, 4, 8, f.x, f.y, FISH_W, FISH_H)) hit = true;
+            if (boss.alive && boss.y + BOSS_H >= 0 && overlap(rocket.x, rocket.y, sprite.w, sprite.h, boss.x, boss.y, BOSS_W, BOSS_H)) hit = true;
+        for (const Fish& f : game.fish)
+            if (f.life > 0 && overlap(rocket.x, rocket.y, sprite.w, sprite.h, f.x, f.y, FISH_W, FISH_H)) hit = true;
         if (hit) {
-            explode(game, rocket.x + 2, std::max(rocket.y, 0.0f) + 4, rocket.owner);
+            explode(game, rocket.x + sprite.w / 2.0f, std::max(rocket.y, 0.0f) + sprite.h / 2.0f, rocket.owner,
+                    rocket.heavy ? TANK_BLAST_RADIUS : EXPLOSION_RADIUS);
             rocket.y = -1000;   // spent; removed below
         }
     }
@@ -1474,6 +1545,7 @@ void updateGame(Game& game, const Actions* actions, float dt) {
         if (!player.alive) continue;
         float hx = player.x + HITBOX_X, hy = player.y + HITBOX_Y;
         for (Thrown& t : game.thrown) {   // ice blocks freeze and lava drops scorch, even a blinking ship; neither kills
+            if (player.phaseTimer > 0) break;
             if (t.kind != THROWN_ICE_BLOCK && t.kind != THROWN_LAVA_DROP && t.kind != THROWN_BIG_LAVA) continue;
             if (!overlap(t.x + 1, t.y + 1, THROWN_W[t.kind] - 2, THROWN_H[t.kind] - 2, hx, hy, HITBOX, HITBOX)) continue;
             if (t.kind == THROWN_ICE_BLOCK) {
@@ -1488,7 +1560,7 @@ void updateGame(Game& game, const Actions* actions, float dt) {
             }
             t.y = arenaH + 100;   // spent; removed below
         }
-        if (player.invincibleTimer == 0) {
+        if (player.invincibleTimer == 0 && player.phaseTimer == 0) {
             bool hit = false;
             for (Shot& shot : game.enemyShots) {
                 if (!hit && overlap(shot.x, shot.y, 2, 4, hx, hy, HITBOX, HITBOX)) {
@@ -1528,6 +1600,12 @@ void updateGame(Game& game, const Actions* actions, float dt) {
                 spawnParticles(game, player.x + SHIP_W / 2.0f, player.y + SHIP_H / 2.0f, 10, paletteColor('i'), 50);
                 feedback(game, TRAUMA_STRONG, 0, 0);
                 game.soundRequested[SOUND_BUBBLE] = true;
+            } else if (hit && player.role == ROLE_TANK && !player.armorSpent) {
+                player.armorSpent = true;
+                player.invincibleTimer = TANK_ARMOR_GRACE;
+                spawnParticles(game, player.x + SHIP_W / 2, player.y + SHIP_H / 2, 14, paletteColor('Y'), 65);
+                feedback(game, TRAUMA_STRONG, 0, 0);
+                game.soundRequested[SOUND_ALIEN_HIT] = true;
             } else if (hit) {
                 killPlayer(game, player);
                 continue;
@@ -2001,6 +2079,18 @@ void drawBackground(const Game& game) {
     for (const Star& star : game.stars) fillRect((int)(star.x * sx), (int)(star.y * sy), 1, 1, paletteColor(STAR_COLORS[star.layer]));
 }
 
+void drawShip(ShipRole role, int playerIndex, int level, int frame, int x, int y, bool phased) {
+    if (role == ROLE_FIGHTER) {
+        const Sprite& ship = *SHIP_SKINS[level - 1][playerIndex == 0 ? 0 : 1][frame];
+        if (playerIndex < STANDARD_PLAYERS) drawSprite(ship, x, y);
+        else drawSpriteEx(ship, x, y, false, 'Y', paletteColor(PLAYER_COLORS[playerIndex]));
+        return;
+    }
+    const Sprite& ship = role == ROLE_TANK ? TANK_SHIP : role == ROLE_MAGE ? MAGE_SHIP
+                                         : phased ? PHASED_SHIP : ASSASSIN_SHIP;
+    drawSpriteEx(ship, x, y, false, 'Y', paletteColor(playerIndex == 0 ? 'b' : PLAYER_COLORS[playerIndex]));
+}
+
 void drawGame(const Game& game) {
     drawBackground(game);
 
@@ -2085,7 +2175,11 @@ void drawGame(const Game& game) {
     for (const Shot& bullet : game.bullets) {
         const Player& owner = game.players[bullet.owner];
         bool banana = owner.buffs & BUFF_JUNGLE, fiery = (owner.buffs & BUFF_VOLCANO) || owner.scorchTimer > 0;
-        if (owner.inMist) {
+        if (bullet.magicBall) {
+            int x = (int)bullet.x, y = (int)bullet.y;
+            fillRect(x + 2, y + 4, 1, 3, paletteColor('p'));
+            drawSprite(MAGE_ORB, x, y);
+        } else if (owner.inMist) {
             fillRect((int)bullet.x, (int)bullet.y, 2, 4, paletteColor('l'));   // heals gorillas
         } else if (banana) {
             drawSprite(fiery ? FIRE_BANANA : PLAYER_BANANA, (int)bullet.x, (int)bullet.y - 1);
@@ -2098,7 +2192,7 @@ void drawGame(const Game& game) {
             drawSprite(BULLET, (int)bullet.x, (int)bullet.y);
         }
     }
-    for (const Rocket& rocket : game.rockets) drawSprite(ROCKET, (int)rocket.x, (int)rocket.y);
+    for (const Rocket& rocket : game.rockets) drawSprite(rocket.heavy ? HEAVY_ROCKET : ROCKET, (int)rocket.x, (int)rocket.y);
     for (const Player& player : game.players) {   // the magic ball at the wand, then its beam
         if (!player.alive) continue;
         if (player.beamCharge > 0) {
@@ -2122,12 +2216,10 @@ void drawGame(const Game& game) {
     for (size_t i = 0; i < game.players.size(); i++) {
         const Player& player = game.players[i];
         bool blinkOff = player.invincibleTimer > 0 && fmodf(player.invincibleTimer, 2 * BLINK_PERIOD) < BLINK_PERIOD;
-        const Sprite& ship = *SHIP_SKINS[game.level - 1][i == 0 ? 0 : 1][frame];
         bool shaking = player.slideTimer > 0 || player.stunTimer > 0 || player.hookedTimer > 0;
         int shipShake = shaking && (int)(game.feelTime * 30) % 2 ? 1 : 0;
-        if (player.alive && !blinkOff) {
-            if (i < STANDARD_PLAYERS) drawSprite(ship, (int)player.x + shipShake, (int)player.y);
-            else drawSpriteEx(ship, (int)player.x + shipShake, (int)player.y, false, 'Y', paletteColor(PLAYER_COLORS[i]));
+        if (player.alive && (!blinkOff || player.phaseTimer > 0)) {
+            drawShip(player.role, (int)i, game.level, frame, (int)player.x + shipShake, (int)player.y, player.phaseTimer > 0);
             const Sprite* wand = player.strongAttack == 1 ? &WAND : player.strongAttack == 3 ? &WAND_ICE : player.strongAttack == 5 ? &WAND_BUBBLE : NULL;
             if (wand) drawSprite(*wand, (int)player.x + 13 + shipShake, (int)player.y + 2);   // holds the armed strong attack's wand
             if (player.muzzleTimer > 0) {   // a white core over an orange flare at each gun
@@ -2285,6 +2377,19 @@ void drawGame(const Game& game) {
         else snprintf(text, sizeof text, "SCORE %07d", player.score);
         drawText(hudX(0, textWidth(text)), 2, text, paletteColor(expanded ? PLAYER_COLORS[p] : 'w'));
         for (int i = 0; i < player.lives - 1; i++) drawSprite(LIFE_ICON, hudX(i * 9, LIFE_ICON.w), 9);
+        if (expanded && playerCount > STANDARD_PLAYERS) {
+            const char* role = ROLE_NAMES[player.role];
+            int labelWidth = textWidth(role);
+            drawText(hudX(0, labelWidth), 17, role, paletteColor(PLAYER_COLORS[p]));
+            if (player.role == ROLE_TANK && player.lives > 0) {
+                fillRect(hudX(labelWidth + 4, 3), 17, 3, 5, paletteColor('Y'));
+                fillRect(hudX(labelWidth + 9, 3), 17, 3, 5, paletteColor(player.armorSpent ? 'd' : 'Y'));
+            }
+            if (player.phaseTimer > 0) {
+                int width = (int)ceilf(labelWidth * player.phaseTimer / ASSASSIN_PHASE_TIME);
+                fillRect(hudX(0, width), 24, width, 1, paletteColor('i'));
+            }
+        }
         for (int i = 0; i < player.rockets; i++) drawSprite(ROCKET_ICON, hudX(i * 5, ROCKET_ICON.w), screenH - 7);
         int strongHeld = 0, passiveHeld = 0;
         for (int level = 1; level <= LEVEL_COUNT; level++) {   // strong attacks just above the rockets (armed one underlined), passive buffs above them
@@ -2311,18 +2416,19 @@ void drawGame(const Game& game) {
             }
         }
     }
-    int bossHp = 0, bossMaxHp = 0;
+    float bossHp = 0;
+    int bossMaxHp = 0;
     bool anyBossAlive = false, anyLaughing = false;
     for (const Boss& boss : game.bosses) {
         anyLaughing |= boss.laughTimer > 0;
-        bossHp += std::max(boss.hp, 0);
+        bossHp += std::max(boss.hp, 0.0f);
         bossMaxHp += boss.maxHp;
         anyBossAlive |= boss.alive;
     }
     if (anyBossAlive) {
         int barX = (screenW - BOSS_HEALTH_BAR_W) / 2;
         fillRect(barX, BOSS_HEALTH_BAR_Y, BOSS_HEALTH_BAR_W, 3, paletteColor('R'));
-        fillRect(barX, BOSS_HEALTH_BAR_Y, BOSS_HEALTH_BAR_W * bossHp / bossMaxHp, 3, paletteColor(anyLaughing ? 'l' : 'r'));
+        fillRect(barX, BOSS_HEALTH_BAR_Y, (int)(BOSS_HEALTH_BAR_W * bossHp / bossMaxHp), 3, paletteColor(anyLaughing ? 'l' : 'r'));
     }
     if (playerCount < game.playerLimit() && !game.over && !game.levelClear) {
         snprintf(text, sizeof text, "%dP PRESS START", playerCount + 1);

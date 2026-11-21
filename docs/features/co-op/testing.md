@@ -19,6 +19,16 @@
 - [x] A spare simulated pad joins in play. Unplugging a joined pad pauses and blocks Resume until its port reconnects. *(Mac scripted input and screenshots, 2026-11-21)*
 - [ ] Verify four physical controllers, PS button menu exit, reconnect, TV readability and 60 fps in the expanded arena. *(PS3 playtest pending)*
 
+## Ship roles
+
+- [x] Picks apply only to expanded parties of at least three. Joining third preserves the run's score and joining fourth preserves existing roles. *(`tests/game_tests.cpp` › `rolesRequireThreeExpandedPlayers`)*
+- [x] Fighter and Mage share base move speed and fire cadence. Tank is slower with the highest single-shot damage. Assassin is faster with lower damage per shot. *(`tests/game_tests.cpp` › `rolesApplyMovementFireCadenceAndDamage`)*
+- [x] Tank loses armor before a life, gets armor back on respawn, and launches a rocket that damages enemies outside the standard radius. *(`tests/game_tests.cpp` › `tankArmorAndHeavyRocket`)*
+- [x] Assassin phases through an enemy shot and an ice block, cannot extend the active phase, and can be hit again after five seconds. *(`tests/game_tests.cpp` › `assassinPhasesThroughAttacksForFiveSeconds`)*
+- [x] Mage fires seven orbs. A single orb deals 4, 2, 1 and 0.5 HP to four consecutive targets. *(`tests/game_tests.cpp` › `mageOrbsPierceEachEnemyOnceAndHalveDamage`)*
+- [x] Three and four simulated controllers choose independently. Canceling a third-player join returns to play, and a reconnecting fourth controller can complete selection. The lobby, four ship sprites and role effects render in the Mac build. *(Mac scripts and reviewed screenshots, 2026-11-21)*
+- [ ] Check ship and effect readability on a TV and role balance during a full four-player run. *(PS3 playtest pending)*
+
 ## Playtest checks
 1. Start a run with one controller, then press Start on the second: player 2 appears blinking at the right, the log shows "player 2 joined".
 2. Let player 1 lose all lives while player 2 plays on; the run continues. Lose player 2's last life: game over shows both scores.

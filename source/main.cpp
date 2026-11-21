@@ -28,8 +28,8 @@ const int MAX_STEPS_PER_FRAME = 4;
 const bool DEV_AIDS = !RELEASE;
 
 enum Scene { SCENE_MAIN_MENU, SCENE_CLASSIC_MENU, SCENE_CONTROLLERS, SCENE_LEVEL_PICKER, SCENE_SETTINGS,
-             SCENE_PLAYING, SCENE_PAUSED, SCENE_QUEST };
-const char* const SCENE_NAMES[] = {"main menu", "classic menu", "controllers", "level picker", "settings", "playing", "paused", "quest"};
+             SCENE_PLAYING, SCENE_PAUSED, SCENE_QUEST, SCENE_ROLES };
+const char* const SCENE_NAMES[] = {"main menu", "classic menu", "controllers", "level picker", "settings", "playing", "paused", "quest", "roles"};
 const char* const MAIN_ITEMS[] = {"CLASSIC", "NAME QUEST", "SETTINGS"};
 const int QUEST_ITEM = 1, SETTINGS_ITEM = 2;
 const char* const CLASSIC_ITEMS[] = {"1-2 PLAYERS", "1-4 PLAYERS", "LEVEL PICKER"};
@@ -150,6 +150,12 @@ int main(int argc, char** argv) {
     int selected = 0;
     int lobbyPlayerChoice = 0;   // 0 starts with as many players as connected pads, up to four
     int playerPorts[MAX_PLAYERS] = {};
+    int rolePorts[MAX_PLAYERS] = {};
+    ShipRole roles[MAX_PLAYERS] = {};
+    bool roleReady[MAX_PLAYERS] = {};
+    int roleParty = 0, roleJoinFrom = 0;
+    Scene roleBack = SCENE_CONTROLLERS;
+    Actions roleCarry[MAX_PLAYERS] = {};
     int questPort = 0;
     int runLevel = 1;   // the level the menu started; play again restarts there
     bool runSingleLevel = false;   // a level picker run: play again replays just that level
@@ -163,6 +169,18 @@ int main(int argc, char** argv) {
     auto setScene = [&](Scene next) {
         scene = next;
         debugNetPrintf(INFO, "scene: %s\n", SCENE_NAMES[next]);
+    };
+    auto chooseRoles = [&](int count, int joined, const int* ports, Scene back) {
+        roleParty = count;
+        roleJoinFrom = joined;
+        roleBack = back;
+        std::copy_n(ports, count, rolePorts);
+        for (int p = 0; p < count; p++) {
+            roles[p] = back == SCENE_PLAYING && p < (int)game.players.size() && game.players.size() > STANDARD_PLAYERS
+                       ? game.players[p].role : (ShipRole)p;
+            roleReady[p] = joined > STANDARD_PLAYERS && p < joined;
+        }
+        setScene(SCENE_ROLES);
     };
     auto openQuest = [&]() {
         audioStopMusic();   // NAME QUEST has no music (D-049)
@@ -233,9 +251,9 @@ int main(int argc, char** argv) {
             if (menu.down) selected = (selected + 1) % itemCount;
         }
 
-        auto startRun = [&](int playerCount, ClassicVariant variant) {
-            std::copy_n(connectedPorts, playerCount, playerPorts);
-            startGame(game, playerCount, (uint32_t)SDL_GetPerformanceCounter(), runLevel, runSingleLevel, variant);
+        auto startRun = [&](int playerCount, ClassicVariant variant, const int* ports, const ShipRole* picks = nullptr) {
+            std::copy_n(ports, playerCount, playerPorts);
+            startGame(game, playerCount, (uint32_t)SDL_GetPerformanceCounter(), runLevel, runSingleLevel, variant, picks);
             audioStartMusic(settings.music);
             setScene(SCENE_PLAYING);
         };
@@ -266,7 +284,7 @@ int main(int argc, char** argv) {
                 runLevel = 1;
                 runSingleLevel = false;
                 debugNetPrintf(INFO, "classic run starts\n");
-                startRun(1, CLASSIC_STANDARD);
+                startRun(1, CLASSIC_STANDARD, connectedPorts);
             } else if (menu.confirm && selected == PICKER_ITEM) {
                 selected = runSingleLevel ? runLevel - 1 : 0;   // back on the last picked level
                 pickerSpin = 0;
@@ -290,10 +308,49 @@ int main(int argc, char** argv) {
                     runLevel = 1;
                     runSingleLevel = false;
                     debugNetPrintf(INFO, "classic 1-4 run starts: %d players, %d controllers\n", lobbyPlayers, connectedCount);
-                    startRun(lobbyPlayers, CLASSIC_EXPANDED);
+                    if (lobbyPlayers > STANDARD_PLAYERS) chooseRoles(lobbyPlayers, 0, connectedPorts, SCENE_CONTROLLERS);
+                    else startRun(lobbyPlayers, CLASSIC_EXPANDED, connectedPorts);
                 }
             }
             break;
+        case SCENE_ROLES: {
+            bool allReady = true, cancel = false;
+            for (int p = 0; p < roleParty; p++) {
+                const Actions& a = pads[rolePorts[p]];
+                bool locked = roleJoinFrom > STANDARD_PLAYERS && p < roleJoinFrom;
+                if (!a.connected) {
+                    if (!locked) roleReady[p] = false;
+                    allReady = false;
+                    continue;
+                }
+                if (a.back) {
+                    if (locked || !roleReady[p]) cancel = true;
+                    else roleReady[p] = false;
+                } else if (!roleReady[p]) {
+                    if (a.left || a.right) roles[p] = (ShipRole)((roles[p] + (a.left ? ROLE_COUNT - 1 : 1)) % ROLE_COUNT);
+                    if (a.jump) roleReady[p] = true;
+                }
+                allReady &= roleReady[p];
+            }
+            if (cancel) {
+                setScene(roleBack);
+            } else if (allReady) {
+                for (int p = 0; p < roleParty; p++)
+                    debugNetPrintf(INFO, "player %d role: %s\n", p + 1, ROLE_NAMES[roles[p]]);
+                if (roleJoinFrom == 0) {
+                    startRun(roleParty, CLASSIC_EXPANDED, rolePorts, roles);
+                } else {
+                    for (int p = roleJoinFrom; p < roleParty; p++) {
+                        if (joinGame(game, roles)) {
+                            playerPorts[p] = rolePorts[p];
+                            debugNetPrintf(INFO, "player %d joined at wave %d\n", p + 1, game.wave);
+                        }
+                    }
+                    setScene(SCENE_PLAYING);
+                }
+            }
+            break;
+        }
         case SCENE_LEVEL_PICKER:
             // The wheel shows the picked level in the middle; it starts a run of just that level.
             if (menu.down) pickerSpin = SDL_min(pickerSpin + 1, 2.0f);
@@ -303,7 +360,7 @@ int main(int argc, char** argv) {
                 runLevel = selected + 1;
                 runSingleLevel = true;
                 debugNetPrintf(INFO, "picked level %d starts\n", runLevel);
-                startRun(1, CLASSIC_STANDARD);
+                startRun(1, CLASSIC_STANDARD, connectedPorts);
             } else if (menu.back) {
                 game.level = 1;
                 selected = PICKER_ITEM;
@@ -390,6 +447,8 @@ int main(int argc, char** argv) {
                             lobbyPlayers = SDL_min(playerCount, available);
                             game.level = 1;
                             setScene(SCENE_CONTROLLERS);
+                        } else if (game.variant == CLASSIC_EXPANDED && playerCount > STANDARD_PLAYERS) {
+                            chooseRoles(playerCount, 0, playerPorts, SCENE_PLAYING);
                         } else {
                             startGame(game, playerCount, (uint32_t)SDL_GetPerformanceCounter(), runLevel, runSingleLevel, game.variant);
                             Uint64 musicStart = SDL_GetPerformanceCounter();
@@ -405,12 +464,23 @@ int main(int argc, char** argv) {
                 }
             }
             if (scene == SCENE_PLAYING && canJoin) {
-                for (int port = 0; port < CONTROLLER_PORTS && playerCount < game.playerLimit(); port++) {
+                int partyPorts[MAX_PLAYERS];
+                std::copy_n(playerPorts, playerCount, partyPorts);
+                int partyCount = playerCount;
+                for (int port = 0; port < CONTROLLER_PORTS && partyCount < game.playerLimit(); port++) {
                     if (!pads[port].connected || !pads[port].confirm) continue;
-                    if (std::find(playerPorts, playerPorts + playerCount, port) != playerPorts + playerCount) continue;
-                    if (joinGame(game)) {
-                        playerPorts[playerCount++] = port;
-                        debugNetPrintf(INFO, "player %d joined at wave %d\n", playerCount, game.wave);
+                    if (std::find(playerPorts, playerPorts + playerCount, port) == playerPorts + playerCount)
+                        partyPorts[partyCount++] = port;
+                }
+                if (partyCount > playerCount && partyCount > STANDARD_PLAYERS) {
+                    for (Player& player : game.players) player.rocketPressedAt = -1;
+                    chooseRoles(partyCount, playerCount, partyPorts, SCENE_PLAYING);
+                } else {
+                    for (int p = playerCount; p < partyCount; p++) {
+                        if (joinGame(game)) {
+                            playerPorts[p] = partyPorts[p];
+                            debugNetPrintf(INFO, "player %d joined at wave %d\n", p + 1, game.wave);
+                        }
                     }
                 }
             }
@@ -418,7 +488,12 @@ int main(int argc, char** argv) {
         }
         }
         if (scene == SCENE_PLAYING)
-            for (size_t p = 0; p < game.players.size(); p++) actions[p] = pads[playerPorts[p]];
+            for (size_t p = 0; p < game.players.size(); p++) {
+                actions[p] = pads[playerPorts[p]];
+                actions[p].rocket |= roleCarry[p].rocket;
+                actions[p].cycle |= roleCarry[p].cycle;
+            }
+        for (Actions& carry : roleCarry) carry = {};
         // Dev aid (Select): player 1 sweeps along the bottom firing, a rocket every 5 s, invincible (30-minute soak test).
         if (autopilot && scene == SCENE_PLAYING) {
             Player& pilot = game.players[0];
@@ -482,6 +557,8 @@ int main(int argc, char** argv) {
         }
         if (steps == MAX_STEPS_PER_FRAME) accumulator = 0;   // fell far behind: drop the backlog rather than spiral
         if (steps == 0 && scene == SCENE_QUEST && frameScene == SCENE_QUEST) questCarry = actions[0];
+        if (steps == 0 && scene == SCENE_PLAYING && game.players.size() > STANDARD_PLAYERS)
+            std::copy_n(actions, game.players.size(), roleCarry);
         if (game.level != levelBefore) debugNetPrintf(INFO, "level %d starts at %.1f s\n", game.level, game.time);
         if (game.wave != waveBefore) {
             for (size_t p = 0; p < game.players.size(); p++)
@@ -641,6 +718,44 @@ int main(int argc, char** argv) {
             drawText((SCREEN_W - textWidth(status)) / 2, panelY + 90, status, paletteColor('y'));
             const char* hint = ready ? "X PLAY  O BACK" : "O BACK";
             drawText((SCREEN_W - textWidth(hint)) / 2, panelY + 108, hint, paletteColor('s'));
+        } else if (scene == SCENE_ROLES) {
+            drawBackground(game);
+            const char* title = "CHOOSE YOUR ROLE";
+            drawText((SCREEN_W - textWidth(title, 2)) / 2, 19, title, paletteColor('w'), 2);
+            const char* const traits[ROLE_COUNT][3] = {
+                {"NORMAL SPEED", "NORMAL SHOTS", ""}, {"SLOW SHIP", "SLOW HEAVY FIRE", "2 HITS / LIFE"},
+                {"FAST SHIP", "FAST LIGHT FIRE", ""}, {"NORMAL SPEED", "STRONG SHOTS", ""}
+            };
+            const int wide = 74, gap = 4, top = 45, height = 94;
+            const int left = (SCREEN_W - roleParty * (wide + gap) + gap) / 2;
+            for (int p = 0; p < roleParty; p++) {
+                int x = left + p * (wide + gap), middle = x + wide / 2;
+                ShipRole role = roles[p];
+                bool connected = pads[rolePorts[p]].connected;
+                uint32_t ink = paletteColor(connected ? PLAYER_COLORS[p] : 's');
+                fillRect(x, top, wide, height, ink);
+                fillRect(x + 1, top + 1, wide - 2, height - 2, paletteColor('k'));
+                char label[16];
+                snprintf(label, sizeof label, "PLAYER %d", p + 1);
+                drawText(middle - textWidth(label) / 2, top + 6, label, ink);
+                drawShip(role, p, roleJoinFrom > 0 ? game.level : 1, (frame / 12) % 2, middle - 8, top + 18);
+                drawText(middle - textWidth(ROLE_NAMES[role]) / 2, top + 38, ROLE_NAMES[role], paletteColor('w'));
+                if (connected && !roleReady[p]) {
+                    drawText(x + 4, top + 38, "<", ink);
+                    drawText(x + wide - 9, top + 38, ">", ink);
+                }
+                for (int line = 0; line < 3; line++) {
+                    const char* trait = traits[role][line];
+                    drawText(middle - textWidth(trait) / 2, top + 47 + line * 7, trait, paletteColor('b'));
+                }
+                drawText(middle - textWidth(ROLE_SPECIALS[role]) / 2, top + 68, ROLE_SPECIALS[role], paletteColor('y'));
+                const char* status = !connected ? "RECONNECT" : roleReady[p] ? "READY" : "X READY";
+                drawText(middle - textWidth(status) / 2, top + 82, status, ink);
+            }
+            const char* hint = "LEFT / RIGHT CHOOSE   O UNREADY / BACK";
+            drawText((SCREEN_W - textWidth(hint)) / 2, 152, hint, paletteColor('b'));
+            const char* special = "R2 USES YOUR SPECIAL IN PLAY";
+            drawText((SCREEN_W - textWidth(special)) / 2, 163, special, paletteColor('s'));
         } else if (scene == SCENE_LEVEL_PICKER) {
             // A wheel: the picked level big in the middle, two levels above and below it smaller, wrapping around.
             drawBackground(game);
