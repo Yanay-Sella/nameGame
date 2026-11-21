@@ -423,6 +423,10 @@ NPC_TEMPLATES = {
     "TOBIN": (["...HHHH...", "..HHHHHH..", "..HSSSSS..", "..HSSESS..", "...SSSS...", "..AAAAAA..", ".SAAAAAAS.", "..AAAAAA..",
                "..KK..JJ..", "..FF..FF.."],
               dict(H="H", S="@", E="k", A="o", K="h", J="h", F="&")),
+    # Tobin's father, an old miner sitting hurt in the Greendeep: grey beard, a yellow cap with a lamp, a bandaged leg.
+    "GARRICK": (["....CCCCL.....", "...CCCCCC.....", "...HSSSSS.....", "...HSSESS.....", "...HSSSSS.....", "...WWWWWW.....",
+                 "..AAWWWWAA....", ".SAAAAAAAS....", ".SAAAAAAAS....", "..AAAAAAAA....", "..KKKKKBBBBFF.", "..KKKKKKKKKFF."],
+                dict(C="Y", L="w", H="s", S="@", E="k", W="b", A="R", K="U", B="w", F="&")),
     "GATEKEEPER": ([".....AAAA.....", "....AAAAAA....", "....ABBBBA....", "....AwBBwA....", "....ABBBBA....", ".....AAAA.....",
                     "...AAAAAAAA...", "..AAAAAAAAAA..", "..AA.AAAA.AA..", "..AA.AAAA.AA..", "..AAGAAAAGAA..", "..A..ATTA..A..",
                     ".....ATTA.....", "....AAAAAA....", "....AATTAA....", "....AATTAA....", "...AAATTAAA...", "..CCCCCCCCCC..",

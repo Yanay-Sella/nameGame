@@ -51,10 +51,22 @@ Rules and numbers: see the work-plan spec [`spec.md`](../../work-plan/name-quest
 36. A mini-boss's death gives its names and opens the world's gate; it is back after a rest or death. A big boss's death gives its names, `GREAT NAME TAKEN`, lights the next world's entry and saves; it stays dead. Ilsa greets the hero differently after world 1's Great Name.
 37. World 1 has 20 areas: the main path runs DOCKING RING, CARGO HOLD, CREW DECK, the maintenance shaft down, REACTOR RING, the coolant conduit up, the HANGAR (the Overseer), THE BULKHEAD (the gate), SIGNAL ROOM, MED BAY (the second checkpoint), COMMAND RING, THE LAST CORRIDOR (no enemies) and the OBSERVATORY DOME (the Star Mage). Off it: three dead ends with the VIAL SHARD, MAP PAGE 1 and STAR IRON, a side room, a loop through the server farm and cold storage, and a vent shaft. The hangar's lever opens a ladder straight up to the entry. Two surveyors: in the crew deck and the signal room.
 
+## Rules (phase 5: worlds 2 and 3; numbers in spec §8, §9, §12, §13)
+38. THE GREENDEEP has its own look: a drowned jungle swallowing an old temple, green-gold light through the canopy, giant trees and temple pillars in mist, mossy soil, branch platforms, fireflies and falling leaves. Vines are its ladders; its water is dark green; its thorns are brown spikes; its gate is a wall of thorny roots.
+39. World 2's hazards: water pits early, thorns in the middle areas, coconut palms late. Passing under a palm drops its coconut 0.3 s later (20 % of max HP); the palm regrows it in 4 s. The tree monkey hangs from the ceiling, drops on a hero below and throws one banana when it lands.
+40. THE MONKEY KING leaps between two trees you can climb to (BANANA ARC, PEEL TOSS; phase 2 a coconut rain marked on the ceiling). A peel on the floor slides the hero 0.5 s without control. THE SILVERBACK pounds the floor (a shockwave you jump), leaps onto the hero's spot and throws a stink that leaves a mist taking 3 % of max HP per second; phase 2 adds two stags and a second pair of waves.
+41. World 2 has 20 areas: the main path runs THE EDGE OF GREEN, FERN HOLLOW, THE OLD STEPS, the sun well down, THE THORN WALK, THE DROWNED TEMPLE, THE KING'S GROVE (the Monkey King), THE THORN WALL (the gate), THE ROOT CELLAR, THE SUNKEN SHRINE (the second checkpoint), PALM TERRACES, THE STILL ROOTS (no enemies) and THE SILVER THRONE (the Silverback). Garrick sits hurt in a dead end beside a fallen statue's head and asks for a RED POTION. A lever opens a hatch from the root hoard back up to the shrine.
+42. THE WHITE SILENCE has its own look: a dim blue cave under a glacier, far ice mountains and a frozen waterfall, crystals and frozen trees, snow-capped blue rock, ice-slab platforms, frozen rope ladders, snow falling at three depths. Its gate is a wall of blue ice.
+43. World 3's hazards: ice floors and freezing water early; crumbling ice and icicles in the middle areas; wind late. Crumbling blocks (every world) shake 0.6 s under the hero, with cracks spreading, then break and come back 4 s later once the hero is off them. An icicle falls 0.25 s after the hero passes under it (20 %) and stays gone until a rest. Wind zones push 40 px/s and turn around every 3 s; snow streaks show which way.
+44. THE YETI sneezes (`AH... AH...`, then 7 snowballs in a fan; twice in phase 2, with snow falling), belly-slides across its den, and throws an ice block that freezes the hero 1.2 s; each X or R1 press chips 0.15 s off. THE GLACIER TITAN rains 6 icicles marked on the ceiling, fires 3 ice shards, and slams: cracks run along the floor ahead of ice spikes erupting outward. In phase 2 the middle 10 tiles of its floor turn to crumbling ice over a void, and a blizzard pushes the hero, turning every 4 s.
+45. World 3 has 20 areas: the main path runs THE COLD MOUTH, THE LONG DRIFT, THE FROZEN STAIR, the glacier well down, THE ICE GALLERY, THE ICE CATHEDRAL, THE YETI'S DEN, THE ICE WALL (the gate), THE BLUE HOLLOW, THE DEEP CHAPEL (the second checkpoint), THE WIND GATE, THE STILL ICE (no enemies) and THE GLACIER THRONE (the Titan, down a ladder). The FROZEN FEATHER waits behind an ice knight in a dead end above the cathedral.
+46. After the Great Names of worlds 2 and 3, Ilsa greets the hero differently and Lio adds a verse about the latest one after his song.
+
 ## Edge cases
 - Start does nothing on the slot, class and intro screens; it pauses in play and while `YOU FADED` shows.
 - A controller unplugged in play opens the pause menu, which waits for it (D-014).
 - A save that can't be renamed into place is written directly (logged); a missing save file is an empty slot.
+- A crumbled block waits to come back while the hero stands in its tile. Icicles stay fallen across area changes until a rest or death.
 
 ## History
 - 2026-11-20: designed with the user (D-035 to D-051); phase 1 engine built.
@@ -64,3 +76,4 @@ Rules and numbers: see the work-plan spec [`spec.md`](../../work-plan/name-quest
 - 2026-11-21: phase 4 started: world 1's art and style frame, the boss framework, both world 1 bosses (rules 30-36).
 - 2026-11-21: music from the user's songs per place plus a boss song (D-057, rule 29); the ambience hums removed.
 - 2026-11-21: the user approved world 1's style frame; world 1's 20 areas built (rule 37). PS3 check and the user's playtest open.
+- 2026-11-21: phase 5: worlds 2 and 3 (looks approved from their style frames), their hazards, four bosses, 40 areas, Garrick, Ilsa and Lio's lines (rules 38-46). PS3 checks and the user's playtest open.

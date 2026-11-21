@@ -46,10 +46,18 @@ static const char* const ILSA_INTRO[3][2] = {
     {"I USED TO REMEMBER WHO LIT THIS FIRE.\nNOW I ONLY REMEMBER TO KEEP IT. IS THAT SAD? IT FEELS LIKE WORK.",
      "BRING ME WHAT YOU CARRY. THE HEARTH WILL TURN IT INTO YOU."},
 };
-// Ilsa's first line once the Great Name of world n is taken (spec §14: author 5); worlds 2-5 come with their phases.
+// Ilsa's first line once the Great Name of world n is taken (spec §14: author 5); worlds 4-5 come with their phases.
 static const char* const ILSA_GREAT_NAME[5] = {
     "YOU CAME BACK WITH A GREAT NAME. THE FIRE SAT UP WHEN YOU WALKED IN.\nIT HAS NOT DONE THAT IN A LONG TIME.",
-    nullptr, nullptr, nullptr, nullptr};
+    "YOU SMELL OF RAIN AND OLD LEAVES. THE FIRE LIKES IT.\nLOOK, IT BURNS A LITTLE GREENER TONIGHT.",
+    "YOUR HANDS ARE SO COLD. HOLD THEM TO THE FIRE A WHILE.\nSOMETHING OLD AND QUIET GAVE YOU ITS NAME. KEEP IT WARM.",
+    nullptr, nullptr};
+// Lio's verse about the latest Great Name, after the song (spec §14: the song changes after each); worlds 4-5 later.
+static const char* const LIO_GREAT_NAME[5] = {
+    nullptr,
+    "I WROTE A NEW VERSE ABOUT THE SILVERBACK.\nIT'S MOSTLY DRUMMING. HE'D HAVE LIKED THAT.",
+    "THEY SAY THE TITAN HUMMED AS IT FELL. I'VE TRIED TO FIND THE NOTE.\nIT'S LOWER THAN ANY STRING I OWN.",
+    nullptr, nullptr};
 // Lio's song, one per highest world 1..7 (spec §14).
 static const char* const LIO_SONGS[7] = {
     "SING WITH ME: THE STATION DRIFTS, THE STATION SLEEPS,\nAND NO ONE WAKES THE THING IT KEEPS...",
@@ -132,8 +140,13 @@ void talkTo(Quest& q, int id) {
         p = {"THE FORGE STILL REMEMBERS HOW TO MAKE A BLADE. SO DO I, MOSTLY.\nSHOW ME YOUR NAMES AND I'LL SHOW YOU STEEL."};
         d.after = AFTER_GEAR_SHOP;
         break;
-    case NPC_LIO:   // phase 7: the song changes after each Great Name
+    case NPC_LIO:   // the song of the highest world, then a verse about the latest Great Name
         p = {LIO_SONGS[(s.highest < 1 ? 1 : s.highest > 7 ? 7 : s.highest) - 1]};
+        for (int w = 5; w >= 1; w--)
+            if (s.bosses >> w & 1) {
+                if (LIO_GREAT_NAME[w - 1]) p.push_back(LIO_GREAT_NAME[w - 1]);
+                break;
+            }
         break;
     case NPC_PELL: p = {"MY PAGES! THE WIND TOOK MY MAPS OF THE FIVE WORLDS."}; break;   // phase 7: the map pages quest
     case NPC_SELA: p = {"..."}; break;                                                     // phase 7: lore at 20, the locket at 35
@@ -174,7 +187,16 @@ void talkTo(Quest& q, int id) {
         break;
     }
     case NPC_TOBIN: p = {"MY FATHER GARRICK WENT INTO THE GREENDEEP AND NEVER CAME BACK."}; break;   // phase 7: the Tobin quest
-    case NPC_GARRICK:
+    case NPC_GARRICK:   // hurt in a Greendeep dead end (spec §14 Tobin quest stage 1)
+        if (q.area.world != 2) {
+            p = {"..."};   // phase 7: Garrick on the Shore
+        } else if (s.items[ITEM_RED] > 0) {   // phase 7: the potion is used and the quest moves to stage 2
+            p = {"A RED POTION... FOR AN OLD DIGGER LIKE ME? BLESS YOU, FRIEND.",
+                 "TELL MY BOY TOBIN I'M COMING HOME.\nSLOWLY. BUT I'M COMING."};
+        } else {
+            p = {"I... I CAN'T WALK. DO YOU HAVE A RED POTION?"};
+        }
+        break;
     case NPC_STRANGER:
     case NPC_CALDER: p = {"..."}; break;   // phase 7: their quests
     case NPC_CLAUDE:   // phase 8: New Game+

@@ -145,7 +145,7 @@ Copy the shape of `docs/features/bosses/implementation.md` and `testing.md`.
 - New `docs/features/level-1/testing.md`: criteria, ticked with the test name for the three Mac tests; unchecked for the PS3
   checks in step 6 (LEVEL 1 banner on screen, autopilot run ends at wave 20 with `level 1 clear` then `level clear` 3.0 s
   later, end-screen panel, high score saved, X starts a new run).
-- `docs/features/bosses/design.md` rule 7: append "(the wave-20 boss ends level 1 instead: [Level 1](../level-1/design.md))".
+- `docs/features/bosses/design.md` rule 7: append "(the wave-20 boss ends level 1 instead: [Level 1](../features/level-1/design.md))".
 - `docs/features/co-op/design.md`: rule 1 "While it's running and not paused" → "While it's running, not paused and the level
   isn't clear"; rule 4 "The run ends when every player is out." → "The run ends when every player is out or the level is clear."
 - `docs/features/high-score/design.md` rule 2: "written at game over" → "written when a run ends (game over or level clear)".
@@ -163,8 +163,8 @@ Copy the shape of `docs/features/bosses/implementation.md` and `testing.md`.
   - Decision row: `| D-017 | 2026-11-17 | A run is level 1: killing the wave-20 boss shows LEVEL 1 CLEAR for 3 s, then the end
     screen, and the high score is saved; enemy shots stay, so losing the last life during the banner is still game over;
     replaces D-002's endless run | endless waves; clear enemy shots at the kill; lock the win at the kill | user's choice: a
-    level structure for later worlds; the finale stays dangerous to the end | [level 1](features/level-1/design.md),
-    [bosses](features/bosses/design.md), [screens](features/screens/design.md), [high score](features/high-score/design.md) |`
+    level structure for later worlds; the finale stays dangerous to the end | [level 1](../features/level-1/design.md),
+    [bosses](../features/bosses/design.md), [screens](../features/screens/design.md), [high score](../features/high-score/design.md) |`
   - Change log: `**0.18 (2026-11-17):** level 1 ending implemented: the wave-20 boss ends the run with LEVEL 1 CLEAR (D-017).`
 - Don't edit older decision rows, `docs/work-plan/make_work_plan.py` or the PDF.
 - Run `python3 .claude/skills/game-docs/scripts/check_docs.py docs` and fix what it reports.
