@@ -27,7 +27,7 @@ const uint32_t HEARTH_LIGHT = 0xFFA05018, BRAZIER_LIGHT = 0xFF804010, LANTERN_LI
 const int HEARTH_LIGHT_RADIUS = 48 * DP, BRAZIER_LIGHT_RADIUS = 28 * DP, LANTERN_LIGHT_RADIUS = 24 * DP;
 const float NPC_FRAME = 0.7f, POPUP_SHOWN = 1.5f, POPUP_RISE = 6 * DP, REST_FADE = 0.3f, FADE_DEPTH = 60 * DP, GATE_SHAKE = 0.5f;
 const int MAP_CELL_W = 12 * DP, MAP_CELL_H = 8 * DP;
-static_assert(sizeof NPC_FRAMES / sizeof NPC_FRAMES[0] == NPC_COUNT, "Every NPC needs two idle frames");
+static_assert(sizeof NPC_FRAMES / sizeof NPC_FRAMES[0] == NPC_DEV_TESTER, "Every story NPC needs two idle frames");
 // Boss frames: idle 1-2, tell, attack, hurt, phase 2 (spec §22); bosses of later phases have none yet.
 #define BOSS_ROW(N) {&BOSS_##N##_IDLE_1, &BOSS_##N##_IDLE_2, &BOSS_##N##_TELL, &BOSS_##N##_ATTACK, &BOSS_##N##_HURT, &BOSS_##N##_PHASE2}
 static const Sprite* const BOSS_FRAMES[6][6] = {BOSS_ROW(OVERSEER), BOSS_ROW(STAR_MAGE), BOSS_ROW(MONKEY_KING), BOSS_ROW(SILVERBACK),
@@ -352,12 +352,14 @@ static void drawObject(const Quest& q, char letter, int tx, int ty, int camX, in
             int index = 0;
             for (int t = 0; t < ty * def.cols + tx; t++) index += def.tiles[t] == 'N';
             id = index < 8 ? def.npcs[index] : -1;
-            if (id < 0 || id >= NPC_COUNT || !npcPresent(q.save, id, q.area.world, q.area.index)) return;
+            if (id < 0 || id >= NPC_COUNT || !npcPresent(q.save, id, q.area.world, q.area.index, q.devAids)) return;
         }
         int idle = (int)(q.time / NPC_FRAME + tx * 0.3f) % 2;
-        const Sprite& frame = *NPC_FRAMES[id][idle];
+        const Sprite& frame = *NPC_FRAMES[id == NPC_DEV_TESTER ? NPC_SURVEYOR_FIRST : id][idle];
         bool flip = q.hero.x + HERO_W / 2 < tx * TILE + TILE / 2;
         drawSpriteEx(frame, cx - frame.w / 2, bottom - frame.h, flip);
+        if (id == NPC_DEV_TESTER)
+            drawText(cx - textWidth("DEV", DP) / 2, bottom - frame.h - 8 * DP, "DEV", paletteColor('y'), DP);
         if (id == NPC_ILSA)
             lights.push_back({cx + (flip ? -1 : 1) * (int)(8 * DP), bottom - (int)((13 - idle) * DP), LANTERN_LIGHT_RADIUS, LANTERN_LIGHT});
         return;
@@ -588,6 +590,35 @@ static void drawCombat(const Quest& q, int camX, int camY) {
                     if (sp.pixels[row * sp.w + col] != '.' && px >= 0 && px < QUEST_W && py >= 0 && py < QUEST_H && bayer4(px, py) < level)
                         screenTarget[py * QUEST_W + px] = color;
                 }
+            break;
+        }
+        case FX_BLINK_MIST: {
+            const struct { int x, y, rx, ry; } wisps[] = {{-4, 5, 9, 4}, {0, -1, 11, 6}, {6, -7, 7, 4}};
+            const uint32_t light = paletteColor('I');
+            float t = f.age / f.life, drift = t * (2 - t), dir = f.flip ? -1 : 1;
+            float density = fmaxf(0, 1 - t / 0.65f);
+            if (density > 0) {
+                for (const auto& w : wisps) {
+                    int cx = x + (int)(dir * (w.x + 3 * drift) * DP);
+                    int cy = y + (int)((w.y - 5 * drift) * DP);
+                    int rx = (int)((w.rx + 3 * drift) * DP), ry = w.ry * DP;
+                    for (int dy = -ry; dy <= ry; dy++)
+                        for (int dx = -rx; dx <= rx; dx++) {
+                            float edge = 1 - (float)(dx * dx) / (rx * rx) - (float)(dy * dy) / (ry * ry);
+                            float coverage = 16 * density * edge;
+                            if (coverage > bayer4(dx, dy))
+                                fillRect(cx + dx, cy + dy, 1, 1, coverage > 9 && dy < 0 ? light : color);
+                        }
+                }
+            }
+            for (int i = 0; i < 14; i++) {
+                if (t >= 0.58f + 0.03f * i) continue;
+                int ox = i * 7 % 19 - 9, oy = i * 11 % 15 - 7;
+                int px = x + (int)(dir * (ox * (1 + drift) + 4 * drift) * DP);
+                int py = y + (int)((oy - (8 + i % 5) * drift) * DP);
+                int size = t < 0.48f && i % 3 == 0 ? DP : 1;
+                fillRect(px, py, size, size, i % 3 == 0 ? light : i % 3 == 1 ? color : paletteColor('c'));
+            }
             break;
         }
         case FX_ARC: drawArc(x, y, (int)f.w, (int)f.h, f.flip, color); break;
@@ -1187,6 +1218,18 @@ static void drawQuestMenu(const Quest& q) {
     if (m.kind == MENU_JOB_CONFIRM) {
         int cls = q.save.heroClass % CLASS_COUNT, tier = std::min(3, q.save.job + 1);
         title = std::string("BECOME ") + JOB_NAMES[cls][tier] + "?";
+    }
+    switch (m.kind) {
+    case MENU_DEV: {
+        char text[32];
+        snprintf(text, sizeof text, "DEV TESTER - LV %d", q.save.level);
+        title = text;
+        break;
+    }
+    case MENU_DEV_CLASS: title = "CHOOSE CLASS"; break;
+    case MENU_DEV_JOB: title = "CHOOSE YOUR JOB"; break;
+    case MENU_DEV_WORLD: title = "WARP TO WORLD"; break;
+    case MENU_DEV_AREA: title = worldDef(m.warpWorld).name; break;
     }
     std::vector<const char*> items;
     for (int i = m.scroll; i < (int)m.items.size() && i < m.scroll + MENU_ROWS; i++) items.push_back(m.items[i].c_str());

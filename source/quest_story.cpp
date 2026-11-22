@@ -21,7 +21,7 @@ static const char* const NPC_NAMES[NPC_COUNT] = {
     "ILSA, KEEPER OF NAMES", "MARRA THE HERBALIST", "BRANN THE SMITH", "LIO THE BARD", "PELL THE CARTOGRAPHER", "OLD SELA",
     "SIR ODO", "WREN", "YSOLDE", "KIT", "THE GATEKEEPER", "TOBIN", "GARRICK", "THE STRANGER", "SER CALDER, THE DROWNED KNIGHT",
     "CLAUDE", "SURVEYOR ANDO", "SURVEYOR BETT", "SURVEYOR CORIN", "SURVEYOR DESS", "SURVEYOR EMRYS", "SURVEYOR FAYE",
-    "SURVEYOR GILD", "SURVEYOR HOLLIS", "SURVEYOR IVO", "SURVEYOR JUNE", "SURVEYOR KESTREL", "SURVEYOR LORNE"};
+    "SURVEYOR GILD", "SURVEYOR HOLLIS", "SURVEYOR IVO", "SURVEYOR JUNE", "SURVEYOR KESTREL", "SURVEYOR LORNE", "DEV TESTER"};
 // One line each, then the world map opens (spec §11): flavour about getting lost.
 static const char* const SURVEYOR_LINES[12] = {
     "I'VE MAPPED THIS PLACE THREE TIMES.\nIT DISAGREES WITH ME EVERY TIME. HERE, TAKE A LOOK.",
@@ -103,17 +103,19 @@ int surveyorId(int world, int area, int tile) {
     return NPC_SURVEYOR_FIRST + (world - 1) * 2 + objectIndex(world, area, tile, 'M') % 2;
 }
 
-bool npcPresent(const SaveData& save, int id, int world, int area) {
+bool npcPresent(const SaveData& save, int id, int world, int area, bool devAids) {
     (void)area;
     switch (id) {
     case NPC_STRANGER: return save.bosses >> 3 & 1;                                   // from world 3's boss death
     case NPC_GARRICK: return (world == WORLD_NAMULA) == (save.quests[QUEST_TOBIN] >= 2);   // the Greendeep, then the Shore
     case NPC_CLAUDE: return save.keys >> KEY_CREDITS_SEEN & 1;
+    case NPC_DEV_TESTER: return devAids;
     default: return true;
     }
 }
 
 void talkTo(Quest& q, int id) {
+    if (id == NPC_DEV_TESTER && !q.devAids) return;
     SaveData& s = q.save;
     DialogueState& d = q.dialogue;
     d = DialogueState();
@@ -136,6 +138,10 @@ void talkTo(Quest& q, int id) {
                 }
             d.after = AFTER_LEVEL_UP;
         }
+        break;
+    case NPC_DEV_TESTER:
+        p = {"USE A TEST SLOT. HERO AND INVENTORY CHANGES ARE SAVED."};
+        d.after = AFTER_DEV;
         break;
     case NPC_MARRA:
         p = {"HERBS FROM THE CLIFF, ROOTS FROM THE SHORE. EVERYTHING HEALS SOMETHING.\nTAKE WHAT YOU NEED. PAY WHAT IT COSTS."};

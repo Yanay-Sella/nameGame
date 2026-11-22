@@ -20,7 +20,7 @@ Rules and numbers: see the work-plan spec [`spec.md`](../../work-plan/name-quest
 ## Rules (phase 2: combat; numbers in spec §5-§8)
 10. Press R1 for one basic attack. The Knight's sword and the Thief's dagger hit a box in front during a short window. The Archer's arrows and the Magician's bolts fly until a wall or their range. Each landed basic hit gives 1 MP.
 11. R2 uses the job tier's strong attack (spec §6 table) for MP; without enough MP nothing happens and the empty click plays. Power Slash, Blade Fury and Meteor root the hero on the ground while they play. R2 cancels a basic attack that is still playing.
-12. Circle dodges: the Knight, Archer and Thief roll on the ground with brief i-frames; the Magician blinks forward, in the air too, stopping before walls.
+12. Circle dodges: the Knight, Archer and Thief roll on the ground with brief i-frames; the Magician blinks forward, in the air too, stopping before walls. Blue mist lingers where the Magician vanished and disperses into tiny blue pixels in about 0.4 s.
 13. HP never regenerates; MP regenerates slowly. The HUD shows LV, the HP and MP bars, `HP n/m` and the carried names.
 14. Enemies follow one of seven behaviours (walker, charger, flyer, shooter, jumper, armored, dropper); their stats come from the world's reference hero (spec §7). Walkers turn at walls and never walk into pits.
 15. Hits flash the enemy white, knock fodder and soldiers back, float a number (crits orange) and briefly freeze the action on strong hits and kills. A kill bursts into particles and adds its names straight to the counter.
@@ -71,6 +71,12 @@ Rules and numbers: see the work-plan spec [`spec.md`](../../work-plan/name-quest
 52. Readability: hero effects draw under enemies, enemy shots and telegraphs draw on top; large hero fills are dithered; at most 200 particles live at once.
 53. The full NPC cast uses the hero art style (D-066). NPCs have two idle frames and recognizable silhouettes matched to their roles. The authoring rules for new humanoid NPCs live in spec §22.
 54. Tap R1 during a basic attack to queue the next of three strikes (D-067, D-068). Holding R1 plays a single strike. Knight uses a level slash, a rising cut and an overhead chop. Archer uses a standard shot, a low reload shot and a snap shot. Magician uses a staff thrust, a side cast and a raised-staff cast. Thief uses a straight stab, a reverse cut and a downward jab. The combo uses the attack cycles and damage in spec §5–§6.
+
+## Dev playtesting
+
+- In dev builds, talk to the NPC marked DEV just left of Namula's hearth or near the Proving Floor spawn. Use a spare slot for changes you want to keep separate from your main playthrough.
+- Choose any of the four classes and any job tier, including the tier 3 skills. Choosing a job raises the level to its threshold if needed. The menu also grants one free level at a time, adds 10,000 Names, fills item stacks to their carry limits, refills HP and MP, and toggles invincibility for the session.
+- Warp lists the worlds and areas that exist in the build. Hold Select for 2 s to return to the Proving Floor from anywhere in play.
 
 ## Edge cases
 - Start does nothing on the slot, class and intro screens; it pauses in play and while `YOU FADED` shows.

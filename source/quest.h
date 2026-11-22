@@ -119,7 +119,7 @@ struct Projectile { float x, y, vx, vy; int w, h; int damage; bool fromHero; int
                     float mult; bool strong; uint64_t hitMask; uint8_t bossMask; float gravity; bool trap; };
 struct DamageNumber { float x, y, age; int value; uint32_t color; float life; bool names; };   // names: "+n NAMES"
 // Short-lived skill shapes for drawing (arcs, bursts, chains, Meteor's marker, a boss's beam and growing ball); x2/y2: a chain link's end.
-enum EffectKind { FX_SWING, FX_ARC, FX_BURST, FX_CHAIN, FX_METEOR, FX_SPIN, FX_BEAM, FX_BALL, FX_SPARK, FX_ZONE, FX_GHOST };
+enum EffectKind { FX_SWING, FX_ARC, FX_BURST, FX_CHAIN, FX_METEOR, FX_SPIN, FX_BEAM, FX_BALL, FX_SPARK, FX_ZONE, FX_GHOST, FX_BLINK_MIST };
 const size_t PARTICLE_CAP = 200;   // no new particle while this many are alive (phase 5b readability)
 struct Effect { int kind; float x, y, w, h, x2, y2, age, life; bool flip; char color; };
 
@@ -209,11 +209,12 @@ enum QuestMode { QMODE_SLOTS, QMODE_DELETE, QMODE_CLASS, QMODE_INTRO, QMODE_PLAY
                  QMODE_SHOP, QMODE_MAP, QMODE_CREDITS };   // CREDITS: phase 8
 
 // One generic list menu (spec §15); the confirm is one switch on kind in questUpdate.
-enum MenuKind { MENU_CHECKPOINT, MENU_TRAVEL, MENU_LEVEL_UP, MENU_JOB_CONFIRM, MENU_YES_NO };
-struct MenuState { int kind; std::vector<std::string> items; int cursor, scroll; };
+enum MenuKind { MENU_CHECKPOINT, MENU_TRAVEL, MENU_LEVEL_UP, MENU_JOB_CONFIRM, MENU_YES_NO,
+                MENU_DEV, MENU_DEV_CLASS, MENU_DEV_JOB, MENU_DEV_WORLD, MENU_DEV_AREA };
+struct MenuState { int kind; std::vector<std::string> items; int cursor, scroll, warpWorld; };
 const int MENU_ROWS = 8;                                   // rows shown before the list scrolls
 // The NPC dialogue box (spec §14): pages of up to 4 lines split by '\n'; `after` opens when the last page closes.
-enum DialogueAfter { AFTER_NONE, AFTER_POTION_SHOP, AFTER_GEAR_SHOP, AFTER_LEVEL_UP, AFTER_JOB, AFTER_MAP, AFTER_YES_NO };
+enum DialogueAfter { AFTER_NONE, AFTER_POTION_SHOP, AFTER_GEAR_SHOP, AFTER_LEVEL_UP, AFTER_JOB, AFTER_MAP, AFTER_YES_NO, AFTER_DEV };
 struct DialogueState { std::vector<std::string> pages; int page; float typed; std::string speaker; int after; };
 const float TALK_CHARS_PER_S = 50;
 
@@ -304,10 +305,10 @@ void logLine(Quest& q, const char* format, ...);          // one spec §18 line 
 // --- NPCs, shops, levels and chests (quest_story.cpp; spec §10, §14). ---
 enum NpcId { NPC_ILSA, NPC_MARRA, NPC_BRANN, NPC_LIO, NPC_PELL, NPC_SELA, NPC_ODO, NPC_WREN, NPC_YSOLDE, NPC_KIT,
              NPC_GATEKEEPER, NPC_TOBIN, NPC_GARRICK, NPC_STRANGER, NPC_CALDER, NPC_CLAUDE, NPC_SURVEYOR_FIRST,
-             NPC_COUNT = NPC_SURVEYOR_FIRST + 12 };
+             NPC_DEV_TESTER = NPC_SURVEYOR_FIRST + 12, NPC_COUNT };
 const char* npcName(int id);
 int surveyorId(int world, int area, int tile);
-bool npcPresent(const SaveData& save, int id, int world, int area);   // the Stranger after world 3, Garrick moving, Claude after the credits
+bool npcPresent(const SaveData& save, int id, int world, int area, bool devAids = false);
 void talkTo(Quest& q, int id);                                        // fills the dialogue pages and `after`, applies quest effects
 extern const char* const ITEM_NAMES[ITEM_COUNT];
 extern const char* const KEY_NAMES[KEY_COUNT];

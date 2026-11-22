@@ -153,7 +153,7 @@ static void outlineSurroundsTheSprite() {
 }
 
 static void npcSpritesShareTheHeroGrid() {
-    CHECK(sizeof NPC_FRAMES / sizeof NPC_FRAMES[0] == NPC_COUNT);
+    CHECK(sizeof NPC_FRAMES / sizeof NPC_FRAMES[0] == NPC_DEV_TESTER);
     std::set<std::string> firstFrames;
     for (const auto& frames : NPC_FRAMES) {
         CHECK(strcmp(frames[0]->pixels, frames[1]->pixels) != 0);
@@ -166,7 +166,7 @@ static void npcSpritesShareTheHeroGrid() {
             CHECK(strchr(s->pixels, 'm') == nullptr && strchr(s->pixels, 'y') == nullptr);
         }
     }
-    CHECK(firstFrames.size() == NPC_COUNT);
+    CHECK(firstFrames.size() == NPC_DEV_TESTER);
 }
 
 static void areaLandmarksExist() {
@@ -1538,11 +1538,21 @@ static void blinkStopsBeforeWalls() {
     Quest q;
     startQuest(q, t, CLASS_MAGICIAN, 10, 0, 10);
     float x0 = q.hero.x;
+    float y0 = q.hero.y;
     Actions a = {};
     a.back = true;
     play(q, a, 1);
     CHECK(q.hero.x > x0 && q.hero.x + HERO_W <= 13 * TILE && q.hero.x + HERO_W >= 13 * TILE - DP);
     CHECK(q.hero.iframes > 0.15f && q.hero.iframes <= 0.2f);
+    CHECK(q.effects.size() == 1 && q.effects[0].kind == FX_BLINK_MIST &&
+          q.effects[0].x == x0 + HERO_W / 2 && q.effects[0].y == y0 + HERO_H - 12 * DP);
+    play(q, a, 12);
+    CHECK(q.effects.size() == 1 && q.effects[0].age > 0);
+    play(q, Actions(), 12);
+    CHECK(q.effects.empty());
+    play(q, Actions(), 36);
+    play(q, a, 1);
+    CHECK(q.effects.empty());
 }
 
 static void strongAttackNeedsMp() {
@@ -1651,6 +1661,82 @@ static void pressDown(Quest& q) { Actions a = {}; a.down = true; play(q, a, 1); 
 // X through every page of the open dialogue (completing each page first).
 static void readDialogue(Quest& q) {
     for (int i = 0; i < 20 && q.mode == QMODE_DIALOGUE; i++) pressX(q);
+}
+
+static void devTesterMakesEveryJobPlayableAndWarps() {
+    Quest q;
+    startDev(q, "slot=3 class=0 world=0 area=0 names=5");
+    standAt(q, 35, 17);
+    pressUp(q);
+    CHECK(q.mode == QMODE_PLAY && !npcPresent(q.save, NPC_DEV_TESTER, 0, 0));
+
+    q.devAids = true;
+    auto openTester = [&] {
+        pressUp(q);
+        CHECK(q.mode == QMODE_DIALOGUE && q.dialogue.speaker == "DEV TESTER");
+        readDialogue(q);
+        CHECK(q.mode == QMODE_MENU && q.menu.kind == MENU_DEV);
+    };
+    auto choose = [&](int row) {
+        int count = (int)q.menu.items.size();
+        CHECK(q.mode == QMODE_MENU && row >= 0 && row < count);
+        if (q.mode != QMODE_MENU || row < 0 || row >= count) return;
+        int steps = (row + count - q.menu.cursor) % count;
+        for (int i = 0; i < steps; i++) pressDown(q);
+        pressX(q);
+    };
+
+    openTester();
+    choose(2);
+    CHECK(q.save.level == 2 && q.save.names == 5);
+    choose(4);
+    CHECK(q.save.names == 10005);
+    choose(5);
+    for (int item = 0; item < ITEM_COUNT; item++) CHECK(q.save.items[item] == carryLimit(q.save, item));
+    q.hero.hp = 1;
+    q.hero.mp = 0;
+    choose(6);
+    CHECK(q.hero.hp == q.stats.maxHp && q.hero.mp == q.stats.maxMp);
+    choose(7);
+    CHECK(q.godMode && q.menu.items[7] == "INVINCIBILITY ON");
+
+    for (int cls = 0; cls < CLASS_COUNT; cls++) {
+        choose(0);
+        choose(cls);
+        CHECK(q.mode == QMODE_PLAY && q.save.heroClass == cls);
+        openTester();
+        for (int tier = 0; tier < 4; tier++) {
+            choose(1);
+            CHECK(q.menu.kind == MENU_DEV_JOB);
+            choose(tier);
+            CHECK(q.mode == QMODE_PLAY && q.save.job == tier && q.save.quests[QUEST_JOB] == tier);
+            q.logLines.clear();
+            Actions cast = {};
+            cast.rocket = true;
+            play(q, cast, 1);
+            CHECK(logged(q, (std::string("quest: skill ") + SKILL_NAMES[cls][tier]).c_str()));
+            standAt(q, 35, 17);
+            openTester();
+        }
+    }
+    SaveData saved;
+    CHECK(saveRead(SAVE_FOLDER, 2, saved) && saved.heroClass == CLASS_THIEF && saved.job == 3 && saved.level == 30);
+
+    choose(3);
+    CHECK(q.menu.kind == MENU_DEV_WORLD && q.menu.items.size() == 5 && q.menu.items.back() == "TEST GROUNDS");
+    choose(3);
+    CHECK(q.menu.kind == MENU_DEV_AREA && q.menu.items.size() == 20);
+    choose(19);
+    CHECK(q.mode == QMODE_PLAY && q.area.world == 3 && q.area.index == 19 && q.arenaLocked);
+    CHECK(q.save.checkpointWorld == 0 && q.save.checkpointId == 0);
+
+    Actions goBack = {};
+    goBack.selectHeld = true;
+    play(q, goBack, 123);
+    CHECK(q.area.world == WORLD_TEST && q.area.index == 0);
+    standAt(q, 1, 19);
+    openTester();
+    saveDelete(SAVE_FOLDER, 2);
 }
 
 static void levelUpSpendsAndRaisesStats() {
@@ -1921,7 +2007,8 @@ static void npcPresenceFollowsQuestStages() {
 
 // Every line anyone says fits the dialogue box: at most 4 lines of 72 characters (spec §14).
 static void dialogueFitsTheBox() {
-    Quest q;
+    Quest q = {};
+    q.devAids = true;
     for (int talk = 0; talk < 5; talk++)
         for (int id = 0; id < NPC_COUNT; id++)
             for (int highest = 1; highest <= 7; highest += 6) {
@@ -2599,6 +2686,7 @@ int main(int argc, char** argv) {
     deathRespawnsEnemies();
     levelUpSpendsAndRaisesStats();
     cannotLevelPastForty();
+    devTesterMakesEveryJobPlayableAndWarps();
     shopPricesScaleWithHighestWorld();
     carryLimitsStopBuying();
     gearTierNeedsTheWorld();

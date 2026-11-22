@@ -22,6 +22,8 @@
 - [x] The Knight's swing hits only in its window; arrows stop at walls; the charger tells then charges; the armored front guard; the dropper falls and throws; walkers never walk into pits. *(`tests/quest_tests.cpp` › knightSwingHitsOnlyInItsWindow, arrowsStopAtWalls, chargerTellsThenCharges, armoredGuardsItsFront, dropperFallsWhenHeroBelow, walkersNeverWalkIntoPits)*
 - [x] R2 pressed during a Knight's swing still lands the Power Slash; spikes hurt 20 % and bounce the hero up. *(`tests/quest_tests.cpp` › skillCastMidSwingStillHits, spikesHurtAndBounce)*
 - [x] I-frames block damage; the roll and the blink give i-frames and the blink stops before walls; the strong attack needs MP. *(`tests/quest_tests.cpp` › iframesBlockDamage, rollGivesIframes, blinkStopsBeforeWalls, strongAttackNeedsMp)*
+- [x] The Magician's blink leaves mist at its starting point. The mist expires and a fully blocked blink produces no mist. *(`tests/quest_tests.cpp` › blinkStopsBeforeWalls)*
+- [x] On the Mac: the Magician blinks in midair in Namula, leaving a blue cloud that rises, breaks into pixels and disappears. *(`make mac-run` 2026-11-22)*
 - [x] Death drops the names at the last safe ground, a second death loses the old echo, touching the echo returns them, death respawns enemies. *(`tests/quest_tests.cpp` › deathDropsNamesAtLastSafeGround, secondDeathLosesTheOldEcho, echoReturnsNames, deathRespawnsEnemies)*
 - [x] On the Mac: each class's tier-3 skill shows at 640x360 (Lion's Roar arc, Storm Volley fan, Meteor marker and fall, Shadow Partner), numbers float, the MP bar drops; a level-1 Knight dies to the TEST GROUNDS enemies (`dropped 500 names`) and gets them back after warping in (`names recovered 500`). *(`make mac-run` and a scripted run of the real update, 2026-11-20)*
 - [ ] On the PS3: an Archer fights the TEST GROUNDS enemies at 60 fps, worst work under 10 ms. *(PS3 log: `quest: area 8.3`, `fps ... quest 8.3`)*
@@ -83,7 +85,8 @@
 - [x] Each class plays nine distinct drawings for each of its three strikes at 60 Hz. All six leg poses support the full sequence. *(`tests/quest_tests.cpp` › everyBasicStrikeShowsNineDrawings)*
 - [x] Each strike changes the knee silhouette through at least three shapes in all six leg poses. The standing front foot stays planted. The Archer’s rear foot plants four art pixels back at full brace. The head moves backward on the Archer and forward on the other three heroes. *(`tests/quest_tests.cpp` › basicAttacksShiftWeightThroughTheLegs)*
 - [x] R1 taps cycle through three distinct strikes for each class. Holding R1 fires once. An idle gap or R2 resets the chain, and a press during hit-stop is queued with the Thief's upward aim. *(2026-11-22, `basicAttacksCycleThroughThreePoses`, `basicAttackPressSurvivesHitStop`)*
-- [ ] On the PS3 (when the user asks): dev saves per class at job 3; every R2 logs `quest: skill <NAME>`, fps ≥ 59 while effects play. *(PS3 log)*
+- [x] The Dev Tester stays inaccessible with dev aids off. In a dev game, choosing each class and job makes its R2 skill castable, and the warp menu reaches the Glacier Titan arena and keeps the saved checkpoint. *(`tests/quest_tests.cpp` › devTesterMakesEveryJobPlayableAndWarps)*
+- [ ] On the PS3, enter a spare slot on the dev build, hold Select for 2 s and press Up beside DEV. Use CHOOSE CLASS and CHOOSE JOB to try each tier 3 skill. Each R2 logs `quest: skill <NAME>`, and fps stays at least 59 while effects play. *(PS3 log)*
 - [ ] The user plays each class for a minute on the TV: R1 taps while running and jumping, a single strike when R1 is held, and every skill while running. Enemy shots and hazards stay readable. Notes: *(user)*
 
 ## Playtest checks

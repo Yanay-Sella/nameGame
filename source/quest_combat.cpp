@@ -12,6 +12,7 @@
 // Hero (spec §5, §6), dp x DP.
 const float ROLL_TIME = 0.35f, ROLL_SPEED = 140 * DP, ROLL_IFRAMES = 0.25f, ROLL_COOLDOWN = 0.6f;
 const float BLINK_DISTANCE = 48 * DP, BLINK_IFRAMES = 0.2f, BLINK_COOLDOWN = 0.8f;
+const float BLINK_MIST_TIME = 0.38f;
 const float HURT_VX = 90 * DP, HURT_TIME = 0.25f, HURT_IFRAMES = 1.0f;
 const int BASIC_COMBO_LENGTH = 3;
 const float BASIC_MULT_BY_JOB[4] = {1.0f, 1.15f, 1.3f, 1.5f};
@@ -1104,12 +1105,15 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
     if (a.back && free && h.rollCooldown <= 0 && h.skill < 0) {
         if (cls == CLASS_MAGICIAN) {
             float dir = h.facingLeft ? -1 : 1;
+            float originX = h.x;
             for (float moved = 0; moved < BLINK_DISTANCE; moved += DP) {
                 if (boxInSolid(q.area, h.x + dir * DP, h.y, HERO_W, HERO_H) || h.x + dir * DP < 0 ||
                     h.x + dir * DP > q.area.def->cols * TILE - HERO_W)
                     break;
                 h.x += dir * DP;
             }
+            if (h.x != originX)
+                addEffect(q, FX_BLINK_MIST, originX + HERO_W / 2, h.y + HERO_H - 12 * DP, 0, 0, BLINK_MIST_TIME, 'u');
             h.iframes = fmaxf(h.iframes, BLINK_IFRAMES);
             h.rollCooldown = BLINK_COOLDOWN;
             q.soundRequested[SOUND_Q_DODGE] = true;

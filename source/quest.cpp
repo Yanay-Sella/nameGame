@@ -278,6 +278,7 @@ static void enterArea(Quest& q, int world, int index, int tx, int ty) {
     updateCamera(q, 0, true);
     q.bosses.clear();
     q.markers.clear();
+    q.effects.erase(std::remove_if(q.effects.begin(), q.effects.end(), [](const Effect& f) { return f.kind == FX_BLINK_MIST; }), q.effects.end());
     q.arenaLocked = false;
     spawnEnemies(q);
     if (index == 0 && world >= 1 && world <= 6 && world > q.save.highest) q.save.highest = world;   // spec §11 highestWorld
@@ -500,6 +501,133 @@ static void openMenu(Quest& q, int kind, std::vector<std::string> items) {
     q.modeTimer = 0;
 }
 
+enum DevOption { DEV_CLASS, DEV_JOB, DEV_LEVEL, DEV_WARP, DEV_NAMES, DEV_BAG, DEV_HEAL, DEV_GOD_MODE };
+const int DEV_NAMES_GRANT = 10000;
+
+static void openDevMenu(Quest& q) {
+    openMenu(q, MENU_DEV, {"CHOOSE CLASS", "CHOOSE JOB", "FREE LEVEL UP", "WARP",
+                          "ADD 10000 NAMES", "FILL POTION BAG", "REFILL HP AND MP",
+                          q.godMode ? "INVINCIBILITY ON" : "INVINCIBILITY OFF"});
+}
+
+static void openDevWorldMenu(Quest& q) {
+    std::vector<std::string> worlds;
+    for (int world = 0; world < WORLD_COUNT; world++)
+        if (worldDef(world).count > 0) worlds.push_back(worldDef(world).name);
+    openMenu(q, MENU_DEV_WORLD, worlds);
+}
+
+static void chooseDevOption(Quest& q) {
+    MenuState& m = q.menu;
+    SaveData& s = q.save;
+    switch (m.kind) {
+    case MENU_DEV:
+        switch (m.cursor) {
+        case DEV_CLASS:
+            openMenu(q, MENU_DEV_CLASS, {CLASS_NAMES, CLASS_NAMES + CLASS_COUNT});
+            break;
+        case DEV_JOB: {
+            std::vector<std::string> jobs;
+            for (int tier = 0; tier < 4; tier++)
+                jobs.push_back(std::string(JOB_NAMES[s.heroClass][tier]) + " - " + SKILL_NAMES[s.heroClass][tier]);
+            openMenu(q, MENU_DEV_JOB, jobs);
+            break;
+        }
+        case DEV_LEVEL:
+            if (s.level >= MAX_LEVEL) {
+                q.soundRequested[SOUND_ROCKET_EMPTY] = true;
+                break;
+            }
+            s.level++;
+            questRefreshStats(q, true);
+            q.soundRequested[SOUND_Q_LEVEL_UP] = true;
+            logLine(q, "quest: dev level %d", s.level);
+            questSave(q);
+            break;
+        case DEV_WARP: openDevWorldMenu(q); break;
+        case DEV_NAMES:
+            s.names = std::min(MAX_NAMES, s.names + DEV_NAMES_GRANT);
+            q.soundRequested[SOUND_Q_NAMES] = true;
+            logLine(q, "quest: dev names %d", s.names);
+            questSave(q);
+            break;
+        case DEV_BAG:
+            for (int item = 0; item < ITEM_COUNT; item++)
+                s.items[item] = std::max(s.items[item], carryLimit(s, item));
+            q.soundRequested[SOUND_Q_CHEST] = true;
+            logLine(q, "quest: dev filled bag");
+            questSave(q);
+            break;
+        case DEV_HEAL:
+            questRefreshStats(q, true);
+            q.soundRequested[SOUND_Q_DRINK] = true;
+            break;
+        case DEV_GOD_MODE:
+            q.godMode = !q.godMode;
+            m.items[m.cursor] = q.godMode ? "INVINCIBILITY ON" : "INVINCIBILITY OFF";
+            q.soundRequested[SOUND_Q_BLIP] = true;
+            logLine(q, "quest: test mode %s", q.godMode ? "on" : "off");
+            break;
+        }
+        break;
+    case MENU_DEV_CLASS:
+    case MENU_DEV_JOB:
+        if (m.kind == MENU_DEV_CLASS) {
+            s.heroClass = m.cursor;
+        } else {
+            const int jobLevels[4] = {1, 5, 15, 30};
+            s.job = s.quests[QUEST_JOB] = m.cursor;
+            s.level = std::max(s.level, jobLevels[s.job]);
+        }
+        q.hero.skill = -1;
+        q.hero.attackTimer = q.hero.strongTimer = q.hero.partnerTimer = 0;
+        q.hero.queuedAttack = BASIC_NONE;
+        q.projectiles.erase(std::remove_if(q.projectiles.begin(), q.projectiles.end(),
+                                           [](const Projectile& p) { return p.fromHero; }), q.projectiles.end());
+        q.effects.clear();
+        questRefreshStats(q, true);
+        q.soundRequested[SOUND_Q_LEVEL_UP] = true;
+        logLine(q, "quest: dev class %s job %d level %d", CLASS_NAMES[s.heroClass], s.job, s.level);
+        questSave(q);
+        q.mode = QMODE_PLAY;
+        break;
+    case MENU_DEV_WORLD: {
+        int row = m.cursor;
+        for (int world = 0; world < WORLD_COUNT; world++) {
+            const WorldDef& w = worldDef(world);
+            if (w.count == 0 || row-- != 0) continue;
+            m.warpWorld = world;
+            std::vector<std::string> areas;
+            for (int i = 0; i < w.count; i++) areas.push_back(w.areas[i].name);
+            openMenu(q, MENU_DEV_AREA, areas);
+            break;
+        }
+        break;
+    }
+    case MENU_DEV_AREA: {
+        int world = m.warpWorld, area = m.cursor, tx = -1, ty = -1;
+        const AreaDef& def = worldDef(world).areas[area];
+        if (const char* spot = strchr(def.tiles, 'S')) {
+            int tile = (int)(spot - def.tiles);
+            tx = tile % def.cols;
+            ty = tile / def.cols;
+        }
+        if (area < (int)q.killed[world].size()) q.killed[world][area] = 0;
+        q.hero = Hero();
+        q.effects.clear();
+        q.numbers.clear();
+        q.particles.clear();
+        q.trauma = q.hitStop = 0;
+        questRefreshStats(q, true);
+        logLine(q, "quest: warp %d.%d", world, area);
+        enterArea(q, world, area, tx, ty);
+        q.soundRequested[SOUND_Q_PORTAL] = true;
+        q.mode = QMODE_PLAY;
+        break;
+    }
+    }
+}
+
 void questStartDev(Quest& q, const char* spec) {
     SaveData s;
     s.used = true;
@@ -662,7 +790,7 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
             if (letter == 'N') {
                 int id = npcs < 8 ? def.npcs[npcs] : -1;
                 npcs++;
-                if (npc < 0 && id >= 0 && sameFloor && dx <= NPC_REACH && npcPresent(s, id, world, q.area.index)) npc = id;
+                if (npc < 0 && id >= 0 && sameFloor && dx <= NPC_REACH && npcPresent(s, id, world, q.area.index, q.devAids)) npc = id;
             } else if (letter == 'T') {
                 int id = chests < 4 ? def.chests[chests] : -1;
                 chests++;
@@ -828,6 +956,7 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
             case AFTER_JOB: openMenu(q, MENU_JOB_CONFIRM, {"YES", "NOT YET"}); break;
             case AFTER_MAP: q.mode = QMODE_MAP; break;
             case AFTER_YES_NO: openMenu(q, MENU_YES_NO, {"YES", "NOT YET"}); break;
+            case AFTER_DEV: if (q.devAids) openDevMenu(q); break;
             }
         }
         break;
@@ -843,7 +972,9 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
             q.soundRequested[SOUND_Q_BLIP] = true;
         }
         if (a.back) {
-            q.mode = QMODE_PLAY;
+            if (q.devAids && m.kind == MENU_DEV_AREA) openDevWorldMenu(q);
+            else if (q.devAids && m.kind >= MENU_DEV_CLASS && m.kind <= MENU_DEV_WORLD) openDevMenu(q);
+            else q.mode = QMODE_PLAY;
         } else if (a.jump) {
             switch (m.kind) {
             case MENU_CHECKPOINT:
@@ -879,6 +1010,13 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
                 q.mode = QMODE_PLAY;
                 break;
             case MENU_YES_NO: q.mode = QMODE_PLAY; break;   // phase 8: Claude's New Game+
+            case MENU_DEV:
+            case MENU_DEV_CLASS:
+            case MENU_DEV_JOB:
+            case MENU_DEV_WORLD:
+            case MENU_DEV_AREA:
+                if (q.devAids) chooseDevOption(q);
+                break;
             }
         }
         break;

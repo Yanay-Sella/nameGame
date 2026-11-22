@@ -1,7 +1,7 @@
 # Handoff: state of the work and how Claude and Codex share it
 
 **Read this first, update it before you stop.** Rules and commands are in `AGENTS.md`; conventions, questions between agents and the small-change lane are in `docs/COLLAB.md`; this file holds what changes between sessions.
-Updated: 2026-11-22 (NAME QUEST attack stances and Archer recoil).
+Updated: 2026-11-22 (NAME QUEST Dev Tester).
 
 ## Classic shooter
 
@@ -51,6 +51,9 @@ Updated: 2026-11-22 (NAME QUEST attack stances and Archer recoil).
 - Spec examples that disagree with the spec formula `round(100 * 1.2^(L-1))`: 39→40 is 102,067 (spec 102,064), 29→30 is 16,484 (spec 10,646). The code follows the formula; the user decides.
 
 ## Session log (newest first; add a line per session: date, agent, what changed, what is next)
+- 2026-11-22, Codex — Added the Dev Tester to Namula and the Proving Floor. All 16 R2 casts, a direct arena warp and the dev-aids gate passed quest tests. Reviewed the Mac menus and built `build/nameGame-dev-tester.pkg`. PS3 installation and playtest are pending.
+- 2026-11-22, Codex — Checked NAME QUEST attack progression. Leveling raises ATK for R1 and R2. For Magician, Ysolde in Namula Cliffs grants Adept (Frost Orb) at level 5 or higher after the Overseer opens world 1's gate, then Elementalist (Chain Lightning) at level 15 or higher with the Frozen Feather from the Feather Vault above the Ice Cathedral. The level 30 Trial of Echoes is planned for phase 7.
+- 2026-11-22, Codex — Added a 0.38 s blue mist that disperses into pixels at the Magician’s blink origin. Checked the wall and expiry cases in the quest tests and reviewed the midair effect on the Mac. PS3 playtest pending.
 - 2026-11-22, Codex — Set the Archer’s rear foot four art pixels farther back at full brace on all three R1 shots. Checked the Mac render. PS3 playtest pending.
 - 2026-11-22, Codex — Revised the R1 stances after art feedback. The Archer leans back onto the rear leg, and the other three heroes load the lead knee. All twelve strikes passed the six-gait checks. Mac renders reviewed. PS3 playtest pending.
 - 2026-11-22, Codex — Animated all twelve R1 strikes with nine frames and a forward lean (D-069). Checked the combos in Mac renders and counted distinct frames at 60 Hz. PS3 playtest and user art review pending.
