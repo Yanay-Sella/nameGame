@@ -116,12 +116,12 @@ const int PROJ_ICICLE = 11, PROJ_SNOWBALL = 12, PROJ_ICE_CUBE = 13, PROJ_SHARD =
 // Hero shots: multiplier, skill or basic, enemies and bosses already hit. gravity: a lobbed throw's pull (px/s²);
 // trap: damage is taken as it is (a share of the hero's max HP, spec §7), not through DEF.
 struct Projectile { float x, y, vx, vy; int w, h; int damage; bool fromHero; int pierce; float range; int kind;
-                    float mult; bool strong; uint64_t hitMask; uint8_t bossMask; float gravity; bool trap; };
+                    float mult; bool strong; uint64_t hitMask; uint8_t bossMask; float gravity; bool trap; int basicJob; };
 struct DamageNumber { float x, y, age; int value; uint32_t color; float life; bool names; };   // names: "+n NAMES"
-// Short-lived skill shapes for drawing (arcs, bursts, chains, Meteor's marker, a boss's beam and growing ball); x2/y2: a chain link's end.
-enum EffectKind { FX_SWING, FX_ARC, FX_BURST, FX_CHAIN, FX_METEOR, FX_SPIN, FX_BEAM, FX_BALL, FX_SPARK, FX_ZONE, FX_GHOST, FX_BLINK_MIST };
+// Short-lived shapes for drawing. x2/y2: a chain link's end or a basic impact's direction.
+enum EffectKind { FX_SWING, FX_ARC, FX_BURST, FX_CHAIN, FX_METEOR, FX_SPIN, FX_BEAM, FX_BALL, FX_SPARK, FX_ZONE, FX_GHOST, FX_BLINK_MIST, FX_BASIC_IMPACT };
 const size_t PARTICLE_CAP = 200;   // no new particle while this many are alive (phase 5b readability)
-struct Effect { int kind; float x, y, w, h, x2, y2, age, life; bool flip; char color; };
+struct Effect { int kind; float x, y, w, h, x2, y2, age, life; bool flip; char color; int basicJob = 0; };
 
 enum BasicAttackInput { BASIC_NONE, BASIC_FORWARD, BASIC_UP };
 
@@ -159,7 +159,7 @@ const int BASIC_STRIKE_FRAMES = 9;
 enum HeroArms { ARMS_NONE = -1, ARMS_RECOVER, ARMS_SKILL_1, ARMS_SKILL_2, ARMS_SKILL_3, ARMS_SKILL_4, ARMS_SKILL_5,
                 ARMS_BASIC, ARMS_QUEUED_DRAW = ARMS_BASIC + 3 * BASIC_STRIKE_FRAMES };
 enum HeroLegs { LEGS_STAND, LEGS_RUN_1, LEGS_RUN_2, LEGS_RUN_3, LEGS_RUN_4, LEGS_AIR };
-struct HeroPose { int body, arms, legs; float attackT, skillT; bool slashLit; };   // slashLit: the melee active window
+struct HeroPose { int body, arms, legs; float attackT, skillT; bool slashLit; int slashW, slashH; };   // slashLit: the melee active window
 // Things lying in the area for a while: the Monkey King's peels and the Silverback's stink mist (spec §12 world 2).
 enum FloorHazardKind { HAZARD_PEEL, HAZARD_MIST };
 struct FloorHazard { int kind; float x, y, timer; };   // x, y: a peel's bottom-centre, a mist's centre; s left
@@ -238,6 +238,7 @@ struct Quest {
     std::vector<std::string> logLines;  // spec §18 lines for main.cpp to print
     // Combat (phase 2)
     HeroStats stats;                    // recomputed by questRefreshStats
+    int selectedSkill = -1;             // strong attack equipped this session, -1 for the latest unlocked tier
     std::vector<Enemy> enemies;
     std::vector<Projectile> projectiles;
     std::vector<DamageNumber> numbers;
@@ -284,6 +285,7 @@ void moveHero(Hero& hero, const Actions& a, const AreaState& area, HeroClass her
 bool heroInLiquid(const Hero& hero, const AreaState& area);
 // Combat (quest_combat.cpp):
 void questRefreshStats(Quest& q, bool fullHeal);          // stats from the save; fullHeal: HP and MP full
+int selectedSkillTier(const Quest& q);
 void spawnEnemies(Quest& q);                              // the current area's A B D E F whose killed bit is clear
 void updateCombat(Quest& q, const Actions& a, float dt);  // attacks, dodge, movement, enemies, shots, damage (PLAY)
 HeroPose heroPose(const Quest& q);                          // quest_combat.cpp (it owns the attack tables)

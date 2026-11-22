@@ -1,7 +1,7 @@
 # Handoff: state of the work and how Claude and Codex share it
 
 **Read this first, update it before you stop.** Rules and commands are in `AGENTS.md`; conventions, questions between agents and the small-change lane are in `docs/COLLAB.md`; this file holds what changes between sessions.
-Updated: 2026-11-22 (NAME QUEST Dev Tester).
+Updated: 2026-11-22 (NAME QUEST basic attack progression).
 
 ## Classic shooter
 
@@ -51,6 +51,8 @@ Updated: 2026-11-22 (NAME QUEST Dev Tester).
 - Spec examples that disagree with the spec formula `round(100 * 1.2^(L-1))`: 39→40 is 102,067 (spec 102,064), 29→30 is 16,484 (spec 10,646). The code follows the formula; the user decides.
 
 ## Session log (newest first; add a line per session: date, agent, what changed, what is next)
+- 2026-11-22, Codex — Job promotions retain all earlier R2 skills and equip the new one (D-071). R3 cycles through unlocked skills and the HUD shows the selection. All four classes passed quest tests. Reviewed the Mac Elementalist HUD and Frost Orb cast. PS3 playtest pending.
+- 2026-11-22, Codex — All four heroes gain faster R1 cycles, larger hitboxes, longer reach and class-coloured impact bursts at each job (D-070). Quest tests passed and Mac impact frames reviewed. TV playtest pending.
 - 2026-11-22, Codex — Added the Dev Tester to Namula and the Proving Floor. All 16 R2 casts, a direct arena warp and the dev-aids gate passed quest tests. Reviewed the Mac menus and built `build/nameGame-dev-tester.pkg`. PS3 installation and playtest are pending.
 - 2026-11-22, Codex — Checked NAME QUEST attack progression. Leveling raises ATK for R1 and R2. For Magician, Ysolde in Namula Cliffs grants Adept (Frost Orb) at level 5 or higher after the Overseer opens world 1's gate, then Elementalist (Chain Lightning) at level 15 or higher with the Frozen Feather from the Feather Vault above the Ice Cathedral. The level 30 Trial of Echoes is planned for phase 7.
 - 2026-11-22, Codex — Added a 0.38 s blue mist that disperses into pixels at the Magician’s blink origin. Checked the wall and expiry cases in the quest tests and reviewed the midair effect on the Mac. PS3 playtest pending.

@@ -66,6 +66,7 @@ void inputRead(Actions* actions) {
         a.fire = down2(PAD_CTRL_R1);
         a.firePressed = press2(PAD_CTRL_R1);
         a.rocket = press2(PAD_CTRL_R2);
+        a.nextSkill = press(PAD_CTRL_R3);
         a.pause = press(PAD_CTRL_START);
         a.item = press2(PAD_CTRL_TRIANGLE);
         a.autopilot = press(PAD_CTRL_SELECT);

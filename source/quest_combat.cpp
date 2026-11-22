@@ -16,6 +16,9 @@ const float BLINK_MIST_TIME = 0.38f;
 const float HURT_VX = 90 * DP, HURT_TIME = 0.25f, HURT_IFRAMES = 1.0f;
 const int BASIC_COMBO_LENGTH = 3;
 const float BASIC_MULT_BY_JOB[4] = {1.0f, 1.15f, 1.3f, 1.5f};
+const float BASIC_CYCLE_BY_JOB[4] = {1.0f, 0.90f, 0.80f, 0.70f};   // spec §6, D-070
+const float MELEE_REACH_PER_JOB = 4 * DP, MELEE_HEIGHT_PER_JOB = 3 * DP;
+const float SHOT_WIDTH_PER_JOB = DP, SHOT_HEIGHT_PER_JOB = 2 * DP, SHOT_SPEED_PER_JOB = 20 * DP, SHOT_RANGE_PER_JOB = 24 * DP;
 // The basic attack per class: cycle, multiplier, melee window and box, or the shot's speed, range and size.
 struct BasicAttack { float cycle, mult, from, to, boxW, boxH, speed, range, shotW, shotH; Sound sound; };
 const BasicAttack BASIC[CLASS_COUNT] = {
@@ -24,6 +27,23 @@ const BasicAttack BASIC[CLASS_COUNT] = {
     {0.50f, 1.1f, 0, 0, 0, 0, 200 * DP, 130 * DP, 6 * DP, 6 * DP, SOUND_Q_SPELL},
     {0.26f, 0.7f, 0.04f, 0.10f, 16 * DP, 12 * DP, 0, 0, 0, 0, SOUND_Q_STAB},
 };
+
+static BasicAttack basicAttack(int cls, int job) {
+    BasicAttack basic = BASIC[cls];
+    basic.cycle *= BASIC_CYCLE_BY_JOB[job];
+    basic.mult *= BASIC_MULT_BY_JOB[job];
+    if (basic.speed == 0) {
+        basic.boxW += job * MELEE_REACH_PER_JOB;
+        basic.boxH += job * MELEE_HEIGHT_PER_JOB;
+    } else {
+        basic.speed += job * SHOT_SPEED_PER_JOB;
+        basic.range += job * SHOT_RANGE_PER_JOB;
+        basic.shotW += job * SHOT_WIDTH_PER_JOB;
+        basic.shotH += job * SHOT_HEIGHT_PER_JOB;
+    }
+    return basic;
+}
+
 // Strong attacks by class and job tier (spec §6): MP cost and how long the skill plays.
 const int SKILL_MP[CLASS_COUNT][4] = {{10, 12, 16, 24}, {8, 14, 18, 26}, {10, 14, 20, 34}, {8, 12, 16, 30}};
 const float SKILL_TIME[CLASS_COUNT][4] = {{0.6f, 0.3f, 0.3f, 0.3f}, {0.25f, 0.25f, 0.25f, 0.45f}, {0.3f, 0.3f, 0.3f, 0.6f},
@@ -618,6 +638,29 @@ static void spark(Quest& q, float x, float y, char color) {
     }
 }
 
+static void hitSpark(Quest& q, float x, float y, float w, float h, float sourceX, float sourceY, bool strong, const Projectile* shot) {
+    int job = strong ? 0 : shot ? shot->basicJob : std::max(0, std::min(3, q.save.job));
+    if (shot && job > 0) {
+        sourceX = shot->x + shot->w / 2.0f;
+        sourceY = shot->y + shot->h / 2.0f;
+    }
+    float contactX = fmaxf(x, fminf(sourceX, x + w)), contactY = fmaxf(y, fminf(sourceY, y + h));
+    spark(q, contactX, contactY, strong ? 'N' : 'w');
+    if (job == 0) return;
+
+    int cls = q.save.heroClass;
+    const char colors[CLASS_COUNT] = {'N', 'g', 'c', 'p'};
+    const int reach[CLASS_COUNT] = {10, 14, 9, 11}, spread[CLASS_COUNT] = {9, 4, 9, 5};
+    bool left = shot ? shot->vx < 0 : q.hero.facingLeft;
+    float dx = left ? -1 : 1, dy = 0;
+    if (cls == CLASS_THIEF) {
+        dx = q.hero.attackUp ? 0 : 0.8f * dx;
+        dy = q.hero.attackUp ? -1 : -0.6f;
+    }
+    q.effects.push_back({FX_BASIC_IMPACT, contactX, contactY, (reach[cls] + 3 * job) * DP, (spread[cls] + 2 * job) * DP,
+                         dx, dy, 0, 0.12f + 0.04f * job, left, colors[cls], job});
+}
+
 static void burst(Quest& q, float x, float y, uint32_t color, int count) {
     for (int i = 0; i < count && q.particles.size() < PARTICLE_CAP; i++) {
         float angle = random01(q) * 6.2832f, speed = (30 + 50 * random01(q)) * DP;
@@ -626,7 +669,7 @@ static void burst(Quest& q, float x, float y, uint32_t color, int count) {
 }
 
 // One hit of the hero's on enemy `index` (spec §7): damage, number, flash, knockback, hit-stop; a kill drops its names.
-static void hitEnemy(Quest& q, int index, float mult, bool strong, float sourceX) {
+static void hitEnemy(Quest& q, int index, float mult, bool strong, float sourceX, const Projectile* shot = nullptr) {
     Enemy& e = q.enemies[index];
     const EnemyType& type = rosterType(e.world, e.type);
     const Hero& h = q.hero;
@@ -642,7 +685,7 @@ static void hitEnemy(Quest& q, int index, float mult, bool strong, float sourceX
     int damage = damageToEnemy(atk, mult, 0.9f + 0.2f * random01(q), crit, q.stats.critMult, mod);
     e.hp -= damage;
     e.flash = FLASH_TIME;
-    spark(q, fmaxf(e.x, fminf(sourceX, e.x + e.w)), e.y + e.h / 2, strong ? 'N' : 'w');
+    hitSpark(q, e.x, e.y, e.w, e.h, sourceX, e.y + e.h / 2, strong, shot);
     addNumber(q, ex, e.y, damage, crit ? 'o' : 'w');
     q.soundRequested[crit ? SOUND_Q_CRIT : SOUND_Q_HIT] = true;
     if (type.kind == KIND_FODDER || type.kind == KIND_SOLDIER) {
@@ -668,7 +711,7 @@ static void hitEnemy(Quest& q, int index, float mult, bool strong, float sourceX
 }
 
 // One hit of the hero's on boss `index` (spec §7): no knockback; updateBosses handles phases and the death.
-static void hitBoss(Quest& q, int index, float mult, bool strong) {
+static void hitBoss(Quest& q, int index, float mult, bool strong, const Projectile* shot = nullptr) {
     QuestBoss& b = q.bosses[index];
     if (!bossHittable(b)) return;
     bool crit = random01(q) < q.stats.crit;
@@ -677,7 +720,7 @@ static void hitBoss(Quest& q, int index, float mult, bool strong) {
     b.hp -= damage;
     b.flash = BOSS_FLASH;
     float heroX = q.hero.x + HERO_W / 2, heroY = q.hero.y + HERO_H / 2;   // the boss box's edge nearest the hero
-    spark(q, fmaxf(b.x, fminf(heroX, b.x + b.w)), fmaxf(b.y, fminf(heroY, b.y + b.h)), strong ? 'N' : 'w');
+    hitSpark(q, b.x, b.y, b.w, b.h, heroX, heroY, strong, shot);
     addNumber(q, b.x + b.w / 2, b.y, damage, crit ? 'o' : 'w');
     q.soundRequested[crit ? SOUND_Q_CRIT : SOUND_Q_HIT] = true;
     if (strong) q.hitStop = fmaxf(q.hitStop, HIT_STOP);
@@ -734,7 +777,7 @@ static void hitCircle(Quest& q, float cx, float cy, float radius, float mult) {
 }
 
 static void shoot(Quest& q, float cx, float cy, float angle, float speed, float range, float w, float h, int kind, float mult,
-                  bool strong, int pierce) {
+                  bool strong, int pierce, int basicJob = 0) {
     Projectile p = {};
     p.vx = cosf(angle) * speed;
     p.vy = sinf(angle) * speed;
@@ -748,6 +791,7 @@ static void shoot(Quest& q, float cx, float cy, float angle, float speed, float 
     p.kind = kind;
     p.mult = mult;
     p.strong = strong;
+    p.basicJob = basicJob;
     q.projectiles.push_back(p);
 }
 
@@ -757,7 +801,7 @@ static void frontBox(const Hero& h, float w, float boxH, float* x, float* y) {
     *y = h.y + HERO_H / 2 - boxH / 2;
 }
 
-// Starts the job tier's strong attack (spec §6 table).
+// Starts the selected strong attack (spec §6 table).
 static void castSkill(Quest& q, int cls, int job) {
     Hero& h = q.hero;
     if (h.mp < SKILL_MP[cls][job] || (cls == CLASS_THIEF && job == 3 && h.partnerTimer > 0)) {
@@ -773,7 +817,7 @@ static void castSkill(Quest& q, int cls, int job) {
     h.volleys = 0;
     float dir = h.facingLeft ? -1 : 1, cx = h.x + HERO_W / 2, handY = h.y + 6 * DP, handX = cx + dir * 6 * DP;
     float aim = h.facingLeft ? 3.14159265f : 0;
-    int pierce = cls == CLASS_ARCHER && job >= 1 ? 1 : 0;
+    int pierce = q.save.job >= 1 ? 1 : 0;   // the Archer's promotion perk also applies to Double Shot
     const float DEGREE = 3.14159265f / 180;
     switch (cls * 4 + job) {
     case CLASS_KNIGHT * 4 + 0:   // Power Slash: box in updateSkill, drawn from the hero's pose
@@ -970,9 +1014,12 @@ static void updateSkill(Quest& q, int cls, int job) {
 HeroPose heroPose(const Quest& q) {
     const Hero& h = q.hero;
     int cls = q.save.heroClass;
-    const BasicAttack& basic = BASIC[cls];
+    int job = std::max(0, std::min(3, q.save.job));
+    const BasicAttack basic = basicAttack(cls, job);
     HeroPose p;
     p.attackT = h.attackTimer > 0 ? basic.cycle - h.attackTimer : -1;
+    p.slashW = (int)basic.boxW;
+    p.slashH = (int)basic.boxH;
     p.skillT = h.skill >= 0 ? SKILL_TIME[cls][h.skill] - h.strongTimer : -1;
     bool running = fabsf(h.vx) > 10 * DP;
     p.legs = !h.onGround ? LEGS_AIR : running ? LEGS_RUN_1 + (int)(q.time / RUN_FRAME) % 4 : LEGS_STAND;
@@ -1013,7 +1060,7 @@ HeroPose heroPose(const Quest& q) {
     } else if (p.attackT >= 0) {
         // Each phase has three drawings. Melee contact tracks the hit window, and ranged release starts at the shot.
         float firstEnd = melee ? basic.from : 0.08f;
-        float secondEnd = melee ? basic.to : basic.cycle - 0.20f;
+        float secondEnd = melee ? basic.to : basic.cycle - 0.20f * BASIC_CYCLE_BY_JOB[job];
         int phase = 0;
         float start = 0, end = firstEnd;
         if (p.attackT > secondEnd) {
@@ -1060,9 +1107,21 @@ void updateEffects(Quest& q, float dt) {
     }
 }
 
+int selectedSkillTier(const Quest& q) {
+    int job = std::max(0, std::min(3, q.save.job));
+    return q.selectedSkill >= 0 && q.selectedSkill <= job ? q.selectedSkill : job;
+}
+
 void updateCombat(Quest& q, const Actions& a, float dt) {
     Hero& h = q.hero;
     int cls = q.save.heroClass;
+    int job = std::max(0, std::min(3, q.save.job));
+    if (a.nextSkill && job > 0) {
+        int tier = selectedSkillTier(q);
+        q.selectedSkill = tier > 0 ? tier - 1 : job;
+        q.soundRequested[SOUND_Q_BLIP] = true;
+        logLine(q, "quest: selected skill %s", SKILL_NAMES[cls][q.selectedSkill]);
+    }
     if (a.firePressed && h.frozenTimer <= 0 && h.skill < 0)
         h.queuedAttack = cls == CLASS_THIEF && a.moveY < -0.5f ? BASIC_UP : BASIC_FORWARD;
     if (q.hitStop > 0) {   // hit-stop freezes the hero, enemies and shots (not particles and numbers)
@@ -1070,8 +1129,7 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
         return;
     }
     const HeroStats& s = q.stats;
-    int job = q.save.job < 0 ? 0 : q.save.job > 3 ? 3 : q.save.job;
-    const BasicAttack& basic = BASIC[cls];
+    const BasicAttack basic = basicAttack(cls, job);
     float walk = CLASSES[cls].walk * DP;
     h.landTimer = fmaxf(0, h.landTimer - dt);
 
@@ -1127,7 +1185,7 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
     free = h.hurtTimer <= 0 && !h.climbing && h.rollTimer <= 0 && h.slideTimer <= 0 && h.frozenTimer <= 0;
 
     // R2 takes priority. One R1 press can queue the next basic attack until the current cycle ends.
-    if (a.rocket && free && h.skill < 0) castSkill(q, cls, job);
+    if (a.rocket && free && h.skill < 0) castSkill(q, cls, selectedSkillTier(q));
     if (!free || h.skill >= 0) h.queuedAttack = BASIC_NONE;
     if (h.queuedAttack != BASIC_NONE && h.attackTimer <= 0) {
         h.basicStep = previousBasic ? (h.basicStep + 1) % BASIC_COMBO_LENGTH : 0;
@@ -1138,9 +1196,8 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
         q.soundRequested[basic.sound] = true;
         float dir = h.facingLeft ? -1 : 1;
         if (basic.speed > 0)
-            shoot(q, h.x + HERO_W / 2 + dir * 6 * DP, h.y + 6 * DP, h.facingLeft ? 3.14159265f : 0, basic.speed, basic.range, basic.shotW,
-                  basic.shotH, cls == CLASS_ARCHER ? PROJ_ARROW : PROJ_BOLT, basic.mult * BASIC_MULT_BY_JOB[job], false,
-                  cls == CLASS_ARCHER && job >= 1 ? 1 : 0);
+            shoot(q, h.x + HERO_W / 2 + dir * 6 * DP, h.y + 6 * DP, h.facingLeft ? 3.14159265f : 0, basic.speed, basic.range,
+                  basic.shotW, basic.shotH, cls == CLASS_ARCHER ? PROJ_ARROW : PROJ_BOLT, basic.mult, false, cls == CLASS_ARCHER && job >= 1 ? 1 : 0, job);
     }
 
     // Movement: knockback, roll and dash keep their speed; R1 and R2 never slow or root the hero (D-062, D-064).
@@ -1189,11 +1246,11 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
                 x = h.x + HERO_W / 2 - w / 2;
                 y = h.y - bh;
             }
-            int hits = hitBox(q, x, y, w, bh, basic.mult * BASIC_MULT_BY_JOB[job], false, h.swing, false);
+            int hits = hitBox(q, x, y, w, bh, basic.mult, false, h.swing, false);
             if (hits > 0) q.hitStop = fmaxf(q.hitStop, BASIC_HIT_STOP);
             h.mp = h.mp + hits < s.maxMp ? h.mp + hits : s.maxMp;   // every landed basic hit gives +1 MP
             if (h.partnerTimer > 0)
-                hitBox(q, x - dir * PARTNER_BEHIND, y, w, bh, basic.mult * BASIC_MULT_BY_JOB[job] * PARTNER_MULT, false, h.swing, true);
+                hitBox(q, x - dir * PARTNER_BEHIND, y, w, bh, basic.mult * PARTNER_MULT, false, h.swing, true);
         }
     }
     if (h.skill >= 0) {
@@ -1233,9 +1290,9 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
                     !overlaps(p.x, p.y, (float)p.w, (float)p.h, e.x, e.y, e.w, e.h))
                     continue;
                 p.hitMask |= 1ull << k;
-                hitEnemy(q, k, p.mult, p.strong, p.x + p.w / 2);
+                hitEnemy(q, k, p.mult, p.strong, p.x + p.w / 2, &p);
                 if (p.kind == PROJ_ORB) burst(q, p.x + p.w / 2, p.y + p.h / 2, paletteColor('i'), 6);
-                if (p.kind == PROJ_ARROW && p.w >= 10 * DP) spark(q, p.x + p.w / 2, p.y + p.h / 2, 'c');   // the Piercing Bolt
+                if (p.strong && p.kind == PROJ_ARROW && p.w >= 10 * DP) spark(q, p.x + p.w / 2, p.y + p.h / 2, 'c');   // the Piercing Bolt
                 if (p.kind == PROJ_ORB && e.alive) e.slowTimer = 3;
                 if (!p.strong) h.mp = h.mp < s.maxMp ? h.mp + 1 : s.maxMp;
                 if (p.pierce-- <= 0) gone = true;
@@ -1244,7 +1301,7 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
                 QuestBoss& b = q.bosses[k];
                 if (!bossHittable(b) || (p.bossMask >> k & 1) || !overlaps(p.x, p.y, (float)p.w, (float)p.h, b.x, b.y, (float)b.w, (float)b.h)) continue;
                 p.bossMask |= 1 << k;
-                hitBoss(q, k, p.mult, p.strong);
+                hitBoss(q, k, p.mult, p.strong, &p);
                 if (!p.strong) h.mp = h.mp < s.maxMp ? h.mp + 1 : s.maxMp;
                 if (p.pierce-- <= 0) gone = true;
             }

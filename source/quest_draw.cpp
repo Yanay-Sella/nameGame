@@ -448,8 +448,8 @@ static void drawHeroSlash(const Quest& q, const HeroPose& p, int camX, int camY)
         uint32_t c = copy ? paletteColor('x') : core, e = copy ? paletteColor('p') : edge;
         int shift = copy ? (int)(-dir * PARTNER_BEHIND) : 0;
         bool recovering = p.arms >= ARMS_BASIC && (p.arms - ARMS_BASIC) % BASIC_STRIKE_FRAMES >= 6;
-        if (cls == CLASS_KNIGHT && p.attackT >= 0) {   // 22 x 18 in front, centred on the hitbox's middle
-            int w = (int)(22 * DP), bh = (int)(18 * DP);
+        if (cls == CLASS_KNIGHT && p.attackT >= 0) {
+            int w = p.slashW, bh = p.slashH;
             int x = (int)(left ? h.x - w : h.x + HERO_W) - camX + shift, y = (int)(h.y + HERO_H / 2 - bh / 2) - camY;
             if (p.slashLit || (recovering && p.attackT <= 0.18f + 0.06f)) {
                 float sweep = fmaxf(0, fminf(1, (p.attackT - 0.08f) / 0.10f));
@@ -464,9 +464,9 @@ static void drawHeroSlash(const Quest& q, const HeroPose& p, int camX, int camY)
             }
         }
         if (cls == CLASS_THIEF && p.attackT >= 0 && (p.slashLit || (recovering && p.attackT <= 0.10f + 0.04f))) {
-            int length = (int)(16 * DP), from = p.slashLit ? 0 : length * 2 / 3;
+            int length = p.slashW, from = p.slashLit ? 0 : length * 2 / 3;
             for (int k = from; k < length; k += DP) {
-                int tall = 1 + 2 * k / length;
+                int tall = 1 + (2 + 2 * job) * k / length;
                 int tilt = h.basicStep == 0 ? 0 : (h.basicStep == 1 ? -1 : 1) * 4 * k / length;
                 for (int t = -tall / 2; t <= tall / 2; t++) {
                     uint32_t color = t == 0 ? c : e;
@@ -533,6 +533,39 @@ static void drawHeroSlash(const Quest& q, const HeroPose& p, int camX, int camY)
     }
 }
 
+// Promoted R1 hits open into a directional burst, with staggered arcs on the higher jobs.
+static void drawBasicImpact(const Effect& f, int x, int y, uint32_t core) {
+    float t = f.age / f.life, decay = 1 - t;
+    float radius = 0.24f + 0.76f * (1 - decay * decay);
+    uint32_t color = paletteColor(f.color);
+    int rays = 6 + 2 * f.basicJob;
+    for (int k = 0; k < rays; ++k) {
+        float angle = (k + 0.25f) * 6.2831853f / rays;
+        float along = cosf(angle) * (cosf(angle) < 0 ? f.w * 0.7f : f.w), across = sinf(angle) * f.h;
+        float dx = along * f.x2 - across * f.y2, dy = along * f.y2 + across * f.x2;
+        for (int j = 0; j < 4; ++j) {
+            float r = radius - j * (0.035f + 0.055f * decay);
+            int px = x + (int)(dx * r), py = y + (int)(dy * r);
+            if (t < 0.58f || bayer4(k, j) < decay * 24)
+                fillRect(px, py, DP, DP, j == 0 && t < 0.42f ? core : color);
+        }
+    }
+    for (int ring = 1; ring < f.basicJob; ++ring) {
+        float delay = (ring - 1) * 0.22f, ringT = t - delay;
+        if (ringT < 0 || ringT >= 0.72f) continue;
+        float r = 0.24f + 0.85f * ringT;
+        for (int k = 0; k < 36; ++k) {
+            if ((k + 2 * ring) % 9 >= 6) continue;
+            float angle = k * 6.2831853f / 36;
+            float along = f.w * r * cosf(angle), across = f.h * r * sinf(angle);
+            int px = x + (int)(along * f.x2 - across * f.y2);
+            int py = y + (int)(along * f.y2 + across * f.x2);
+            if (ringT < 0.43f || bayer4(k, ring) < (0.72f - ringT) * 32)
+                fillRect(px, py, DP, DP, color);
+        }
+    }
+}
+
 // Hero effects and shots first, then enemies and bosses, then enemy shots and telegraphs on top (spec §7, §8, §21; phase 5b).
 static void drawCombat(const Quest& q, int camX, int camY) {
     const SaveData& s = q.save;
@@ -564,6 +597,7 @@ static void drawCombat(const Quest& q, int camX, int camY) {
     const Hero& h = q.hero;
     const uint32_t white = paletteColor(q.reduceFlashing ? 'b' : 'w');   // the white cores and sparks (reduce flashing: grey)
     for (const Effect& f : q.effects) {
+        if (f.kind == FX_BASIC_IMPACT) continue;
         int x = (int)f.x - camX, y = (int)f.y - camY;
         uint32_t color = paletteColor(f.color);
         switch (f.kind) {
@@ -705,11 +739,12 @@ static void drawCombat(const Quest& q, int camX, int camY) {
         float speed = hypotf(p.vx, p.vy), ux = speed > 0 ? p.vx / speed : 0, uy = speed > 0 ? p.vy / speed : 0;
         const Sprite* sp = nullptr;
         if (p.kind == PROJ_ARROW) {
-            bool big = p.w >= 10 * DP;
+            bool big = p.strong && p.w >= 10 * DP;
             sp = big ? &ARROW_BIG : p.vy < -0.12f * fabsf(p.vx) ? &ARROW_UP : p.vy > 0.12f * fabsf(p.vx) ? &ARROW_DOWN : &ARROW_FLAT;
-            for (int k = 0; k < 6 && !big; k++) {   // a speed line behind: 6 dp, 50 % dithered
-                int px = cx - (int)(ux * (sp->w / 2 + k * DP)), py = cy - (int)(uy * (sp->w / 2 + k * DP));
-                if (bayer4(px, py) < 8) fillRect(px, py, DP, DP, white);
+            for (int k = 0; k < 6 + 2 * p.basicJob && !big; k++) {
+                float d = (sp->w + p.basicJob * DP) / 2 + k * DP;
+                int px = cx - (int)(ux * d), py = cy - (int)(uy * d);
+                if (bayer4(px, py) < 8) fillRect(px, py, DP, DP, p.basicJob > 0 ? paletteColor('g') : white);
             }
             const char trail[3] = {'w', 'c', 'I'};
             for (int k = 0; k < 3 && big; k++)   // the Piercing Bolt's glowing streak
@@ -724,9 +759,9 @@ static void drawCombat(const Quest& q, int camX, int camY) {
             bool bolt = p.kind == PROJ_BOLT;
             sp = bolt ? (b ? &BOLT_B : &BOLT_A) : (b ? &ORB_B : &ORB_A);
             const char* colors = bolt ? "cuU" : "iIi";
-            for (int k = 0; k < 3; k++) {
-                int d = (int)((k + 1) * 3 * DP + sp->w / 2), size = k < 2 ? 2 * DP : DP;
-                fillRect(cx - (int)(ux * d) - size / 2, cy - (int)(uy * d) - size / 2, size, size, paletteColor(colors[k]));
+            for (int k = 0; k < 3 + p.basicJob; k++) {
+                int d = (int)((k + 1) * 3 * DP + (sp->w + p.basicJob * DP) / 2), size = k < 2 ? 2 * DP : DP;
+                fillRect(cx - (int)(ux * d) - size / 2, cy - (int)(uy * d) - size / 2, size, size, paletteColor(colors[k % 3]));
             }
         } else if (p.kind == PROJ_STAR) {
             sp = b ? &STAR_B : &STAR_A;
@@ -734,7 +769,20 @@ static void drawCombat(const Quest& q, int camX, int camY) {
             sp = b ? &QUAKE_B : &QUAKE_A;
             cy = (int)(p.y + p.h) - camY - sp->h / 2;   // the crest stands on the floor
         }
-        if (sp) drawSpriteEx(*sp, cx - sp->w / 2, cy - sp->h / 2, flip);
+        if (!sp) continue;
+        if (p.basicJob > 0) {
+            int w = sp->w + p.basicJob * DP, h = sp->h + 2 * p.basicJob * DP;
+            for (int row = 0; row < h; row += DP) {
+                int sy = row * sp->h / h / (int)DP * (int)DP;
+                for (int col = 0; col < w; col += DP) {
+                    int sx = col * sp->w / w / (int)DP * (int)DP;
+                    char ink = sp->pixels[sy * sp->w + (flip ? sp->w - 1 - sx : sx)];
+                    if (ink != '.') fillRect(cx - w / 2 + col, cy - h / 2 + row, DP, DP, ink == 'w' ? white : paletteColor(ink));
+                }
+            }
+        } else {
+            drawSpriteEx(*sp, cx - sp->w / 2, cy - sp->h / 2, flip);
+        }
     }
     for (const Enemy& e : q.enemies) {
         if (!e.alive) continue;
@@ -793,6 +841,9 @@ static void drawCombat(const Quest& q, int camX, int camY) {
         } else {
             drawSpriteEx(sprite, x, y, b.facingLeft);
         }
+    }
+    for (const Effect& f : q.effects) {
+        if (f.kind == FX_BASIC_IMPACT) drawBasicImpact(f, (int)f.x - camX, (int)f.y - camY, white);
     }
     for (const Projectile& p : q.projectiles) {   // enemy shots, over everything but the hero
         if (p.fromHero) continue;
@@ -1013,6 +1064,13 @@ static void drawPlay(const Quest& q) {
     fillRect(namesX - 6 * DP + DP, 4 * DP, 3 * DP, 5 * DP, paletteColor('y'));   // the 5 x 5 wisp icon
     fillRect(namesX - 6 * DP, 6 * DP, 5 * DP, 3 * DP, paletteColor('y'));
     fillRect(namesX - 6 * DP + 2 * DP, 6 * DP, DP, 2 * DP, paletteColor('w'));
+    if (q.save.job > 0) {
+        const char* skill = SKILL_NAMES[q.save.heroClass][selectedSkillTier(q)];
+        snprintf(text, sizeof text, "R2 %s", skill);
+        drawText(316 * DP - textWidth(text, DP), 12 * DP, text, paletteColor('w'), DP);
+        const char* hint = "R3 SWITCH";
+        drawText(316 * DP - textWidth(hint, DP), 20 * DP, hint, paletteColor('s'), DP);
+    }
     // The selected item and its count, then the running buffs' seconds (spec §15).
     const Sprite& icon = *ITEM_ICONS[q.selectedItem % ITEM_COUNT];
     drawSpriteOutlined(icon, 4 * DP, 168 * DP, false, paletteColor('x'));

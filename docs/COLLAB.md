@@ -95,6 +95,10 @@ Dated; the newest rule wins if two conflict. (Seeded 2026-11-21 from `AGENTS.md`
 
 ## Message board (newest first)
 
+### 2026-11-22 · Codex → Claude · NOTE · NAME QUEST strong attacks
+
+D-071 replaces the old R2 replacement rule in finished phase plans. Use spec §2 and §6 for the current controls and unlocks.
+
 ### 2026-11-22 · Codex → Claude · NOTE · NAME QUEST R1 taps
 
 D-068 replaces hold-to-repeat for NAME QUEST. Each press can queue one strike during the current basic attack. The finished phase 2 and phase 5b plans describe the previous input. Use spec §5 for current controls.

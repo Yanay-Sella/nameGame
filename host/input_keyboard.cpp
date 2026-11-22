@@ -1,6 +1,6 @@
 // Mac build: two keyboard pads and a NAMEGAME_PAD script that can drive any port.
 // Player 1: arrows, Z cross (jump), X circle (dodge), C square (potion), V triangle (item), Enter start, Backspace select, Space R1 (fire), Right Shift R2 (rocket),
-//           P L1 (screenshot), 1 L2, 2 L3 (1 + 2 together: test mode).
+//           P L1 (screenshot), 1 L2, 2 L3 (1 + 2 together: test mode), 3 R3 (switch strong attack).
 // Player 2: WASD, K cross (joins the run), L square, H R1 (fire), J R2 (rocket).
 #include "../source/input.h"
 #include <SDL.h>
@@ -11,9 +11,9 @@
 #include <vector>
 
 enum { BTN_LEFT, BTN_DOWN, BTN_RIGHT, BTN_UP, BTN_START, BTN_L3, BTN_SELECT, BTN_SQUARE, BTN_CROSS, BTN_CIRCLE, BTN_TRIANGLE,
-       BTN_R1, BTN_L1, BTN_R2, BTN_L2, BUTTON_COUNT };
+       BTN_R1, BTN_L1, BTN_R2, BTN_L2, BTN_R3, BUTTON_COUNT };
 const char* const BUTTON_NAMES[BUTTON_COUNT] = {"left", "down", "right", "up", "start", "l3", "select", "square", "cross", "circle",
-                                                "triangle", "r1", "l1", "r2", "l2"};
+                                                "triangle", "r1", "l1", "r2", "l2", "r3"};
 
 struct KeyBinding { SDL_Scancode key; int player, button; };
 const KeyBinding KEYS[] = {
@@ -21,6 +21,7 @@ const KeyBinding KEYS[] = {
     {SDL_SCANCODE_Z, 0, BTN_CROSS}, {SDL_SCANCODE_X, 0, BTN_CIRCLE}, {SDL_SCANCODE_C, 0, BTN_SQUARE}, {SDL_SCANCODE_V, 0, BTN_TRIANGLE},
     {SDL_SCANCODE_RETURN, 0, BTN_START}, {SDL_SCANCODE_BACKSPACE, 0, BTN_SELECT}, {SDL_SCANCODE_SPACE, 0, BTN_R1},
     {SDL_SCANCODE_RSHIFT, 0, BTN_R2}, {SDL_SCANCODE_P, 0, BTN_L1}, {SDL_SCANCODE_1, 0, BTN_L2}, {SDL_SCANCODE_2, 0, BTN_L3},
+    {SDL_SCANCODE_3, 0, BTN_R3},
     {SDL_SCANCODE_A, 1, BTN_LEFT}, {SDL_SCANCODE_S, 1, BTN_DOWN}, {SDL_SCANCODE_D, 1, BTN_RIGHT}, {SDL_SCANCODE_W, 1, BTN_UP},
     {SDL_SCANCODE_K, 1, BTN_CROSS}, {SDL_SCANCODE_L, 1, BTN_SQUARE}, {SDL_SCANCODE_H, 1, BTN_R1}, {SDL_SCANCODE_J, 1, BTN_R2},
 };
@@ -123,6 +124,7 @@ void inputRead(Actions* actions) {
             a.fire = down(BTN_R1);
             a.firePressed = press[BTN_R1];
             a.rocket = press[BTN_R2];
+            a.nextSkill = press[BTN_R3];
             a.pause = press[BTN_START];
             a.confirm = press[BTN_CROSS] || press[BTN_START];
             a.autopilot = press[BTN_SELECT];

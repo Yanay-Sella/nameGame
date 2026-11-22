@@ -48,7 +48,8 @@ Intro pages (QMODE_INTRO, after the class pick; exact text, `\n` = line break):
 | Left stick / D-pad | walk; up/down climb ladders; down + X drops through a one-way platform | move the cursor |
 | X | jump (hold for a higher jump); Thief: X again in the air = double jump | confirm / next page |
 | R1 | basic attack on press. Tap again during a strike to queue the next one (§5) | — |
-| R2 | strong attack (costs MP) | — |
+| R2 | cast the selected strong attack (costs MP) | — |
+| R3 | cycle unlocked strong attacks, newest to oldest | — |
 | Circle | dodge (roll; Magician: blink) | back / close |
 | Square | use the selected item | — |
 | Triangle | select the next owned item | delete a slot (slot select) |
@@ -206,7 +207,7 @@ skill plays; a skill only blocks starting a basic attack or a dodge until it end
 Basic attacks cycle through three distinct animations per class (D-067). Each R1 press starts one strike or queues
 the next one during the current cycle, including during hit-stop (D-068). The queue holds one strike. Holding R1
 plays a single strike. A gap between attack cycles or a successful R2 starts the next chain at strike one.
-Each strike uses the class's cycle, hit window, box or projectile, and damage.
+Each strike uses the class and job's cycle, hit window, box or projectile, and damage.
 
 ## §6 Classes and jobs (D-040)
 
@@ -227,7 +228,17 @@ Each strike uses the class's cycle, hit window, box or projectile, and damage.
 Job tiers: 0 (base), 1 at level 5, 2 at level 15, 3 at level 30, given by the class mentor in Namula (§14) once the
 level and the trial (§14) are met. A job: full heal, banner `<JOB NAME>` (scale 2, gold) for 2 s, 30 particles,
 SOUND_Q_LEVEL_UP, autosave. The basic attack's multiplier rises x1.0 / 1.15 / 1.3 / 1.5 with the tier and its trail
-recolours (§21 trim colours). The strong attack is replaced by the tier's skill:
+recolours (§21 trim colours).
+
+D-070 scales R1's full cycle by 100% / 90% / 80% / 70% across the four tiers. Melee keeps the base hit window
+and gains 4 dp of reach and 3 dp of height per promotion. The Thief's upward stab rotates the upgraded box.
+Arrows and bolts gain 1 dp of width, 2 dp of height, 24 dp of range and 20 dp/s of projectile speed per promotion.
+Promoted basic hits on enemies and bosses add class-coloured sparks with wider bursts at each tier and one
+and two expanding arcs at tiers 2 and 3 respectively.
+
+Each job unlocks a new strong attack and keeps all earlier skills available (D-071). Promotion and loading a slot
+select the latest skill. R3 cycles down through unlocked tiers and wraps to the latest. R2 spends the selected
+skill's MP cost. Switching during an attack selects the next cast while the current one finishes.
 
 | Class | Tier 0 | Tier 1 (lv 5) | Tier 2 (lv 15) | Tier 3 (lv 30) |
 |---|---|---|---|---|
@@ -591,7 +602,8 @@ A mentor of another class gives one flavour line about their craft.
 
 - **HUD:** `LV 12` white at (4, 4); HP bar 64 x 4 at (4, 11) (`r` over `R`), `HP 123/450` at (72, 10) in `s`;
   MP bar 64 x 3 at (4, 17) (`u` over `U`). Names: right-aligned at (316, 4) white, with a 5 x 5 wisp icon left of the
-  number. Item: 8 x 8 icon at (4, 168) and `x3` beside it; buffs as `ATK 87` / `DEF 87` / `SPD 87` (seconds) in `o`
+  number. After promotion, `R2 <SKILL NAME>` and `R3 SWITCH` are right-aligned at (316, 12) and (316, 20).
+  Item: 8 x 8 icon at (4, 168) and `x3` beside it; buffs as `ATK 87` / `DEF 87` / `SPD 87` (seconds) in `o`
   to its right. Area banner on the first visit: centred at y 30, `b`, 2 s. World banner on arrival: scale 2, centred
   at y 40, 2 s. Boss bar: name centred at y 162 (white), bar 160 x 4 at (80, 170), `r` over `R`.
 - **Slots:** title `NAME QUEST` scale 2 at y 12; three panels 280 x 40 at x 20, y 34 / 80 / 126 (`n` border, `k`
@@ -685,6 +697,7 @@ quest: names recovered %d
 quest: checkpoint %d.%d lit | rest at %d.%d | travel to %d.%d
 quest: level %d (spent %d, names left %d)
 quest: job %d %s
+quest: selected skill %s                              strong attack name on R3
 quest: bought %s for %d
 quest: chest %d.%d %s
 quest: boss %s start | phase %d | down after %.0f s

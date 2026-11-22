@@ -898,6 +898,7 @@ static void play(Quest& q, Actions a, int steps) {
     for (int i = 0; i < steps; i++) {
         questUpdate(q, a, DT);
         a.firePressed = a.jump = a.rocket = a.back = a.up = a.down = a.left = a.right = a.autopilot = a.godMode = false;
+        a.nextSkill = false;
     }
 }
 
@@ -932,6 +933,81 @@ static void basicAttackKillsFodderInThreeHits() {
     CHECK(!q.enemies[0].alive && hits == 3);
     CHECK(q.save.names == enemyNames(1, 1, 0, false) && q.save.kills == 1);
     CHECK(q.killed[WORLD_TEST][0] & 1);
+}
+
+static void everyJobShortensBasicCombos() {
+    TestArea t;
+    makeArea(t, {});
+    Actions fire = {};
+    fire.firePressed = true;
+    for (int cls = 0; cls < CLASS_COUNT; cls++) {
+        int previousTicks = 60;
+        for (int job = 0; job < 4; job++) {
+            Quest q;
+            startQuest(q, t, cls, 30, job, 14);
+            play(q, fire, 1);
+            if (cls == CLASS_ARCHER || cls == CLASS_MAGICIAN) {
+                CHECK(q.projectiles.size() == 1);
+                if (!q.projectiles.empty()) {
+                    const Projectile& shot = q.projectiles.front();
+                    CHECK(shot.w == (6 + job) * DP && shot.h == ((cls == CLASS_ARCHER ? 2 : 6) + 2 * job) * DP);
+                    CHECK(shot.vx == ((cls == CLASS_ARCHER ? 240 : 200) + 20 * job) * DP && shot.basicJob == job);
+                }
+            }
+            int ticks = 1;
+            play(q, fire, 1);
+            while (q.hero.swing == 1 && ticks < 60) {
+                play(q, Actions{}, 1);
+                ticks++;
+            }
+            CHECK(ticks < previousTicks && q.hero.basicStep == 1);
+            previousTicks = ticks;
+        }
+    }
+}
+
+static void everyJobGrowsBasicHitsAndImpacts() {
+    TestArea t;
+    makeArea(t, {{19, withLetter(30, 'D')}});
+    const int baseReach[CLASS_COUNT] = {22, 170, 130, 16};
+    const int baseHeight[CLASS_COUNT] = {18, 2, 6, 12};
+    for (int cls = 0; cls < CLASS_COUNT; cls++) {
+        bool ranged = cls == CLASS_ARCHER || cls == CLASS_MAGICIAN;
+        for (int tier = 1; tier < 4; tier++) {
+            for (int job : {tier - 1, tier}) {
+                for (bool testReach : {false, true}) {
+                    Quest q;
+                    startQuest(q, t, cls, 30, job, 14);
+                    q.godMode = true;
+                    Enemy& e = q.enemies.front();
+                    e.hp = e.maxHp = 1000000;
+                    e.stunTimer = 10;
+                    e.state = ES_HANG;   // keep the target still at arbitrary heights
+                    float originX = q.hero.x + (ranged ? HERO_W / 2 + 6 * DP : HERO_W);
+                    float originY = q.hero.y + (ranged ? 6 * DP : HERO_H / 2);
+                    int reachStep = ranged ? 24 : 4, heightStep = ranged ? 2 : 3;
+                    e.x = originX + (testReach ? baseReach[cls] + (tier - 1) * reachStep + reachStep / 2 : 8) * DP;
+                    e.y = originY - e.h / 2;
+                    if (!testReach)
+                        e.y = originY - (baseHeight[cls] + (tier - 1) * heightStep + 1) * DP / 2 - e.h;
+                    Actions fire = {};
+                    fire.firePressed = true;
+                    for (int tick = 0; tick < 80 && e.hp == e.maxHp; tick++) {
+                        play(q, fire, 1);
+                        fire.firePressed = false;
+                    }
+                    CHECK((e.hp < e.maxHp) == (job == tier));
+                    auto impact = std::find_if(q.effects.begin(), q.effects.end(), [](const Effect& f) { return f.kind == FX_BASIC_IMPACT; });
+                    CHECK((impact != q.effects.end()) == (job == tier));
+                    if (impact != q.effects.end()) {
+                        CHECK(impact->basicJob == tier && impact->w > 0 && impact->h > 0 && impact->age == 0);
+                        play(q, Actions{}, 20);
+                        CHECK(std::none_of(q.effects.begin(), q.effects.end(), [](const Effect& f) { return f.kind == FX_BASIC_IMPACT; }));
+                    }
+                }
+            }
+        }
+    }
 }
 
 // Every redrawn ground enemy (worlds 1-2) stands tall enough for a basic arrow, flying at the bow's height, to hit it (spec §6, §22).
@@ -1576,6 +1652,35 @@ static bool logged(const Quest& q, const char* text) {
     return false;
 }
 
+static void strongAttacksCycleThroughUnlockedTiers() {
+    TestArea t;
+    makeArea(t, {});
+    const int costs[CLASS_COUNT][4] = {{10, 12, 16, 24}, {8, 14, 18, 26}, {10, 14, 20, 34}, {8, 12, 16, 30}};
+    Actions next = {}, cast = {};
+    next.nextSkill = true;
+    cast.rocket = true;
+    for (int cls = 0; cls < CLASS_COUNT; cls++) {
+        for (int job = 0; job <= 3; job++) {
+            Quest q;
+            startQuest(q, t, cls, 30, job, 14);
+            CHECK(selectedSkillTier(q) == job);
+            for (int tier = job; tier >= 0; tier--) {
+                CHECK(selectedSkillTier(q) == tier);
+                q.hero.mp = costs[cls][tier];
+                q.hero.mpFraction = 0;
+                play(q, cast, 1);
+                CHECK(q.hero.skill == tier && q.hero.mp == 0);
+                play(q, next, 1);
+                CHECK(q.hero.skill == tier);
+                CHECK(selectedSkillTier(q) == (tier > 0 ? tier - 1 : job));
+                play(q, Actions(), 40);
+                CHECK(q.hero.skill == -1 && q.save.job == job);
+            }
+            CHECK(logged(q, "quest: selected skill") == (job > 0));
+        }
+    }
+}
+
 static void deathDropsNamesAtLastSafeGround() {
     TestArea t;
     std::string floor = row(WIDE_COLS, 0, WIDE_COLS - 1, '#');
@@ -1936,6 +2041,10 @@ static void jobNeedsLevelAndGate() {
 static void secondJobNeedsTheFeather() {
     Quest q;
     startDev(q, "slot=3 class=2 world=0 area=1 level=15 job=1 quest0=1");
+    Actions next = {};
+    next.nextSkill = true;
+    play(q, next, 1);
+    CHECK(selectedSkillTier(q) == 0);
     talkTo(q, NPC_YSOLDE);
     CHECK(q.dialogue.after == AFTER_NONE);
     q.save.keys |= 1u << KEY_FROZEN_FEATHER;
@@ -1948,8 +2057,20 @@ static void secondJobNeedsTheFeather() {
     readDialogue(q);
     pressX(q);
     CHECK(q.save.job == 2 && !(q.save.keys >> KEY_FROZEN_FEATHER & 1) && logged(q, "quest: job 2 ELEMENTALIST"));
+    CHECK(selectedSkillTier(q) == 2);
+    play(q, next, 1);
+    Actions cast = {};
+    cast.rocket = true;
+    play(q, cast, 1);
+    CHECK(logged(q, "quest: skill FROST ORB"));
     talkTo(q, NPC_YSOLDE);
     CHECK(q.dialogue.pages[0] == "COME BACK AT LEVEL 30.");
+    questOpen(q, SAVE_FOLDER);
+    q.cursor = 2;
+    pressX(q);
+    CHECK(q.mode == QMODE_PLAY && selectedSkillTier(q) == 2);
+    play(q, next, 1);
+    CHECK(selectedSkillTier(q) == 1);
     saveDelete(SAVE_FOLDER, 2);
 }
 
@@ -2655,6 +2776,8 @@ int main(int argc, char** argv) {
     referenceHitIsTwentyPercent();
     classesDifferAsDesigned();
     basicAttackKillsFodderInThreeHits();
+    everyJobShortensBasicCombos();
+    everyJobGrowsBasicHitsAndImpacts();
     thiefStabsUp();
     arrowsHitEveryGroundEnemy();
     basicAttackKeepsFullSpeed();
@@ -2680,6 +2803,7 @@ int main(int argc, char** argv) {
     rollGivesIframes();
     blinkStopsBeforeWalls();
     strongAttackNeedsMp();
+    strongAttacksCycleThroughUnlockedTiers();
     deathDropsNamesAtLastSafeGround();
     secondDeathLosesTheOldEcho();
     echoReturnsNames();

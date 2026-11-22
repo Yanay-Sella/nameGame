@@ -162,6 +162,8 @@ Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN ME
 | D-067 | 2026-11-22 | Give each NAME QUEST class a three-strike R1 animation loop at its existing cadence | repeat one strike animation | the user asked for three distinct attacks in sequence | [NAME QUEST](features/name-quest/design.md) |
 | D-068 | 2026-11-22 | Each R1 press triggers one basic attack. A press during an attack queues the next strike in the three-strike combo. | hold R1 to repeat | the user wants to tap through the combo | [NAME QUEST](features/name-quest/design.md) |
 | D-069 | 2026-11-22 | Each NAME QUEST R1 strike plays nine poses with bent knees and a weight shift toward the target for Knight, Magician and Thief, and away from it for Archer | three upper-body poses per strike | the user wants smoother attacks with visible body weight for all four heroes | [NAME QUEST](features/name-quest/design.md) |
+| D-070 | 2026-11-22 | Every NAME QUEST promotion shortens the R1 cycle, grows the hitbox and reach, and adds stronger class-coloured hit effects | add only damage on promotion | the user wants a visible and playable upgrade to basic attacks for all four heroes | [NAME QUEST](features/name-quest/design.md) |
+| D-071 | 2026-11-22 | NAME QUEST promotions retain earlier strong attacks. R3 selects an unlocked skill and R2 casts it | replace the strong attack on promotion | players want to keep using earlier skills | [NAME QUEST](features/name-quest/design.md) |
 
 ## Open questions
 - **Assumptions to confirm:** sprites as text grids in code (D-006); every number marked `[ASSUMPTION]` in the feature notes.

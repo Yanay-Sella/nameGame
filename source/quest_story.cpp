@@ -243,6 +243,7 @@ void grantJob(Quest& q) {
     SaveData& s = q.save;
     if (s.job >= 3) return;
     s.job++;
+    q.selectedSkill = -1;
     s.quests[QUEST_JOB] = s.job;   // JOB stage n gave tier n (tier 3 waits for the trial, phase 7)
     if (s.job == 2) s.keys &= ~(1u << KEY_FROZEN_FEATHER);   // the mentor takes the feather
     questRefreshStats(q, true);

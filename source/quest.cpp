@@ -579,6 +579,7 @@ static void chooseDevOption(Quest& q) {
             s.job = s.quests[QUEST_JOB] = m.cursor;
             s.level = std::max(s.level, jobLevels[s.job]);
         }
+        q.selectedSkill = -1;
         q.hero.skill = -1;
         q.hero.attackTimer = q.hero.strongTimer = q.hero.partnerTimer = 0;
         q.hero.queuedAttack = BASIC_NONE;
@@ -661,6 +662,7 @@ void questStartDev(Quest& q, const char* spec) {
     s.highest = world > 1 ? world : 1;
     q.slot = slot >= 1 && slot <= SLOT_COUNT ? slot - 1 : SLOT_COUNT - 1;
     q.save = s;
+    q.selectedSkill = -1;
     logLine(q, "quest: slot %d new (class %s, level %d)", q.slot + 1, CLASS_NAMES[s.heroClass], s.level);
     questSave(q);
     q.hero = Hero();
@@ -692,6 +694,7 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
         } else if (a.jump) {
             q.slot = q.cursor;
             saveRead(q.folder.c_str(), q.slot, q.save);
+            q.selectedSkill = -1;
             q.save.heroClass = q.save.heroClass >= 0 && q.save.heroClass < CLASS_COUNT ? q.save.heroClass : 0;
             q.save.lit |= 1 | 1u << 2;   // the hearth and world 1's entry are always lit (spec §11)
             logLine(q, "quest: slot %d loaded (class %s, level %d)", q.slot + 1, CLASS_NAMES[q.save.heroClass], q.save.level);
@@ -725,6 +728,7 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
         }
         if (a.jump) {   // the slot is written at once, so a crash after the pick keeps the class
             q.save = SaveData();
+            q.selectedSkill = -1;
             q.save.used = true;
             q.save.heroClass = q.cursor;
             logLine(q, "quest: slot %d new (class %s, level %d)", q.slot + 1, CLASS_NAMES[q.cursor], q.save.level);
