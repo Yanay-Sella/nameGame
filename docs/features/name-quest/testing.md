@@ -76,13 +76,15 @@
 ### Phase 5b: heroes and combat feel
 - [x] Style preview: the first drawing was rejected; the user approved the build copied from their reference archer, then each batch (idle and run; jump, fall, land, hurt; climb, roll, attacks; skill poses; effects and tiers). *(2026-11-22)*
 - [x] R1 never slows any class (run and jump), and no R2 skill roots the hero, Meteor mid-jump included. *(`tests/quest_tests.cpp` › basicAttackKeepsFullSpeed, skillsNeverRootTheHero)*
-- [x] The melee slash is lit exactly in its hit window; melee basic hits stop 0.025 s and arrows don't; the bow draws while R1 is held; skills hit at their spec times; the standing and running frames fit the canvas with the feet on the hitbox line. *(`tests/quest_tests.cpp` › slashLitMatchesHitWindow, meleeBasicHitStops, rangedDrawShowsWhileHeld, skillTimingUnchanged, heroSpritesFitTheirBox)*
+- [x] The melee slash is lit exactly in its hit window; melee basic hits stop 0.025 s and arrows don't; the bow draws when the next shot is queued; skills hit at their spec times; the standing and running frames fit the canvas with the feet on the hitbox line. *(`tests/quest_tests.cpp` › slashLitMatchesHitWindow, meleeBasicHitStops, rangedDrawShowsWhenNextShotIsQueued, skillTimingUnchanged, heroSpritesFitTheirBox)*
 - [x] On the Mac: every class attacks mid-run (crescent, arrow, bolt, stab), and every tier-3 skill plays while running and logs `quest: skill`. *(`make mac-run` 2026-11-22, world 1 area 0)*
 - [x] `make quest-anims`: 16 sheets and 4 lineups read; the flipbook sent to the user. *(2026-11-22)*
 - [x] All 28 NPCs have distinct art on the hero grid and two frames that meet the floor. Checked the lineup and the in-game scale beside the Knight in Namula. *(2026-11-22, `npcSpritesShareTheHeroGrid` and `make mac-run`)*
-- [x] Holding R1 cycles through three distinct strike poses and repeats for each class. Tested restart after an idle gap or an R2. Checked the attacks in the animation sheets and the Knight's third strike in Test Grounds. *(2026-11-22, `basicAttacksCycleThroughThreePoses`, `make quest-anims` and `make mac-run`)*
+- [x] Each class plays nine distinct drawings for each of its three strikes at 60 Hz. All six leg poses support the full sequence. *(`tests/quest_tests.cpp` › everyBasicStrikeShowsNineDrawings)*
+- [x] Each strike changes the knee silhouette through at least three shapes in all six leg poses. The standing front foot stays planted. The Archer’s rear foot plants four art pixels back at full brace. The head moves backward on the Archer and forward on the other three heroes. *(`tests/quest_tests.cpp` › basicAttacksShiftWeightThroughTheLegs)*
+- [x] R1 taps cycle through three distinct strikes for each class. Holding R1 fires once. An idle gap or R2 resets the chain, and a press during hit-stop is queued with the Thief's upward aim. *(2026-11-22, `basicAttacksCycleThroughThreePoses`, `basicAttackPressSurvivesHitStop`)*
 - [ ] On the PS3 (when the user asks): dev saves per class at job 3; every R2 logs `quest: skill <NAME>`, fps ≥ 59 while effects play. *(PS3 log)*
-- [ ] The user plays each class for a minute on the TV: R1 held while running and jumping, every skill while running; enemy shots and hazards stay readable. Notes: *(user)*
+- [ ] The user plays each class for a minute on the TV: R1 taps while running and jumping, a single strike when R1 is held, and every skill while running. Enemy shots and hazards stay readable. Notes: *(user)*
 
 ## Playtest checks
 1. `NAMEGAME_QUEST='slot=3 class=3 world=0 area=0' make mac-run BUTTONS='2|right:1.5|cross|1|l1|1|quit'`: the Thief in Namula, HUD at the top left.
@@ -93,7 +95,7 @@
 6. `NAMEGAME_QUEST='slot=3 class=1 world=0 area=0 names=2000' make mac-run BUTTONS='right:0.3|cross+right:0.5|right:0.4|cross+right:0.5|right:3.5|cross+right:0.5|right:0.5|0.3|up|0.3|cross|cross|0.3|down|down|cross|0.2|cross|0.3|l1|1|quit'`: Marra's shop after buying two MANA POTION.
 7. `NAMEGAME_QUEST='slot=3 class=0 world=8 area=1' make mac-run BUTTONS='l2+l3|right:1.5|0.3|up|0.3|cross|0.2|cross|0.3|l1|1|quit'`: the TEST GROUNDS map.
 8. `NAMEGAME_QUEST='slot=3 class=0 world=1 area=0 level=4' make mac-run BUTTONS='right:0.7|l1|1|quit'`: world 1's style frame.
-9. `NAMEGAME_QUEST='slot=3 class=2 world=8 area=4 level=4' make mac-run BUTTONS='l2+l3|right:6|r1:3|l1|1|quit'`: the Overseer (area=5: the Star Mage).
+9. `NAMEGAME_QUEST='slot=3 class=2 world=8 area=4 level=4' make mac-run BUTTONS='l2+l3|right:6|r1|0.15|r1|0.15|r1|0.15|r1|0.2|l1|1|quit'`: the Overseer (area=5: the Star Mage).
 10. On the PS3, walk Namula's three areas with every class: steps, ladders and the cliffs feel calm; the jump feels right.
 11. `NAMEGAME_QUEST='slot=3 class=0 world=2 area=0 level=11 gear=1' make mac-run BUTTONS='right:0.7|l1|1|quit'`: world 2's style frame (world=3 level=17 gear=2: world 3's).
 12. `NAMEGAME_QUEST='slot=3 class=1 world=2 area=6 level=11 gear=1' make mac-run BUTTONS='l2+l3|9|l1|1|quit'`: the Monkey King on its tree (area=19: the Silverback; world=3 area=6 or 19 level=17 gear=2: the Yeti, the Titan).

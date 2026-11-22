@@ -18,7 +18,7 @@ Rules and numbers: see the work-plan spec [`spec.md`](../../work-plan/name-quest
 9. Namula has three calm areas (the village, the cliffs, the shore); the sea on the shore is its only danger. Its portals are closed stone arches for now.
 
 ## Rules (phase 2: combat; numbers in spec §5-§8)
-10. R1 attacks (hold to repeat) with the class's basic attack: the Knight's sword and the Thief's dagger hit a box in front during a short window, the Archer's arrows and the Magician's bolts fly until a wall or their range. Each landed basic hit gives 1 MP.
+10. Press R1 for one basic attack. The Knight's sword and the Thief's dagger hit a box in front during a short window. The Archer's arrows and the Magician's bolts fly until a wall or their range. Each landed basic hit gives 1 MP.
 11. R2 uses the job tier's strong attack (spec §6 table) for MP; without enough MP nothing happens and the empty click plays. Power Slash, Blade Fury and Meteor root the hero on the ground while they play. R2 cancels a basic attack that is still playing.
 12. Circle dodges: the Knight, Archer and Thief roll on the ground with brief i-frames; the Magician blinks forward, in the air too, stopping before walls.
 13. HP never regenerates; MP regenerates slowly. The HUD shows LV, the HP and MP bars, `HP n/m` and the carried names.
@@ -64,13 +64,13 @@ Rules and numbers: see the work-plan spec [`spec.md`](../../work-plan/name-quest
 
 ## Rules (phase 5b: heroes and combat feel; spec §5, §6, §21, §22)
 47. The four heroes are drawn on the build of the user's reference archer: big heads with 2 x 2 eyes and blush, flat shades, no outline (D-065). Each class has its own silhouette (helm and shield; ponytail and bow; wide hat and staff; scarf and mask) and each job tier adds a trim colour and one detail.
-48. Holding R1 never slows the hero, and no R2 skill roots the hero: every class runs, turns and jumps at full speed while attacking (D-062, D-064). Skills with their own movement (Shadow Dash, Rising Slash's hop) keep it.
-49. The drawn pose is an arm pose over a leg pose: the legs keep running while the arms wind up, strike and follow through; the bow and staff draw while R1 is held.
+48. Every class runs, turns and jumps at full speed during R1 attacks and R2 skills (D-062, D-064). Skills with their own movement (Shadow Dash, Rising Slash's hop) keep it.
+49. Each R1 strike plays nine drawings. The Knight, Magician and Thief bend their lead knee and lean into the attack. The Archer steps back with the rear foot and bends that knee while aiming forward. The front foot stays planted when standing, and running legs continue their stride (D-069). The bow and staff draw for the next shot if it is queued.
 50. A melee slash is brightest exactly while it can hit; the Knight's skills draw their crescents from the same timing. Melee basic hits stop the action for 0.025 s (D-063).
 51. Hero shots are sprites in class colours (wood and steel arrows, blue bolts, icy orbs, steel stars), never magenta; every hit throws a spark, gold for skills.
 52. Readability: hero effects draw under enemies, enemy shots and telegraphs draw on top; large hero fills are dithered; at most 200 particles live at once.
 53. The full NPC cast uses the hero art style (D-066). NPCs have two idle frames and recognizable silhouettes matched to their roles. The authoring rules for new humanoid NPCs live in spec §22.
-54. Holding R1 loops through three basic attacks per class (D-067). Knight uses a level slash, a rising cut and an overhead chop. Archer uses a standard shot, a low reload shot and a snap shot. Magician uses a staff thrust, a side cast and a raised-staff cast. Thief uses a straight stab, a reverse cut and a downward jab. The combo uses the attack cycles and damage in spec §5–§6.
+54. Tap R1 during a basic attack to queue the next of three strikes (D-067, D-068). Holding R1 plays a single strike. Knight uses a level slash, a rising cut and an overhead chop. Archer uses a standard shot, a low reload shot and a snap shot. Magician uses a staff thrust, a side cast and a raised-staff cast. Thief uses a straight stab, a reverse cut and a downward jab. The combo uses the attack cycles and damage in spec §5–§6.
 
 ## Edge cases
 - Start does nothing on the slot, class and intro screens; it pauses in play and while `YOU FADED` shows.
@@ -89,3 +89,4 @@ Rules and numbers: see the work-plan spec [`spec.md`](../../work-plan/name-quest
 - 2026-11-21: the user approved world 1's style frame; world 1's 20 areas built (rule 37). PS3 check and the user's playtest open.
 - 2026-11-21: phase 5: worlds 2 and 3 (looks approved from their style frames), their hazards, four bosses, 40 areas, Garrick, Ilsa and Lio's lines (rules 38-46). PS3 checks and the user's playtest open.
 - 2026-11-22: extended the hero style to NPCs and added three R1 attack animations per class (D-066, D-067).
+- 2026-11-22: R1 combos advance with repeated presses (D-068).

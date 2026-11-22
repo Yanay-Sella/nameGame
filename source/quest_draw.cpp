@@ -445,7 +445,7 @@ static void drawHeroSlash(const Quest& q, const HeroPose& p, int camX, int camY)
     for (int copy = 0; copy < (h.partnerTimer > 0 ? 2 : 1); copy++) {   // the Shadow Partner's copy 10 dp behind, in x and p
         uint32_t c = copy ? paletteColor('x') : core, e = copy ? paletteColor('p') : edge;
         int shift = copy ? (int)(-dir * PARTNER_BEHIND) : 0;
-        bool recovering = p.arms == ARMS_RECOVER || p.arms == ARMS_RECOVER_2 || p.arms == ARMS_RECOVER_3;
+        bool recovering = p.arms >= ARMS_BASIC && (p.arms - ARMS_BASIC) % BASIC_STRIKE_FRAMES >= 6;
         if (cls == CLASS_KNIGHT && p.attackT >= 0) {   // 22 x 18 in front, centred on the hitbox's middle
             int w = (int)(22 * DP), bh = (int)(18 * DP);
             int x = (int)(left ? h.x - w : h.x + HERO_W) - camX + shift, y = (int)(h.y + HERO_H / 2 - bh / 2) - camY;

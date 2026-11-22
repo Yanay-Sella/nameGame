@@ -65,7 +65,7 @@ button, select { font: 14px monospace; margin-right: 6px; }
 <button id="speed">1x</button> <span id="info"></span>
 </div>
 <img id="view" alt="clip">
-<p>0-0.5 s run with R1 held, 0.5-1.2 s R1 standing, 1.2-1.4 s idle, 1.4 s R2 pressed, then 1.0 s of its aftermath.</p>
+<p>R1 taps are 0.2 s apart for the first 0.8 s. The hero stops running at 0.5 s and presses R2 at 1.4 s.</p>
 <script>
 const CLIPS = %(clips)s;
 const pick = document.getElementById("clip"), view = document.getElementById("view"), info = document.getElementById("info");

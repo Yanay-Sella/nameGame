@@ -221,7 +221,7 @@ int main(int argc, char** argv) {
             a.jump |= questCarry.jump; a.item |= questCarry.item; a.back |= questCarry.back; a.up |= questCarry.up;
             a.down |= questCarry.down; a.left |= questCarry.left; a.right |= questCarry.right;
             a.godMode |= questCarry.godMode; a.autopilot |= questCarry.autopilot; a.rocket |= questCarry.rocket;
-            a.cycle |= questCarry.cycle;
+            a.cycle |= questCarry.cycle; a.firePressed |= questCarry.firePressed;
         }
         questCarry = {};
         // Every controller drives the menus.
@@ -409,6 +409,7 @@ int main(int argc, char** argv) {
                 selected = QUEST_ITEM;
                 setScene(SCENE_MAIN_MENU);
             } else if ((actions[0].pause || !actions[0].connected) && questCanPause(quest)) {
+                quest.hero.queuedAttack = BASIC_NONE;
                 questPaused = true;
                 selected = 0;
                 setScene(SCENE_PAUSED);
@@ -551,6 +552,7 @@ int main(int argc, char** argv) {
             if (pickerSpin < 0) pickerSpin = SDL_min(0.0f, pickerSpin + STEP / PICKER_SPIN_TIME);
             for (Actions& a : actions) a.rocket = a.cycle = false;   // a press counts once, in the first step
             Actions& a0 = actions[0];
+            a0.firePressed = false;
             a0.jump = a0.item = a0.back = a0.up = a0.down = a0.left = a0.right = a0.confirm = a0.pause = a0.godMode = a0.autopilot = false;
             accumulator -= STEP;
             steps++;

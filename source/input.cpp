@@ -64,6 +64,7 @@ void inputRead(Actions* actions) {
             applyDeadzone(a.moveX, a.moveY, STICK_DEADZONE);
         }
         a.fire = down2(PAD_CTRL_R1);
+        a.firePressed = press2(PAD_CTRL_R1);
         a.rocket = press2(PAD_CTRL_R2);
         a.pause = press(PAD_CTRL_START);
         a.item = press2(PAD_CTRL_TRIANGLE);

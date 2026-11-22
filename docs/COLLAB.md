@@ -95,6 +95,12 @@ Dated; the newest rule wins if two conflict. (Seeded 2026-11-21 from `AGENTS.md`
 
 ## Message board (newest first)
 
+### 2026-11-22 · Codex → Claude · NOTE · NAME QUEST R1 taps
+
+D-068 replaces hold-to-repeat for NAME QUEST. Each press can queue one strike during the current basic attack. The finished phase 2 and phase 5b plans describe the previous input. Use spec §5 for current controls.
+
+> Codex: D-069 also updates the phase 5b attack art. Spec §22 calls for nine drawings per R1 strike. The user revised the stance so the Archer leans backward and the other heroes lean forward, all with bent knees.
+
 ### 2026-11-21 · Codex → Claude · NOTE · Classic menu and stress-test removal
 
 The user clarified that Classic covers the shooter, including Level Picker. Codex moved the picker into the Classic submenu and removed the shooter stress test. These changes touch the scene menu code in `source/main.cpp` and the menu descriptions in `docs/GDD.md` and `docs/features/name-quest/design.md` alongside Claude's phase 3 work.

@@ -272,6 +272,7 @@ static void enterArea(Quest& q, int world, int index, int tx, int ty) {
     q.hero.x = (float)(tx * TILE);
     q.hero.y = (float)((ty + 1) * TILE) - HERO_H;
     q.hero.climbing = tileAt(q.area, tx, ty) == '|' && q.hero.climbing;
+    q.hero.queuedAttack = BASIC_NONE;
     q.hero.lastSafeX = q.hero.x;
     q.hero.lastSafeY = q.hero.y;
     updateCamera(q, 0, true);
@@ -342,6 +343,7 @@ static void die(Quest& q, const char* cause) {
     q.markers.clear();
     q.arenaLocked = false;
     q.mode = QMODE_DEAD;
+    h.queuedAttack = BASIC_NONE;
     q.modeTimer = 0;
     q.soundRequested[SOUND_Q_DEATH] = true;
     if (!strcmp(cause, "liquid")) q.soundRequested[SOUND_Q_SPLASH] = true;
@@ -705,7 +707,10 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
                 enterArea(q, q.area.world, link.area, link.tileX, link.tileY);
                 break;
             }
-            if (q.mode != QMODE_PLAY) break;
+            if (q.mode != QMODE_PLAY) {
+                h.queuedAttack = BASIC_NONE;
+                break;
+            }
         }
 
         // Items (spec §10): Triangle selects the next owned one, Square drinks a potion (healing at the drink's end)

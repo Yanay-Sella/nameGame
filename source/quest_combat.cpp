@@ -4,6 +4,7 @@
 #include "quest_sprites_1.h"
 #include "quest_sprites_2.h"
 #include "quest_sprites_3.h"
+#include <algorithm>
 #include <math.h>
 #include <string.h>
 #include <string>
@@ -1009,15 +1010,26 @@ HeroPose heroPose(const Quest& q) {
         case CLASS_THIEF * 4 + 3: p.arms = ARMS_SKILL_5; break;
         }
     } else if (p.attackT >= 0) {
-        float at = p.attackT, c = basic.cycle;
-        const int windup[] = {ARMS_WINDUP, ARMS_WINDUP_2, ARMS_WINDUP_3};
-        int arms = windup[h.basicStep];
-        if (melee) p.arms = at < basic.from ? arms : at <= basic.to ? arms + 1
-                          : at < basic.to + 0.6f * (c - basic.to) ? arms + 2 : ARMS_NONE;
-        else p.arms = at < 0.08f ? arms + 1 : at >= c - 0.20f && h.fireHeld
-                      ? windup[(h.basicStep + 1) % BASIC_COMBO_LENGTH] : arms + 2;
-    } else if (!melee && h.fireHeld) {
-        p.arms = ARMS_WINDUP;   // the draw held before the first shot (it fires on the next free step)
+        // Each phase has three drawings. Melee contact tracks the hit window, and ranged release starts at the shot.
+        float firstEnd = melee ? basic.from : 0.08f;
+        float secondEnd = melee ? basic.to : basic.cycle - 0.20f;
+        int phase = 0;
+        float start = 0, end = firstEnd;
+        if (p.attackT > secondEnd) {
+            phase = 2;
+            start = secondEnd;
+            end = basic.cycle;
+        } else if (p.attackT >= firstEnd) {
+            phase = 1;
+            start = firstEnd;
+            end = secondEnd;
+        }
+        int frame = std::min(2, (int)(3 * (p.attackT - start) / (end - start)));
+        p.arms = ARMS_BASIC + h.basicStep * BASIC_STRIKE_FRAMES + phase * 3 + frame;
+        if (!melee && phase == 2 && h.queuedAttack != BASIC_NONE) {
+            int nextStrike = (h.basicStep + 1) % BASIC_COMBO_LENGTH;
+            p.arms = ARMS_QUEUED_DRAW + nextStrike * 3 + frame;
+        }
     }
 
     p.slashLit = melee && p.attackT >= basic.from && p.attackT <= basic.to;
@@ -1048,16 +1060,18 @@ void updateEffects(Quest& q, float dt) {
 }
 
 void updateCombat(Quest& q, const Actions& a, float dt) {
+    Hero& h = q.hero;
+    int cls = q.save.heroClass;
+    if (a.firePressed && h.frozenTimer <= 0 && h.skill < 0)
+        h.queuedAttack = cls == CLASS_THIEF && a.moveY < -0.5f ? BASIC_UP : BASIC_FORWARD;
     if (q.hitStop > 0) {   // hit-stop freezes the hero, enemies and shots (not particles and numbers)
         q.hitStop = fmaxf(0, q.hitStop - dt);
         return;
     }
-    Hero& h = q.hero;
     const HeroStats& s = q.stats;
-    int cls = q.save.heroClass, job = q.save.job < 0 ? 0 : q.save.job > 3 ? 3 : q.save.job;
+    int job = q.save.job < 0 ? 0 : q.save.job > 3 ? 3 : q.save.job;
     const BasicAttack& basic = BASIC[cls];
     float walk = CLASSES[cls].walk * DP;
-    h.fireHeld = a.fire;
     h.landTimer = fmaxf(0, h.landTimer - dt);
 
     // Timers and MP regen (HP never regenerates).
@@ -1070,10 +1084,8 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
     h.hurtTimer = fmaxf(0, h.hurtTimer - dt);
     h.partnerTimer = fmaxf(0, h.partnerTimer - dt);
     h.slideTimer = fmaxf(0, h.slideTimer - dt);
-    bool firePressed = a.fire && !h.fireWasHeld;
-    h.fireWasHeld = a.fire;
     if (h.frozenTimer > 0) {   // frozen in the Yeti's ice block: X or R1 presses chip it away
-        h.frozenTimer -= dt + (a.jump || firePressed ? FROZEN_PRESS_CUT : 0);
+        h.frozenTimer -= dt + (a.jump || a.firePressed ? FROZEN_PRESS_CUT : 0);
         if (h.frozenTimer <= 0) {
             h.frozenTimer = 0;
             q.soundRequested[SOUND_CRACK] = true;
@@ -1110,12 +1122,14 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
     }
     free = h.hurtTimer <= 0 && !h.climbing && h.rollTimer <= 0 && h.slideTimer <= 0 && h.frozenTimer <= 0;
 
-    // Strong attack (R2), then the basic attack (R1 held); neither while a skill plays.
+    // R2 takes priority. One R1 press can queue the next basic attack until the current cycle ends.
     if (a.rocket && free && h.skill < 0) castSkill(q, cls, job);
-    if (a.fire && free && h.skill < 0 && h.attackTimer <= 0) {
+    if (!free || h.skill >= 0) h.queuedAttack = BASIC_NONE;
+    if (h.queuedAttack != BASIC_NONE && h.attackTimer <= 0) {
         h.basicStep = previousBasic ? (h.basicStep + 1) % BASIC_COMBO_LENGTH : 0;
         h.attackTimer = basic.cycle;
-        h.attackUp = cls == CLASS_THIEF && a.moveY < -0.5f;
+        h.attackUp = h.queuedAttack == BASIC_UP;
+        h.queuedAttack = BASIC_NONE;
         h.swing++;
         q.soundRequested[basic.sound] = true;
         float dir = h.facingLeft ? -1 : 1;

@@ -897,7 +897,7 @@ static void startQuest(Quest& q, TestArea& t, int heroClass, int level, int job,
 static void play(Quest& q, Actions a, int steps) {
     for (int i = 0; i < steps; i++) {
         questUpdate(q, a, DT);
-        a.jump = a.rocket = a.back = a.up = a.down = a.left = a.right = a.autopilot = a.godMode = false;
+        a.firePressed = a.jump = a.rocket = a.back = a.up = a.down = a.left = a.right = a.autopilot = a.godMode = false;
     }
 }
 
@@ -922,9 +922,9 @@ static void basicAttackKillsFodderInThreeHits() {
     q.godMode = true;
     CHECK(q.enemies.size() == 1 && q.enemies[0].hp == enemyHealth(1, 3, 0));
     Actions a = {};
-    a.fire = true;
     int hits = 0, last = q.enemies[0].hp;
     for (int i = 0; i < 600 && q.enemies[0].alive; i++) {
+        a.firePressed = i % 12 == 0;
         play(q, a, 1);
         if (q.enemies[0].hp < last) hits++;
         last = q.enemies[0].hp;
@@ -949,9 +949,9 @@ static void arrowsHitEveryGroundEnemy() {
             q.enemies[0].y = 20 * TILE - q.enemies[0].h;
         }
         Actions a = {};
-        a.fire = true;
         int hits = 0, last = q.enemies[0].hp;
         for (int i = 0; i < 120; i++) {
+            a.firePressed = i % 12 == 0;
             q.hero.facingLeft = q.enemies[0].x < q.hero.x;
             play(q, a, 1);
             if (q.enemies[0].hp < last) hits++;
@@ -1014,14 +1014,14 @@ static void slashLitMatchesHitWindow() {
         Enemy& e = q.enemies[0];
         e.hp = e.maxHp = 1000000;
         Actions a = {};
-        a.fire = true;
+        a.firePressed = true;
         int firstDamage = -1, lastLit = -1, firstLit = -1;
         bool allDamageLit = true;
         for (int i = 0; i < 40; i++) {
             e.x = q.hero.x + HERO_W + 2 * DP;   // in front, inside both boxes
             int before = e.hp;
             play(q, a, 1);
-            a.fire = false;
+            a.firePressed = false;
             HeroPose pose = heroPose(q);
             bool damaged = e.hp < before;
             if (damaged && firstDamage < 0) firstDamage = i;
@@ -1044,13 +1044,13 @@ static void meleeBasicHitStops() {
     Enemy& e = q.enemies[0];
     e.hp = e.maxHp = 1000000;
     Actions a = {};
-    a.fire = true;
+    a.firePressed = true;
     float stop = -1;
     for (int i = 0; i < 30 && stop < 0; i++) {
         e.x = q.hero.x + HERO_W + 2 * DP;
         int before = e.hp;
         play(q, a, 1);
-        a.fire = false;
+        a.firePressed = false;
         if (e.hp < before) stop = q.hitStop;
     }
     CHECK(fabsf(stop - 0.025f) <= 0.001f);
@@ -1060,12 +1060,12 @@ static void meleeBasicHitStops() {
     Enemy& target = q.enemies[0];
     target.hp = target.maxHp = 1000000;
     a = {};
-    a.fire = true;
+    a.firePressed = true;
     bool hit = false;
     for (int i = 0; i < 90 && !hit; i++) {
         int before = target.hp;
         play(q, a, 1);
-        a.fire = false;
+        a.firePressed = false;
         if (target.hp < before) {
             hit = true;
             CHECK(q.hitStop == 0);
@@ -1074,43 +1074,50 @@ static void meleeBasicHitStops() {
     CHECK(hit);
 }
 
-// The Archer's draw shows while R1 is held: the release right after a shot, the draw in the cycle's last 0.2 s.
-static void rangedDrawShowsWhileHeld() {
+static void rangedDrawShowsWhenNextShotIsQueued() {
     TestArea t;
     makeArea(t, {});
     Quest q;
     startQuest(q, t, CLASS_ARCHER, 10, 0, 14);
     Actions a = {};
-    a.fire = true;
+    a.firePressed = true;
     play(q, a, 1);
-    CHECK(heroPose(q).arms == ARMS_ACTIVE);
+    CHECK(heroPose(q).arms == ARMS_BASIC);
+    play(q, Actions{}, 5);
+    play(q, a, 1);
     bool drew = false;
-    for (int i = 1; i < 27; i++) {
-        play(q, a, 1);
+    for (int i = 7; i < 27; i++) {
+        play(q, Actions{}, 1);
         HeroPose pose = heroPose(q);
-        if (pose.arms == ARMS_WINDUP_2) {
+        if (pose.arms >= ARMS_QUEUED_DRAW + 3 && pose.arms < ARMS_QUEUED_DRAW + 6) {
             drew = true;
             CHECK(pose.attackT >= 0.45f - 0.20f - 0.001f);
         }
     }
     CHECK(drew);
-    a.fire = false;
-    play(q, a, 60);
-    CHECK(heroPose(q).arms == ARMS_NONE);
+    play(q, Actions{}, 60);
+    CHECK(heroPose(q).arms == ARMS_NONE && q.hero.swing == 2);
 }
 
 static void basicAttacksCycleThroughThreePoses() {
     TestArea t;
     makeArea(t, {});
-    const int active[] = {ARMS_ACTIVE, ARMS_ACTIVE_2, ARMS_ACTIVE_3};
     for (int cls = 0; cls < CLASS_COUNT; cls++) {
         Quest q;
         startQuest(q, t, cls, 10, 0, 14);
         Actions fire = {};
+        fire.firePressed = true;
         fire.fire = true;
+        play(q, fire, 60);
+        CHECK(q.hero.swing == 1 && heroPose(q).arms == ARMS_NONE);
+        startQuest(q, t, cls, 10, 0, 14);
+        fire.fire = false;
+        int contact = cls == CLASS_KNIGHT || cls == CLASS_THIEF ? 3 : 0;
+        const int active[] = {ARMS_BASIC + contact, ARMS_BASIC + 9 + contact, ARMS_BASIC + 18 + contact};
         int strikes = 0;
         int previousSwing = -1;
         for (int i = 0; i < 150 && strikes < 4; i++) {
+            fire.firePressed = i % 8 == 0;
             play(q, fire, 1);
             int arms = heroPose(q).arms;
             if (q.hero.swing == previousSwing || (arms != active[0] && arms != active[1] && arms != active[2])) continue;
@@ -1124,22 +1131,119 @@ static void basicAttacksCycleThroughThreePoses() {
         const Sprite& third = *HERO_ARMS[cls][active[2]][LEGS_STAND];
         CHECK(strcmp(first.pixels, second.pixels) != 0 && strcmp(second.pixels, third.pixels) != 0
               && strcmp(third.pixels, first.pixels) != 0);
-        play(q, fire, 35);
-        CHECK(q.hero.basicStep != 0);
-        play(q, Actions{}, 35);
+        fire.firePressed = true;
+        play(q, fire, 1);
+        CHECK(q.hero.queuedAttack == BASIC_FORWARD);
+        play(q, Actions{}, 65);
         play(q, fire, 1);
         CHECK(q.hero.basicStep == 0);
-        play(q, fire, 35);
-        CHECK(q.hero.basicStep != 0);
+        play(q, Actions{}, 1);
+        play(q, fire, 1);
+        CHECK(q.hero.queuedAttack == BASIC_FORWARD);
         q.hero.mp = q.stats.maxMp;
         Actions skill = {};
         skill.rocket = true;
         play(q, skill, 1);
-        CHECK(q.hero.skill >= 0);
+        CHECK(q.hero.skill >= 0 && q.hero.queuedAttack == BASIC_NONE);
+        int swing = q.hero.swing;
         play(q, Actions{}, 40);
+        CHECK(q.hero.swing == swing);
         play(q, fire, 1);
         CHECK(q.hero.basicStep == 0);
     }
+}
+
+// Watch three strikes at 60 Hz, including the different finish when a ranged follow-up is queued.
+static void everyBasicStrikeShowsNineDrawings() {
+    TestArea t;
+    makeArea(t, {});
+    for (int cls = 0; cls < CLASS_COUNT; cls++) {
+        Quest q;
+        startQuest(q, t, cls, 10, 0, 14);
+        std::set<std::string> drawings[3];
+        int frames[3] = {};
+        int lastPose = ARMS_NONE;
+        for (int tick = 0; tick < 120; tick++) {
+            Actions a = {};
+            a.firePressed = tick == 0 || (q.hero.swing < 3 && tick % 8 == 0);
+            play(q, a, 1);
+            const HeroPose p = heroPose(q);
+            if (p.arms == ARMS_NONE || p.arms == lastPose) continue;
+            int strike = q.hero.basicStep;
+            const Sprite& sprite = *HERO_ARMS[cls][p.arms][LEGS_STAND];
+            drawings[strike].insert(sprite.pixels);
+            frames[strike]++;
+            lastPose = p.arms;
+        }
+        CHECK(q.hero.swing == 3);
+        for (int strike = 0; strike < 3; strike++) {
+            CHECK(frames[strike] == 9 && drawings[strike].size() == 9);
+            for (int legs = 0; legs < HERO_LEG_POSES; legs++) {
+                std::set<std::string> solo;
+                for (int f = 0; f < BASIC_STRIKE_FRAMES; f++)
+                    solo.insert(HERO_ARMS[cls][ARMS_BASIC + strike * BASIC_STRIKE_FRAMES + f][legs]->pixels);
+                CHECK(solo.size() == 9);
+            }
+        }
+    }
+}
+
+// Each combo bends the legs and puts the head over the loaded foot in all six gait poses.
+static void basicAttacksShiftWeightThroughTheLegs() {
+    for (int cls = 0; cls < HERO_CLASSES; cls++)
+        for (int strike = 0; strike < 3; strike++)
+            for (int legs = 0; legs < HERO_LEG_POSES; legs++) {
+                const auto& poses = HERO_ARMS[cls];
+                int first = ARMS_BASIC + strike * BASIC_STRIKE_FRAMES;
+                std::set<std::string> knees;
+                float headX[BASIC_STRIKE_FRAMES];
+                for (int f = 0; f < BASIC_STRIKE_FRAMES; f++) {
+                    const Sprite& s = *poses[first + f][legs];
+                    if (legs == LEGS_STAND) {
+                        const Sprite& settled = *poses[first + BASIC_STRIKE_FRAMES - 1][legs];
+                        int soleRow = (s.h - 1) * s.w;
+                        int frontHalf = s.w / 2;
+                        int firstPlantedPixel = cls == CLASS_ARCHER ? frontHalf : 0;
+                        CHECK(memcmp(s.pixels + soleRow + firstPlantedPixel,
+                                     settled.pixels + soleRow + firstPlantedPixel, s.w - firstPlantedPixel) == 0);
+                        if (cls == CLASS_ARCHER && f == 1) {
+                            std::string braced(s.pixels + soleRow, frontHalf);
+                            std::string resting(settled.pixels + soleRow, frontHalf);
+                            size_t rearFoot = braced.find('/');
+                            CHECK(rearFoot != std::string::npos && rearFoot + 8 == resting.find('/'));
+                        }
+                    }
+                    std::string kneePixels;
+                    for (int y = 46; y < 52; y += 2)
+                        kneePixels.append(s.pixels + y * s.w + 20, 26);
+                    knees.insert(kneePixels);
+                    int sum = 0, count = 0;
+                    for (int y = 0; y < 18; y += 2)
+                        for (int x = 0; x < s.w; x += 2)
+                            if (s.pixels[y * s.w + x] != '.') { sum += x; count++; }
+                    CHECK(count > 0);
+                    headX[f] = count ? (float)sum / count : 0;
+                }
+                CHECK(knees.size() >= 3);
+                int impact = cls == CLASS_ARCHER || cls == CLASS_MAGICIAN ? 1 : 4;
+                float shift = headX[impact] - headX[BASIC_STRIKE_FRAMES - 1];
+                CHECK(cls == CLASS_ARCHER ? shift < -4 : shift > 4);
+            }
+}
+
+static void basicAttackPressSurvivesHitStop() {
+    TestArea t;
+    makeArea(t, {});
+    Quest q;
+    startQuest(q, t, CLASS_THIEF, 10, 0, 14);
+    Actions fire = {};
+    fire.firePressed = true;
+    play(q, fire, 3);
+    q.hitStop = 2 * DT;
+    fire.moveY = -1;
+    play(q, fire, 1);
+    play(q, Actions{}, 45);
+    CHECK(q.hero.swing == 2 && q.hero.basicStep == 1 && q.hero.attackUp);
 }
 
 // The skills' damage timing is unchanged by phase 5b: the first damage lands at the spec's time after the press.
@@ -1188,7 +1292,7 @@ static void heroSpritesFitTheirBox() {
         }
 }
 
-// R1 held never slows the hero (D-062): the same run and the same jump peak with and without the basic attack.
+// R1 attacks never slow the hero (D-062): the same run and jump peak with and without attacking.
 static void basicAttackKeepsFullSpeed() {
     TestArea t;
     makeArea(t, {});
@@ -1199,12 +1303,15 @@ static void basicAttackKeepsFullSpeed() {
             startQuest(q, t, c, 10, 0, 14);
             Actions a = {};
             a.moveX = 1;
-            a.fire = fire;
-            play(q, a, 60);
+            for (int i = 0; i < 60; i++) {
+                a.firePressed = fire && i % 8 == 0;
+                questUpdate(q, a, DT);
+            }
             endX[fire] = q.hero.x;
             startQuest(q, t, c, 10, 0, 14);
             peak[fire] = q.hero.y;
             for (int i = 0; i < 60; i++) {
+                a.firePressed = fire && i % 8 == 0;
                 a.jump = i == 10;
                 a.jumpHeld = i >= 10;
                 questUpdate(q, a, DT);
@@ -1224,9 +1331,9 @@ static void knightSwingHitsOnlyInItsWindow() {
     q.godMode = true;
     q.enemies[0].x = q.hero.x + HERO_W + 2 * DP;   // just in front, inside the 22 x 18 box
     Actions a = {};
-    a.fire = true;
+    a.firePressed = true;
     play(q, a, 1);
-    a.fire = false;
+    a.firePressed = false;
     float hitAt = -1;
     for (int i = 1; i < 30 && hitAt < 0; i++) {
         play(q, a, 1);
@@ -1237,7 +1344,7 @@ static void knightSwingHitsOnlyInItsWindow() {
     startQuest(q, t, CLASS_KNIGHT, 10, 0, 14);
     q.godMode = true;
     q.enemies[0].x = q.hero.x + HERO_W + 30 * DP;
-    a.fire = true;
+    a.firePressed = true;
     play(q, a, 30);
     CHECK(q.enemies[0].hp == q.enemies[0].maxHp);
 }
@@ -1252,12 +1359,13 @@ static void thiefStabsUp() {
         q.godMode = true;
         Enemy& e = q.enemies[0];
         Actions a = {};
-        a.fire = true;
+        a.firePressed = true;
         a.moveY = up ? -1 : 0;
         for (int i = 0; i < 10; i++) {   // the enemy held just above the head through the stab's window
             e.x = q.hero.x + HERO_W / 2 - e.w / 2;
             e.y = q.hero.y - e.h - 2 * DP;
             play(q, a, 1);
+            a.firePressed = false;
         }
         CHECK(q.hero.attackUp == (up == 1));
         CHECK((e.hp < e.maxHp) == (up == 1));
@@ -1273,9 +1381,9 @@ static void skillCastMidSwingStillHits() {
     q.godMode = true;
     q.enemies[0].x = q.hero.x + HERO_W + 2 * DP;
     Actions a = {};
-    a.fire = true;
+    a.firePressed = true;
     play(q, a, 1);
-    a.fire = false;
+    a.firePressed = false;
     play(q, a, 2);
     a.rocket = true;
     play(q, a, 40);
@@ -1302,7 +1410,7 @@ static void arrowsStopAtWalls() {
     startQuest(q, t, CLASS_ARCHER, 10, 0, 14);
     q.godMode = true;
     Actions a = {};
-    a.fire = true;
+    a.firePressed = true;
     play(q, a, 1);
     CHECK(q.projectiles.size() == 1);
     play(q, Actions(), 60);
@@ -1337,9 +1445,9 @@ static void armoredGuardsItsFront() {
         q.godMode = true;
         q.enemies[0].facingLeft = !back;
         Actions a = {};
-        a.fire = true;
+        a.firePressed = true;
         play(q, a, 1);
-        a.fire = false;
+        a.firePressed = false;
         for (int i = 0; i < 90 && q.enemies[0].hp == q.enemies[0].maxHp; i++) play(q, a, 1);
         damage[back] = q.enemies[0].maxHp - q.enemies[0].hp;
     }
@@ -1709,7 +1817,7 @@ static void leverOpensDoorsForGood() {
     standAt(q, 74, 18);
     q.hero.facingLeft = false;
     Actions a = {};
-    a.fire = true;
+    a.firePressed = true;
     play(q, a, 30);
     CHECK(tileAt(q.area, 77, 10) == '.' && (q.save.shortcuts[WORLD_TEST] & 1) && logged(q, "quest: shortcut 8.0 open"));
     AreaState again;
@@ -2378,7 +2486,7 @@ static void renderAnims() {
             snprintf(path, sizeof path, "build/anims/lineup_w%d%s.bmp", world, tier ? "_t3" : "");
             screenSaveBmp(path);
         }
-    // Sheets: run with R1 held, R1 standing, a pause, then R2 and its aftermath; a 160 x 90 dp crop every 2nd step.
+    // Sheets: R1 taps while running and standing, a pause, then R2 and its aftermath; a 160 x 90 dp crop every 2nd step.
     const int CROP_W = 160 * DP, CROP_H = 90 * DP, COLS = 8, GAP = DP, STEPS = 144;
     const int ROWS = (STEPS / 2 + COLS - 1) / COLS, SHEET_W = COLS * (CROP_W + GAP), SHEET_H = ROWS * (CROP_H + GAP);
     TestArea t;
@@ -2394,7 +2502,7 @@ static void renderAnims() {
             for (int i = 0; i < STEPS; i++) {
                 Actions a = {};
                 a.moveX = i < 30 ? 1 : 0;
-                a.fire = i < 72;
+                a.firePressed = i < 60 && i % 12 == 0;
                 if (i == 84) {
                     q.hero.mp = q.stats.maxMp;
                     a.rocket = true;
@@ -2466,8 +2574,11 @@ int main(int argc, char** argv) {
     skillsNeverRootTheHero();
     slashLitMatchesHitWindow();
     meleeBasicHitStops();
-    rangedDrawShowsWhileHeld();
+    rangedDrawShowsWhenNextShotIsQueued();
     basicAttacksCycleThroughThreePoses();
+    basicAttackPressSurvivesHitStop();
+    everyBasicStrikeShowsNineDrawings();
+    basicAttacksShiftWeightThroughTheLegs();
     skillTimingUnchanged();
     heroSpritesFitTheirBox();
     knightSwingHitsOnlyInItsWindow();

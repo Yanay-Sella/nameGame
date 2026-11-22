@@ -1,7 +1,7 @@
 # Handoff: state of the work and how Claude and Codex share it
 
 **Read this first, update it before you stop.** Rules and commands are in `AGENTS.md`; conventions, questions between agents and the small-change lane are in `docs/COLLAB.md`; this file holds what changes between sessions.
-Updated: 2026-11-22 (NAME QUEST NPC art and three-strike R1 animations).
+Updated: 2026-11-22 (NAME QUEST attack stances and Archer recoil).
 
 ## Classic shooter
 
@@ -51,6 +51,11 @@ Updated: 2026-11-22 (NAME QUEST NPC art and three-strike R1 animations).
 - Spec examples that disagree with the spec formula `round(100 * 1.2^(L-1))`: 39→40 is 102,067 (spec 102,064), 29→30 is 16,484 (spec 10,646). The code follows the formula; the user decides.
 
 ## Session log (newest first; add a line per session: date, agent, what changed, what is next)
+- 2026-11-22, Codex — Set the Archer’s rear foot four art pixels farther back at full brace on all three R1 shots. Checked the Mac render. PS3 playtest pending.
+- 2026-11-22, Codex — Revised the R1 stances after art feedback. The Archer leans back onto the rear leg, and the other three heroes load the lead knee. All twelve strikes passed the six-gait checks. Mac renders reviewed. PS3 playtest pending.
+- 2026-11-22, Codex — Animated all twelve R1 strikes with nine frames and a forward lean (D-069). Checked the combos in Mac renders and counted distinct frames at 60 Hz. PS3 playtest and user art review pending.
+- 2026-11-22, Codex — Changed NAME QUEST R1 to one attack per press with one queued combo strike (D-068). NAME QUEST tests passed and Classic's 50 failures matched the baseline. Checked the Knight's combo in a headless Mac render. PS3 playtest pending.
+- 2026-11-22, Codex — Checked the NAME QUEST hero attack timing. The game steps at 60 Hz, and R1 sprite poses use class-specific durations. PS3 playtest pending.
 - 2026-11-22, Codex — Redrew all 16 named NPCs and 12 surveyors on the hero art grid (D-066). Spec §22 and AGENTS.md carry the future art rules. Added three R1 animations per class at the existing strike cadence (D-067). NAME QUEST tests passed. The Classic suite reported its 50 existing failures. Reviewed Namula and the combo renders on Mac. PS3 playtest pending.
 - 2026-11-22, Codex — Verified the desktop app's General setting for preventing sleep during a run. The worktree already matched local `main`.
 - 2026-11-22, Codex — Resolved the handoff conflict in the merge of `codex/work` into `main`, preserving both session logs.

@@ -123,6 +123,8 @@ enum EffectKind { FX_SWING, FX_ARC, FX_BURST, FX_CHAIN, FX_METEOR, FX_SPIN, FX_B
 const size_t PARTICLE_CAP = 200;   // no new particle while this many are alive (phase 5b readability)
 struct Effect { int kind; float x, y, w, h, x2, y2, age, life; bool flip; char color; };
 
+enum BasicAttackInput { BASIC_NONE, BASIC_FORWARD, BASIC_UP };
+
 // The hero's body and combat state.
 struct Hero {
     float x, y, vx, vy;          // top-left of the 8x14 hitbox
@@ -140,22 +142,22 @@ struct Hero {
     float drinkTimer;            // s left of drinking a potion (heals at its end)
     int drinkItem;               // the potion being drunk (ItemType)
     int basicStep;               // zero-based step in the three-hit basic attack animation
+    BasicAttackInput queuedAttack;
     int swing;                   // id of the current melee swing (each enemy is hit once per swing)
     bool attackUp;               // the basic attack aims up (the Thief with up held)
     int skill = -1;              // the strong attack playing (job tier), -1 none
     int volleys;                 // Storm Volley fans still to fire
     float landTimer;             // s left of the landing pose (drawing only)
-    bool fireHeld;               // R1 held this step (the bow and staff draw while it is)
     float dashDir, skillX, skillY;   // Shadow Dash's direction; Meteor's target
     float slideTimer, slideSpeed;    // a banana peel: s left of sliding without control, signed speed (spec §12 world 2)
     float frozenTimer;               // the Yeti's ice block: s left without control; X or R1 presses cut it (spec §12 world 3)
-    bool fireWasHeld;                // R1 held last frame (a press is a new hold)
 };
 // The hero's drawn pose (spec §22): a body frame, or an arm pose over legs; t: s into the basic attack / skill, -1 none.
 enum HeroBody { BODY_IDLE_1, BODY_IDLE_2, BODY_RUN_1, BODY_RUN_2, BODY_RUN_3, BODY_RUN_4, BODY_JUMP, BODY_PEAK, BODY_FALL,
                 BODY_LAND, BODY_CLIMB_1, BODY_CLIMB_2, BODY_ROLL_1, BODY_ROLL_2, BODY_HURT };
-enum HeroArms { ARMS_NONE = -1, ARMS_WINDUP, ARMS_ACTIVE, ARMS_RECOVER, ARMS_SKILL_1, ARMS_SKILL_2, ARMS_SKILL_3, ARMS_SKILL_4, ARMS_SKILL_5,
-               ARMS_WINDUP_2, ARMS_ACTIVE_2, ARMS_RECOVER_2, ARMS_WINDUP_3, ARMS_ACTIVE_3, ARMS_RECOVER_3 };
+const int BASIC_STRIKE_FRAMES = 9;
+enum HeroArms { ARMS_NONE = -1, ARMS_RECOVER, ARMS_SKILL_1, ARMS_SKILL_2, ARMS_SKILL_3, ARMS_SKILL_4, ARMS_SKILL_5,
+                ARMS_BASIC, ARMS_QUEUED_DRAW = ARMS_BASIC + 3 * BASIC_STRIKE_FRAMES };
 enum HeroLegs { LEGS_STAND, LEGS_RUN_1, LEGS_RUN_2, LEGS_RUN_3, LEGS_RUN_4, LEGS_AIR };
 struct HeroPose { int body, arms, legs; float attackT, skillT; bool slashLit; };   // slashLit: the melee active window
 // Things lying in the area for a while: the Monkey King's peels and the Silverback's stink mist (spec §12 world 2).

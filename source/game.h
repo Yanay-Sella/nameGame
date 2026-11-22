@@ -21,6 +21,7 @@ struct Actions {
     bool selectHeld;              // Select held (NAME QUEST dev: held 2 s → TEST GROUNDS)
     bool item;                    // Triangle pressed (NAME QUEST: select the next item)
     bool connected;               // this player's controller is open
+    bool firePressed;             // R1 pressed (NAME QUEST basic attack)
 };
 
 // Sounds the game asks for during a step; main.cpp plays each requested one once.

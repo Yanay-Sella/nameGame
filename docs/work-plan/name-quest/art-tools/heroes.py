@@ -1,7 +1,7 @@
 """The four NAME QUEST heroes (spec §21, §22, phase 5b step 2), on the build of the user's reference archer (approved
 2026-11-22): a 32x28 art-px canvas doubled to 64x56 real px, facing right, no outline. Head rows 0-14 (face rows 10-13),
 body rows 15-21, legs rows 22-27 (feet on row 27); the 8x14 dp hitbox covers art columns 12-19, rows 14-27, and the
-canvas is symmetric around it. Per class: 15 body frames, and 14 arm poses (upper body) over 6 leg poses. Trim 'h' and
+canvas is symmetric around it. Per class: 15 body frames, nine poses per R1 strike over six leg poses. Trim 'h' and
 tier details '1'-'3' are recoloured by job tier when drawn. Writes source/quest_sprites_hero.h/.cpp; called by
 make_quest_art.py. Standard library only."""
 import math
@@ -12,11 +12,13 @@ SHIFT = 4   # templates are written in the reference's columns; the canvas puts 
 CLASS_NAMES = ["KNIGHT", "ARCHER", "MAGICIAN", "THIEF"]
 BODY_FRAMES = ["IDLE_1", "IDLE_2", "RUN_1", "RUN_2", "RUN_3", "RUN_4", "JUMP", "PEAK", "FALL", "LAND", "CLIMB_1", "CLIMB_2",
                "ROLL_1", "ROLL_2", "HURT"]
-BASE_ARM_POSES = ["WINDUP", "ACTIVE", "RECOVER", "SKILL_1", "SKILL_2", "SKILL_3", "SKILL_4", "SKILL_5"]
-COMBO_ARM_POSES = ["WINDUP_2", "ACTIVE_2", "RECOVER_2", "WINDUP_3", "ACTIVE_3", "RECOVER_3"]
-ARM_POSES = BASE_ARM_POSES + COMBO_ARM_POSES
+SKILL_POSES = ["RECOVER", "SKILL_1", "SKILL_2", "SKILL_3", "SKILL_4", "SKILL_5"]
+STRIKES = {f"STRIKE_{strike+1}_{frame+1}": (strike, frame)
+           for strike in range(3) for frame in range(9)}
+DRAWS = {f"DRAW_{strike+1}_{frame+1}": (strike, frame)
+         for strike in range(3) for frame in range(3)}
+ARM_POSES = SKILL_POSES + list(STRIKES) + list(DRAWS)
 LEG_POSES = ["STAND", "RUN_1", "RUN_2", "RUN_3", "RUN_4", "AIR"]
-# Authored: every body frame, three poses per basic attack and five skill poses.
 TIER_CHARS = "123"
 
 
@@ -123,16 +125,9 @@ CLASSES["THIEF"] = dict(
     tier=T("........33", "", "", "", "", "...1", "..1", top=13),   # 1 third scarf tail, 2 pommel (torso), 3 mask knot
 )
 
-# --- Basic attack poses: the whole upper body below the head (torso, both arms, the weapon) for each pose. ---
+# Upper-body templates shared by the R2 skill and recovery poses.
 ARMS = {
-    "KNIGHT": {   # sword raised high, struck level at full reach, followed through low in front
-        "WINDUP": T(".................b", ".................bw", ".................bw", ".................bw",
-                    ".................bw", ".................bw", ".................bw", "................ddd",
-                    ".................h", ".................@", ".................]", ".......bbbbsbbsbbb",
-                    "....hhhsbbbbbbbsss", "...hsssh&bbbbbss", "...hsdsh&bbbbbs", "...hsdsh&hhhhhhs", "....hhh.@ssssss",
-                    "........sssssdd", top=4),
-        "ACTIVE": T(".......bbbbsbbsbbb", "....hhhsbbbbbbbsss..dbbbbbb", "...hsssh&bbbbbs]]]]@dwwwwwww",
-                    "...hsdsh&bbbbbs.....d", "...hsdsh&hhhhhhs", "....hhh.@ssssss", "........sssssdd", top=15),
+    "KNIGHT": {
         "RECOVER": T(".......bbbbsbbsbbb", "....hhhsbbbbbbbsss", "...hsssh&bbbbbs]]", "...hsdsh&bbbbbs.]]",
                      "...hsdsh&hhhhhhs.@h", "....hhh.@ssssss...db", "........sssssdd.....bw", ".....................bw",
                      "......................bw", ".......................b", top=15),
@@ -148,15 +143,7 @@ ARMS = {
                      "........//&&&&&]@@@@&", ".........&&&&&&....:&", ".........&;;;;;....:/", ".........;;;;;;....:/",
                      ".........;;;,,,...../", top=13),
     },
-    "MAGICIAN": {   # the staff pulled back (gem lit), thrust forward, swinging back up
-        "WINDUP": T("...................w", "..................cwc", "..................2c2", "...................&",
-                    "...................&", "...................&", "...................&", "...................&",
-                    "...................&", "......>>:@^^^^^^:..&", "......>:.@^^^^^^``@&", ".......:.@@^^^^^``@&",
-                    "...................&", "...................&", "...................&", "...................&",
-                    "...................&", "...................&", "...................&", top=6),
-        "ACTIVE": T(".........................w", "........................c2", ".......................&",
-                    "......................&", "......>>:@^^^^^^:....&", "......>:.@^^^^^^``@@&", ".......:.@@^^^^^``.&",
-                    "..................&", ".................&", top=11),
+    "MAGICIAN": {
         "RECOVER": T("..................w", "..................c2", "..................&", "..................&",
                      "..................&", "..................&", "...................&", "...................&",
                      "......>>:@^^^^^^:..&", "......>:.@^^^^^^``.&", ".......:.@@^^^^^``@&", "....................&",
@@ -164,9 +151,7 @@ ARMS = {
                      ".....................&", ".....................&", ".....................&", ".....................&",
                      ".....................&", top=7),
     },
-    "THIEF": {   # the dagger pulled back to the hip, thrust with the arm fully out, arm coming back
-        "WINDUP": T(".......pppppppp", ".......-ppppp-", "........<<<<<<X]", ".......@<<<<<X]]", ".......@XXXXX]@bw",
-                    ".......h<hhhhhh", "........XXXXXXX", top=15),
+    "THIEF": {
         "ACTIVE": T(".......pppppppp", ".......-ppppp-", "........<<<<<<X", ".......@<<<<<X]]]]]@bbw", ".......@XXXXXXX",
                     ".......h<hhhhhh", "........XXXXXXX", top=15),
         "RECOVER": T(".......pppppppp", ".......-ppppp-", "........<<<<<<X]]", ".......@<<<<<X]]]@bw", ".......@XXXXXXX",
@@ -174,90 +159,6 @@ ARMS = {
     },
 }
 
-# The second and third basic strikes, in order: a rising cut and overhead chop, a low reload and snap shot,
-# a side cast and raised-staff cast, a reverse cut and downward jab.
-ARMS["KNIGHT"].update(
-    WINDUP_2=T(".......bbbbsbbsbbb", "....hhhsbbbbbbbsss", "...hsssh&bbbbbss", "...hsdsh&bbbbbs..]",
-               "...hsdsh&hhhhhhs.]@", "....hhh.@ssssss..hd", "........sssssdd...bw",
-               "...................bw", "....................bw", ".....................bw", top=15),
-    ACTIVE_2=T("..........................w", ".........................bw", "........................bw",
-               ".......................bw", "......................bw", ".....................bw", "....................bw",
-               "...................ddd", ".......bbbbsbbsbbb..h", "....hhhsbbbbbbbsss.@@", "...hsssh&bbbbbss]]]",
-               "...hsdsh&bbbbbs..]", "...hsdsh&hhhhhhs", "....hhh.@ssssss", "........sssssdd", top=7),
-    RECOVER_2=T("....................w", "...................bw", "...................bw", "..................bw",
-                "..................bw", ".................ddd", "..................h", "..................@",
-                ".......bbbbsbbsbbb]@", "....hhhsbbbbbbbsss]", "...hsssh&bbbbbss]", "...hsdsh&bbbbbs",
-                "...hsdsh&hhhhhhs", "....hhh.@ssssss", "........sssssdd", top=7),
-    WINDUP_3=T("................b", "...............bw", "..............bw", ".............bw", "............bw",
-               "...........bw", "..........bw", ".........ddd", "..........h.@@", "...........@]]]", "..............]]",
-               ".......bbbbsbbsbbb", "....hhhsbbbbbbbsss", "...hsssh&bbbbbss", "...hsdsh&bbbbbs",
-               "...hsdsh&hhhhhhs", "....hhh.@ssssss", "........sssssdd", top=4),
-    ACTIVE_3=T(".......bbbbsbbsbbb", "....hhhsbbbbbbbsss]", "...hsssh&bbbbbss]]@@", "...hsdsh&bbbbbs....hd",
-               "...hsdsh&hhhhhhs.....dbw", "....hhh.@ssssss........bw", "........sssssdd..........bw",
-               "..........................bw", "...........................w", top=15),
-    RECOVER_3=T(".......bbbbsbbsbbb", "....hhhsbbbbbbbsss", "...hsssh&bbbbbss]", "...hsdsh&bbbbbs..]]",
-                "...hsdsh&hhhhhhs...@@", "....hhh.@ssssss.....d", "........sssssdd.....bw",
-                ".....................bw", "......................bw", "......................b", top=15),
-)
-ARMS["ARCHER"].update(
-    WINDUP_2=T("....................//", ".................../:", "....................:/", ".................@...:/",
-               ".........@/&;;&.@////////bw", "........//&&&&&]@@@@@&", "........//&&&&&...:..:/",
-               ".........&&&&&&....::/", ".........&;;;;;...../", ".........;;;;;;...../", ".........;;;,,,", top=11),
-    ACTIVE_2=T("...................//", ".................../:", "....................:/", "....................:/",
-               "......@@..&&;;&......:&", "......./@@&&&&&]@@@@@&", "........//&&&&&.....:/",
-               ".........&&&&&&....:/", ".........&;;;;;...:/", ".........;;;;;;.../", ".........;;;,,,", top=11),
-    RECOVER_2=T(".........@/&;;&", "........//&&&&&.....//", "........//&&&&&]@@.::/",
-                ".........&&&&&&...@:&", ".........&;;;;;..::/", ".........;;;;;;.::/", ".........;;;,,,./", top=15),
-    WINDUP_3=T("......................./", "......................:/", ".....................:/", "....................:/",
-               "...................:/", ".................@//bw", ".........@/&;;&.@@@@@&",
-               "........//&&&&&]@@..:/", "........//&&&&&.....:/", ".........&&&&&&......:/",
-               ".........&;;;;;......./", ".........;;;;;;......./", ".........;;;,,,", top=9),
-    ACTIVE_3=T("......................./", "......................:/", "......................:/", ".....................:/",
-               ".....................:/", ".........@...........:&", ".......@@@/&;;&..@@@@&",
-               "........//&&&&&]@....:/", "........//&&&&&......:/", ".........&&&&&&.......:/",
-               ".........&;;;;;........//", ".........;;;;;;", ".........;;;,,,", top=9),
-    RECOVER_3=T("....................//", "....................:/", "....................:/", "...................:/",
-                ".........@/&;;&....:&", "........//&&&&&]@@@&", "........//&&&&&....:/",
-                ".........&&&&&&.....:/", ".........&;;;;;.....:/", ".........;;;;;;......//", ".........;;;,,,", top=11),
-)
-ARMS["MAGICIAN"].update(
-    WINDUP_2=T(".....w", ".....Ic", "......2c", ".......&", "........&", ".........&", "..........&", "...........&",
-               "......>>:@@^^^^^:", "......>:..@^^^^^\x60\x60", ".......:.@@^^^^^\x60\x60", top=7),
-    ACTIVE_2=T(".....................2cw", "....................&&c", "..................&&", "................&&",
-               "......>>:@^^^^^@@&", "......>:.@^^^^^@@", ".......:.@@^^^^^\x60\x60", top=11),
-    RECOVER_2=T("..................cww", "...................2c", "....................&", ".....................&",
-                "......>>:@^^^^^^:....&", "......>:.@^^^^^^\x60\x60@@&", ".......:.@@^^^^^\x60\x60.&",
-                "..................&", ".................&", top=11),
-    WINDUP_3=T(".....................w", "....................cIc", "....................2c2", ".....................&",
-               ".....................&", ".....................&", "...................@@&", "..................@@.&",
-               "......>>:@^^^^^:@@@@.&", "......>:.@^^^^^^\x60\x60...&", ".......:.@@^^^^^\x60\x60..&",
-               ".....................&", top=7),
-    ACTIVE_3=T(".....................w", "....................Icw", "...................&2c", "...................&",
-               "...................&", "......>>:@^^^^^^:@@&", "......>:.@^^^^^\x60\x60@@@@", ".......:.@@^^^^^\x60\x60.&",
-               "...................&", "...................&", "...................&", top=10),
-    RECOVER_3=T("....................cw", "....................2c", "....................&", "....................&",
-                "......>>:@^^^^^^:...&", "......>:.@^^^^^^\x60\x60@@&", ".......:.@@^^^^^\x60\x60..&",
-                "....................&", "....................&", "....................&", top=11),
-)
-ARMS["THIEF"].update(
-    WINDUP_2=T(".......pppppppp", ".......-ppppp-", "........<<<<<<X]", ".......@<<<<<X.]]", ".......@XXXXXXX..@@",
-               ".......h<hhhhhh....b", "........XXXXXXX.....bw", "......................w", top=15),
-    ACTIVE_2=T(".....................w", "....................bw", ".......pppppppp....bw", ".......-ppppp-..@@b",
-               "........<<<<<<X]]]]", ".......@<<<<<X]", ".......@XXXXXXX", ".......h<hhhhhh", "........XXXXXXX", top=13),
-    RECOVER_2=T(".................w", "................bw", "...............bw", ".......pppppppp@", ".......-ppppp-]]",
-                "........<<<<<<X]", ".......@<<<<<X]", ".......@XXXXXXX", ".......h<hhhhhh", "........XXXXXXX", top=12),
-    WINDUP_3=T("...................b", "...................bw", "...................bw", "...................@",
-               ".......pppppppp...]]", ".......-ppppp-...]]", "........<<<<<<X]]", ".......@<<<<<X]", ".......@XXXXXXX",
-               ".......h<hhhhhh", "........XXXXXXX", top=11),
-    ACTIVE_3=T(".......pppppppp", ".......-ppppp-...]]", "........<<<<<<X]]..@", ".......@<<<<<X].....bw",
-               ".......@XXXXXXX......bw", ".......h<hhhhhh.......w", "........XXXXXXX", top=15),
-    RECOVER_3=T(".......pppppppp", ".......-ppppp-", "........<<<<<<X]]", ".......@<<<<<X..]]", ".......@XXXXXXX..@",
-                ".......h<hhhhhh..bw", "........XXXXXXX...w", top=15),
-)
-
-
-# --- Climb (back view, arms up; CLIMB_2 is CLIMB_1 mirrored) and roll (a tucked ball; ROLL_2 turned half a circle).
-# Keys: A the back (cape, vest, robe, cloak), S the sleeves, H head/hair in the ball, B ball shade, F feet. ---
 CLIMB = T("..................@", "..................S", ".....@............S", ".....S............S", ".....S............S",
           ".....S............S", ".....S............S", ".....SSSAAAAAAAASSS", ".........AAAAAA", ".........AAAAAA",
           ".........AAAAAA", ".........AAAAAA", ".........hhhhhh", ".........AAAAAA", top=8)
@@ -458,19 +359,220 @@ def arm_frame(cls, pose, legs):
     return compose(cls, legs, bob + dy, back_override or back, dx, torso=torso, head=head, head_dy=head_dy)
 
 
+# Front-hand x/y on the 32x28 canvas and weapon angle in degrees. Negative angles point up.
+# Melee rows wind up, strike, then settle. Ranged rows start on release and settle into a ready stance.
+STRIKE_PATHS = {
+    "KNIGHT": [
+        [(20,16,-67), (19,14,-88), (20,13,-70), (22,14,-42), (24,16,-8), (24,18,20), (23,19,37), (22,19,55), (21,19,73)],
+        [(20,19,57), (19,20,68), (21,20,42), (23,19,18), (24,16,-25), (23,14,-55), (22,13,-72), (21,15,-58), (21,17,-40)],
+        [(21,16,-55), (19,13,-89), (18,11,-106), (21,12,-72), (23,15,-32), (24,18,14), (23,20,44), (22,20,59), (21,19,74)],
+    ],
+    "ARCHER": [
+        [(25,16,0), (25,16,-5), (24,16,-8), (23,17,-3), (22,18,6), (21,19,16), (20,20,24), (20,19,32), (20,18,38)],
+        [(25,18,9), (25,18,14), (24,19,19), (23,20,24), (22,20,30), (21,20,39), (21,19,43), (20,19,35), (20,18,26)],
+        [(24,14,-18), (25,14,-24), (25,15,-17), (24,16,-9), (23,17,0), (22,18,9), (21,19,17), (20,19,23), (20,18,32)],
+    ],
+    "MAGICIAN": [
+        [(23,16,-16), (24,16,-10), (24,17,0), (23,18,9), (22,19,2), (22,18,-18), (21,18,-42), (21,18,-62), (21,17,-81)],
+        [(22,19,2), (23,18,-7), (24,17,-18), (23,16,-34), (22,15,-53), (21,15,-72), (20,16,-90), (20,17,-102), (21,18,-96)],
+        [(22,14,-56), (24,14,-42), (24,15,-28), (23,16,-12), (23,17,2), (22,18,-14), (21,18,-40), (20,17,-66), (20,16,-87)],
+    ],
+    "THIEF": [
+        [(19,18,16), (18,19,25), (20,19,13), (24,18,2), (26,17,-4), (25,17,0), (23,18,11), (21,19,25), (20,19,37)],
+        [(19,20,43), (18,20,65), (20,20,38), (23,19,8), (25,16,-24), (24,15,-49), (22,15,-65), (21,16,-40), (20,17,-20)],
+        [(20,16,-45), (19,14,-65), (20,13,-77), (23,15,-36), (25,18,24), (24,20,46), (23,20,56), (21,19,45), (20,18,33)],
+    ],
+}
+
+# Preparing a queued shot brings the hand to the height of that shot's release.
+DRAW_PATHS = {
+    "ARCHER": [[(22,19,14), (23,17,7), (24,16,0)],
+               [(22,20,24), (23,19,15), (24,18,9)],
+               [(22,17,2), (23,15,-9), (24,14,-18)]],
+    "MAGICIAN": [[(21,18,-65), (21,17,-49), (22,16,-31)],
+                 [(20,17,-101), (20,18,-65), (21,19,-25)],
+                 [(20,17,-78), (21,15,-90), (22,13,-74)]],
+}
+
+# The free arm is part of each tunic. The weapon arm is drawn from shoulder through elbow to hand.
+STRIKE_CORE = {
+    "KNIGHT": T(".......bbbbsbbsbbb", "....hhhsbbbbbbbsss", "...hsssh&bbbbbss", "...hsdsh&bbbbbs",
+                "...hsdsh&hhhhhhs", "....hhh.@ssssss", "........sssssdd", top=15),
+    "ARCHER": ARCHER_CORE,
+    "MAGICIAN": T("......>>:@^^^^^^:", "......>:.@^^^^^^``", ".......:.@@^^^^^``", top=15),
+    "THIEF": T(".......pppppppp", ".......-ppppp-", "........<<<<<<X", ".......@<<<<<X", ".......@XXXXXXX",
+               ".......h<hhhhhh", "........XXXXXXX", top=15),
+}
+
+
+# Hip and knee centres, back leg then front, in the six gait poses. The soles come from the gait art.
+LEG_JOINTS = {
+    "STAND": ((14, 13), (18, 18)), "RUN_1": ((14, 12), (17, 19)),
+    "RUN_2": ((14, 12), (17, 17)), "RUN_3": ((17, 19), (14, 12)),
+    "RUN_4": ((17, 17), (14, 12)), "AIR": ((14, 13), (17, 19)),
+}
+
+
+def pixel_line(grid, x0, y0, x1, y1, color):
+    steps = max(1, math.ceil(max(abs(x1 - x0), abs(y1 - y0))))
+    for i in range(steps + 1):
+        x = round(x0 + (x1 - x0) * i / steps)
+        y = round(y0 + (y1 - y0) * i / steps)
+        assert 0 <= x < W and 0 <= y < H, (x, y)
+        grid[y][x] = color
+
+
+def strike_legs(cls, legs, load, hip_x, drop):
+    """Bend the knees between the moving hips and the feet of the current gait pose."""
+    grid = [["."] * W for _ in range(H)]
+    magician = cls == "MAGICIAN"
+    if load == 0:
+        stamp(grid, (ROBE if magician else LEGS)[legs], keys=CLASSES[cls].get("legs"))
+        return grid
+
+    lower = [["."] * W for _ in range(H)]
+    stamp(lower, (ROBE if magician else LEGS)[legs])
+    gait = {"RUN_3": "RUN_1", "RUN_4": "RUN_2"}.get(legs, legs) if magician else legs
+    colors = CLASSES[cls].get("legs", dict(T="`", U="^", B="&", F="&", G="&", E="&"))
+    rear_side = int(legs in ("RUN_3", "RUN_4"))
+    for side, (thigh, shin, sole) in enumerate(("TBG", "UFE")):
+        hip, knee = LEG_JOINTS[gait][side]
+        hip += hip_x
+        archer_rear = cls == "ARCHER" and side == rear_side
+        loaded = archer_rear if cls == "ARCHER" else side == 1
+        knee += round(load * (0.75 if loaded else 0.25))
+        shoe = []
+        for y in range(22, H):
+            xs = [x for x, ch in enumerate(lower[y]) if ch == ("&" if magician else sole)]
+            if magician:
+                mid = len(xs) // 2
+                xs = xs[mid:] if side else xs[:mid]
+            shoe.extend((x, y) for x in xs)
+        if archer_rear:
+            # Lift the rear foot as it travels and plant it at full draw.
+            step = (0, 1, 3, 4, 4)[load]
+            lift = int(legs == "STAND" and load < 3)
+            knee -= (step + 1) // 2
+            shoe = [(x - step, y - lift) for x, y in shoe]
+        ankle_y = min(y for x, y in shoe)
+        ankle = min(x for x, y in shoe if y == ankle_y) + 1
+        knee_y = min(ankle_y - 1, 23 + min(1, drop))
+        for width in (0, 1):
+            pixel_line(grid, hip + width, 21 + drop, knee + width, knee_y, colors[thigh])
+            pixel_line(grid, knee + width, knee_y, ankle + width, ankle_y, colors[shin])
+        for x, y in shoe:
+            grid[y][x] = colors[sole]
+
+    if magician:
+        # The hem hangs lower behind the hips and rises where the leading knee presses into the cloth.
+        waist, hem = 18, 25
+        for x in range(W):
+            front = min(1, max(0, (x - 14) / 8))
+            raised_hem = hem - round(load * 0.6 * front)
+            for y in range(waist + drop, raised_hem + 1):
+                depth = (y - waist - drop) / (raised_hem - waist - drop)
+                dx = round(hip_x * (1 - depth) + load * 0.75 * front * depth)
+                src_x = x - dx
+                src_y = waist + round(depth * (hem - waist))
+                if 0 <= src_x < W and lower[src_y][src_x] != ".":
+                    grid[y][x] = lower[src_y][src_x]
+    return grid
+
+
+def strike_frame(cls, strike, frame, legs, drawing=False):
+    """Pose the legs, torso and weapon together on one R1 frame."""
+    ranged = cls in DRAW_PATHS
+    hand_x, hand_y, angle = STRIKE_PATHS[cls][strike][frame]
+    load = (3, 4, 4, 3, 2, 2, 1, 1, 0) if ranged else (0, 1, 1, 2, 4, 4, 3, 1, 0)
+    load = load[frame]
+    if drawing:
+        hand_x, hand_y, angle = DRAW_PATHS[cls][strike][frame - 6]
+        load = (1, 2, 3)[frame - 6]
+    lean = -load if cls == "ARCHER" else load
+    hip_x = round(lean * 0.4)
+    drop = round(load * 0.5)
+    bob = int(legs in ("RUN_1", "RUN_3"))
+    costume = CLASSES[cls]
+    grid = strike_legs(cls, legs, load, hip_x, drop)
+    upper = [["."] * W for _ in range(H)]
+    stamp(upper, STRIKE_CORE[cls])
+    stamp(upper, costume["head"])
+    back = "flutter" if bob or load >= 3 else "rest"
+    stamp(upper, costume["back"][back], only_empty=True)
+    stamp(upper, costume["tier"], only_empty=True)
+    # Sample around the belt. The brim, brow and shoulders pitch down together at full extension.
+    for y in range(H):
+        weight = min(1, max(0, (23 + drop - y) / 13))
+        for x in range(W):
+            pitch = lean * (x - 16) / 33
+            src_y = y - drop - round((bob + pitch) * weight)
+            src_x = x - hip_x - round(lean * weight)
+            if 0 <= src_x < W and 0 <= src_y < H and upper[src_y][src_x] != ".":
+                grid[y][x] = upper[src_y][src_x]
+
+    sx, sy = 18 + hip_x + round(lean * 0.5), 16 + bob + drop
+    hx = hand_x + (hip_x if cls == "ARCHER" else 0)
+    hy = hand_y + bob
+    ex, ey = (sx + hx) / 2 - 1, max(sy, hy) + 1
+    sleeve = {"KNIGHT": "s", "ARCHER": "&", "MAGICIAN": "^", "THIEF": "<"}[cls]
+    pixel_line(grid, sx, sy, ex, ey, sleeve)
+    pixel_line(grid, sx, sy + 1, ex, ey + 1, sleeve)
+    pixel_line(grid, ex, ey, hx, hy, "]")
+    pixel_line(grid, ex, ey + 1, hx, hy + 1, "@" if cls == "ARCHER" else sleeve)
+
+    # Grip-local coordinates: u runs along the blade or arrow, v across it.
+    co, si = math.cos(math.radians(angle)), math.sin(math.radians(angle))
+    def stroke(u0, v0, u1, v1, color):
+        pixel_line(grid, hx + u0*co - v0*si, hy + u0*si + v0*co,
+             hx + u1*co - v1*si, hy + u1*si + v1*co, color)
+
+    if cls == "ARCHER":
+        pull = (3, 5, 7)[frame - 6] if drawing else (1, 3, 2, 2, 3, 3, 3, 3, 3)[frame]
+        for side in (-1, 1):
+            stroke(0, 0, -1, side*3, "/")
+            stroke(-1, side*3, -3, side*6, "/")
+            stroke(-3, side*6, -pull, 0, ":")
+        # The drawing hand snaps back to the cheek on release, then returns towards the string.
+        fingers = -pull if drawing else (-8, -10, -9, -7, -6, -5, -4, -3, -3)[frame]
+        stroke(-8, 1, fingers, 0, "@")
+        if drawing:
+            stroke(-pull, 0, 2, 0, "/")
+            stroke(3, 0, 3, 0, "w")
+    elif cls == "MAGICIAN":
+        rear = min(9, (H - 3 - hy) / -si) if si < 0 else 9
+        stroke(-rear, 0, 6, 0, "&")
+        stroke(5, -1, 6, -1, "c")
+        stroke(5, 1, 6, 1, "2")
+        stroke(6, 0, 7, 0, "c")
+        stroke(7, 0, 7, 0, "w")
+    else:
+        length = 7 if cls == "KNIGHT" else 4
+        stroke(-1, 0, 2, 0, "h" if cls == "KNIGHT" else "2")
+        stroke(2, -1, 2, 1, "d")
+        stroke(3, -1, length - 1, -1, "b")
+        stroke(3, 0, length, 0, "w")
+    grid[hy][hx] = "@"
+    return doubled(grid)
+
+
 def all_frames():
-    """Named frames for each class, including the extra basic attack poses over all six leg poses."""
     out = []
     for cls in CLASS_NAMES:
         for name in BODY_FRAMES:
-            out.append(("HERO_%s_%s" % (cls, name), body_frame(cls, name)))
-        for pose in BASE_ARM_POSES:
+            out.append((f"HERO_{cls}_{name}", body_frame(cls, name)))
+        for pose in ARM_POSES:
+            if pose in DRAWS and cls not in ("ARCHER", "MAGICIAN"):
+                continue
             for legs in LEG_POSES:
-                out.append(("HERO_%s_%s_%s" % (cls, pose, legs), arm_frame(cls, pose, legs)))
-    for cls in CLASS_NAMES:
-        for pose in COMBO_ARM_POSES:
-            for legs in LEG_POSES:
-                out.append(("HERO_%s_%s_%s" % (cls, pose, legs), arm_frame(cls, pose, legs)))
+                if pose in STRIKES:
+                    strike, frame = STRIKES[pose]
+                    rows = strike_frame(cls, strike, frame, legs)
+                elif pose in DRAWS:
+                    strike, frame = DRAWS[pose]
+                    rows = strike_frame(cls, strike, frame + 6, legs, drawing=True)
+                else:
+                    rows = arm_frame(cls, pose, legs)
+                out.append((f"HERO_{cls}_{pose}_{legs}", rows))
     return out
 
 
@@ -542,6 +644,9 @@ def write_all(write, sprite_text, root):
     for cls in CLASS_NAMES:
         cpp.append("    {")
         for pose in ARM_POSES:
+            if pose in DRAWS and cls not in ("MAGICIAN", "ARCHER"):
+                strike, frame = DRAWS[pose]
+                pose = f"STRIKE_{strike+1}_{frame+7}"
             cpp.append("        {" + ", ".join("&HERO_%s_%s_%s" % (cls, pose, l) for l in LEG_POSES) + "},")
         cpp.append("    },")
     cpp.append("};")
@@ -581,13 +686,12 @@ def preview(folder, save_png, global_palette):
                     if c != ".":
                         img[j * ch + 4 + y][job * cw + 4 + x] = pal[c]
     save_png(os.path.join(folder, "heroes_tiers.png"), cw * 4, ch * len(CLASS_NAMES), img, 3)
-    names = ["WINDUP", "ACTIVE", "RECOVER", "WINDUP_2", "ACTIVE_2", "RECOVER_2", "WINDUP_3", "ACTIVE_3", "RECOVER_3"]
-    width, height = cw * len(names), ch * len(CLASS_NAMES)
+    width, height = cw * 9, ch * 3 * len(CLASS_NAMES)
     img = [[bg] * width for _ in range(height)]
     for j, cls in enumerate(CLASS_NAMES):
-        for i, name in enumerate(names):
-            for y, line in enumerate(tinted(frames["HERO_%s_%s_STAND" % (cls, name)], 0)):
+        for pose, (strike, frame) in STRIKES.items():
+            for y, line in enumerate(tinted(frames[f"HERO_{cls}_{pose}_STAND"], 0)):
                 for x, c in enumerate(line):
                     if c != ".":
-                        img[j * ch + 4 + y][i * cw + 4 + x] = pal[c]
+                        img[(j * 3 + strike) * ch + 4 + y][frame * cw + 4 + x] = pal[c]
     save_png(os.path.join(folder, "basic-combos.png"), width, height, img, 2)

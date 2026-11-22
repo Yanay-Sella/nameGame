@@ -121,6 +121,7 @@ void inputRead(Actions* actions) {
                 a.moveY = dy / length;
             }
             a.fire = down(BTN_R1);
+            a.firePressed = press[BTN_R1];
             a.rocket = press[BTN_R2];
             a.pause = press[BTN_START];
             a.confirm = press[BTN_CROSS] || press[BTN_START];

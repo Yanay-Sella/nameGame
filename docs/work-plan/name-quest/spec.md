@@ -47,7 +47,7 @@ Intro pages (QMODE_INTRO, after the class pick; exact text, `\n` = line break):
 |---|---|---|
 | Left stick / D-pad | walk; up/down climb ladders; down + X drops through a one-way platform | move the cursor |
 | X | jump (hold for a higher jump); Thief: X again in the air = double jump | confirm / next page |
-| R1 | basic attack. Hold to cycle through three strikes (§5) | — |
+| R1 | basic attack on press. Tap again during a strike to queue the next one (§5) | — |
 | R2 | strong attack (costs MP) | — |
 | Circle | dodge (roll; Magician: blink) | back / close |
 | Square | use the selected item | — |
@@ -197,15 +197,16 @@ Hitbox 8 x 14; sprite 32 x 28 drawn at (x - 12, y - 14), facing right, flipped f
 | HURT_IFRAMES | 1.0 | blinking |
 | Underwater (world 5) | GRAVITY 380, JUMP_SPEED 190, MAX_FALL 120, walk x0.85 | peak 47 px; layout rule 8 still uses the land numbers so world 5 feels floaty, not open |
 
-Attacks: **the basic attack (R1, held or tapped) never slows the hero**: every class walks at full speed, turns, jumps
+**The basic attack (R1) never slows the hero.** Every class walks at full speed, turns, jumps
 and lands while it plays (D-062, phase 5b; the old Archer and Magician x0.5 was removed, and no phase may bring it
 back). Movement built into a skill (Shadow Dash, Rising Slash's hop) stays part of that skill. **No strong attack roots
 the hero** either (D-064, phase 5b: Power Slash, Meteor and Blade Fury used to): the hero runs and steers while any
 skill plays; a skill only blocks starting a basic attack or a dodge until it ends. Drinking a potion takes 0.5 s, walking at x0.4.
 
-Basic attacks cycle through three distinct animations per class (D-067). Holding R1 carries directly into the next
-strike and repeats after the third. A gap between attack cycles or a successful R2 starts the next chain at strike one.
-Each strike uses the class's existing cycle, hit window, box or projectile, and damage. A tap starts one strike.
+Basic attacks cycle through three distinct animations per class (D-067). Each R1 press starts one strike or queues
+the next one during the current cycle, including during hit-stop (D-068). The queue holds one strike. Holding R1
+plays a single strike. A gap between attack cycles or a successful R2 starts the next chain at strike one.
+Each strike uses the class's cycle, hit window, box or projectile, and damage.
 
 ## §6 Classes and jobs (D-040)
 
@@ -727,7 +728,7 @@ New palette characters (append to `paletteColor`; never reuse `m`, `y` outside t
 '?' 0xFF8A8478 citadel grey '!' 0xFF4E4A46 citadel dark  'z' 0xFFC8A040 citadel gold
 'Q' 0xFFD97757 Claude's cloak
 ```
-- Hero (phase 5b, D-061): per class 15 body frames and 14 arm poses x 6 leg poses (§22). The class's trim uses `h`; it is recoloured by job tier when drawn: tier 0 `h`, 1 `b`, 2 `Y`, 3 `N`. Tier details use `1`–`3` (shown in the tier colour from that tier on).
+- Hero (phase 5b, D-061): per class 15 body frames, nine drawings per R1 strike and separate R2 poses over six leg poses (§22). The class's trim uses `h`; it is recoloured by job tier when drawn: tier 0 `h`, 1 `b`, 2 `Y`, 3 `N`. Tier details use `1`–`3` (shown in the tier colour from that tier on).
   Hero palette characters (phase 5b): `+` blush, `[` skin outline, `]` leather outline, `(` steel outline, `)` cape outline, `{` green outline, `;` `,` sage green, `/` leather, `>` `:` pale hair, `_` hair outline, `^` `` ` `` navy robe, `|` navy outline, `<` cloak light, `-` scarf shade, `}` scarf outline (values in phase 5b step 2).
   Knight: grey plate `b`/`d`, red cape `r`. Archer: green hood `g`/`G`, bow `h`. Magician: blue robe `u`/`U`, hat.
   Thief: dark `x`/`X` with a purple scarf `p`.
@@ -811,9 +812,12 @@ game draws into a CPU pixel buffer (D-008), any blending is done in software and
   doubled to 64 x 56 real px, facing right, with **no outline** (like the references). Head rows 0-14 (the face on rows
   10-13: 2 x 2 eyes with a white highlight in the back eye, blush under each), body rows 15-21, legs rows 22-27 with the feet
   on row 27; the hitbox is still 8 x 14 (art columns 12-19), drawn at (x - 12, y + 14 - 28). 2-3 flat shades per material.
-  Frames: 15 body frames (idle, run, jump, peak, fall, land, climb, roll, hurt) and 14 arm poses over 6 leg poses. Each
-  of the three basic strikes has wind-up, active and recovery poses. There are five additional skill poses. The legs keep
-  running while the arms attack. The brightest frame of a melee slash is
+  Each hero has 15 body frames for locomotion and hurt. Each of the three R1 strikes plays nine distinct poses (D-069).
+  The hips drop and the knees bend. Knight, Magician and Thief lean toward the target. Archer leans away from it
+  on the draw and release, keeping the bow aimed forward. The Archer steps the rear foot back by four art pixels
+  at full brace and keeps the front foot planted while standing. The six leg poses carry the attack
+  while standing, running or airborne. Ranged heroes can use the last three poses to prepare a queued shot. R2 uses
+  five skill poses and a recovery pose. The brightest frame of a melee slash is
   its active hit window. Each job tier changes the trim colour (§21) and adds one visible detail. Full rules:
   [`phase-5b-character-art.md`](phase-5b-character-art.md).
 - **Enemies:** redrawn for NAME QUEST as side-view sprites based on the shooter's designs (same colours and shapes, so
