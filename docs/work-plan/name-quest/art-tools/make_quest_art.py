@@ -238,100 +238,6 @@ def chest(opened):
     return g
 
 
-# --- NPCs (spec §14, §22): small old-school templates with a baked outline, doubled, facing right.
-# 14x18 art px (16x20 dp with the outline); Tobin 10x10 (12x12 dp), the Gatekeeper 14x22 (16x24 dp). Frame B breathes
-# (head and shoulders 1 px lower) and blinks. Keys map to the global palette per NPC. ---
-NPC_TEMPLATES = {
-    "ILSA": ([".....AAA......", "....AAAAA.....", "...AAAAAAA....", "...AABSSSA....", "...AASSESA....", "...AASSSSA....",
-              "...AAA$$AA....", "..AAAAAAAAA...", "..AAAAAAAAAG..", "..BAAAAAAAA.L.", "..BAAAAAAAA.L.", "..BAAAAAAAALOL",
-              "..BAAAAAAAALNL", "..BBAAAAAAA.L.", "..BBAAAAAAAA..", "..BBBAAAAAAA..", "...BBBAAAAA...", "...FF...FF...."],
-             dict(A="7", B="4", S="@", E="k", F="&", G="@", L="K", O="o", N="N")),
-    "MARRA": (["....HHHH......", "...HHHHHH.....", "...HHSSSS.....", "...HSSESS.....", "...HSSSSS.....", "....$SSS......",
-               "...CCCCCC.....", "..CAAAAAAC....", "..AAAAAAAAG...", "..AAWWWWAA.ll.", "..AAWWWWAA.l..", "..AAWWWWAA....",
-               "..AAWWWWAA....", "..AAAAAAAA....", "..BAAAAAAB....", "..BBAAAABB....", "...BB..BB.....", "...FF..FF....."],
-              dict(H="h", S="@", E="k", A="g", B="G", C="P", W="b", G="@", l="l", F="&")),
-    "BRANN": (["....HHHH......", "...HHHHHH.....", "...HSSSSS..XXX", "...HSSESS..XXX", "...SSSSSS...T.", "...DDDDDD...T.",
-               "..SDDDDDDS..T.", ".SSAWWWWASS.T.", ".SSAWWWWAASSG.", "..SAWWWWAA....", "..AAWWWWAA....", "..AAWWWWAA....",
-               "..AAWWWWAA....", "..BBWWWWBB....", "..BBBBBBBB....", "..BB....BB....", "..BB....BB....", ".FFF...FFF...."],
-              dict(H="&", S="@", E="k", D="h", A="X", W="W", B="d", X="s", T="&", G="@", F="x")),
-    "LIO": (["........r.....", "...CCCCCr.....", "..CCCCCCC.....", "...HSSSSS.....", "...HSSESS.....", "...HSSSSS.....",
-             "....$SS$......", "...AAAAAA.....", "..AAAAAAAA....", "..AALLLLLLLLG.", "..AOOOAAAA....", "..OOOOOAAA....",
-             "..OOkOOAAA....", "..AOOOAAAA....", "..BBBBBBBB....", "...KK..JJ.....", "...KK..JJ.....", "..FFF..FFF...."],
-            dict(r="Y", C="r", H="H", S="@", E="k", A="u", B="U", L="&", O="S", k="x", K="U", J="u", G="@", F="&")),
-    "PELL": (["....HHHH......", "...HHHHHH.....", "...HSSSSS.....", "...HSwEwS.....", "...HSSSSS.....", "....$SS$......",
-              "...AAAAAA.....", "..AAAAAAAAOO..", ".OOOOOOOOOOOC.", "COOOOOOOOOOOC.", ".OOOOOOOOOOOC.", "..AAAAAAAAG...",
-              "..AAAAAAAA....", "..AAAAAAAA....", "..BBBBBBBB....", "...KK..JJ.....", "...KK..JJ.....", "..FFF..FFF...."],
-             dict(H="s", S="@", E="k", w="b", A="h", B="W", O="H", C="S", G="@", K="W", J="h", F="&")),
-    "SELA": (["..............", "....HHHH......", "...HHHHHH.....", "...HHSSSS.....", "...HSSESS.....", "...HSSSS$.....",
-              "..CCC$$CC.....", ".CCCCCCCCC....", ".CCCCCCCCCG...", "..CCCCCCCC.T..", "..AAAAAAAA.T..", "..AAAAAAAA.T..",
-              "..AAAAAAAA.T..", "..AAAAAAAA.T..", "..BAAAAAAB.T..", "..BBAAAABB.T..", "..BBBBBBBB.T..", "...FF..FF..T.."],
-             dict(H="b", S="@", E="k", C="p", A="d", B="n", G="@", T="&", F="&")),
-    "ODO": (["....AAAA......", "...AAAAAA.....", "...ABBBBA.....", "...ASSESA.....", "...ASSSSA.....", "...HHHHHH.....",
-             "...HHHHH......", "..AAAAAAAA....", ".AACCCCCCAA...", ".AACCCCCCAG...", ".A.CCCCCC.T...", "...CCCCCC.T...",
-             "...CCCCCC.T...", "...AAAAAA.T...", "...AA..AA.T...", "...AA..AA.T...", "...AA..AA.T...", "..FFF.FFF.L..."],
-            dict(A="b", B="s", S="@", E="k", H="w", C="r", G="s", T="b", L="s", F="d")),
-    "WREN": ([".....AAA......", "....AAAAA.....", "...AAAAAAA....", "...AASSSSA....", "...AASSESS....", "...AASSSSS....",
-              "..LAAA$$A.....", ".L.AAAAAAA....", ".L.ABBBBBA....", ".L.ABBBBBAG...", ".L.ABBBBBA....", ".L.ABBBBBA....",
-              "..LACCCCCA....", "...ABBBBBA....", "...KK..JJ.....", "...KK..JJ.....", "...KK..JJ.....", "..FFF..FFF...."],
-             dict(A="G", B="g", S="@", E="k", L="h", C="&", G="@", K="W", J="&", F="&")),
-    "YSOLDE": (["......A....N..", ".....AA...NcN.", "....AAA....T..", "...AAAAA...T..", "..CCCCCCC..T..", "...HSSSS...T..",
-                "...HSSES...T..", "...HHSS$...T..", "..AAAAAAA..T..", "..AAAAAAAAGT..", "..AAAAAAA..T..", "..AACCAAA..T..",
-                "..AAAAAAA..T..", "..AAAAAAAA.T..", "..BAAAAAAA.T..", ".BBAAAAAAAAT..", ".BBBBBBBBBBT..", "...FF..FF..T.."],
-               dict(A="p", B="U", C="U", H="b", S="@", E="k", N="w", c="c", T="&", G="@", F="&")),
-    "KIT": (["..............", "...HHHHH......", "..HHHHHHH.....", "..HHSSSSS.....", "..HCCwCCw.....", "..HSSSSSS.....",
-             "...DDDDDDD....", "..DDAAAADDD...", "..AAAAAAA.DD..", "..AAAAAAAG....", "..AAAAAAA.w...", "..ACCCCCA.....",
-             "..AAAAAAA.....", "...KK..JJ.....", "...KK...JJ....", "...KK...JJ....", "..KK.....JJ...", "..FF.....FF..."],
-            dict(H="&", S="@", C="x", w="w", D="R", A="d", G="@", K="n", J="d", F="x")),
-    "TOBIN": (["...HHHH...", "..HHHHHH..", "..HSSSSS..", "..HSSESS..", "...SSSS...", "..AAAAAA..", ".SAAAAAAS.", "..AAAAAA..",
-               "..KK..JJ..", "..FF..FF.."],
-              dict(H="H", S="@", E="k", A="o", K="h", J="h", F="&")),
-    # Tobin's father, an old miner sitting hurt in the Greendeep: grey beard, a yellow cap with a lamp, a bandaged leg.
-    "GARRICK": (["....CCCCL.....", "...CCCCCC.....", "...HSSSSS.....", "...HSSESS.....", "...HSSSSS.....", "...WWWWWW.....",
-                 "..AAWWWWAA....", ".SAAAAAAAS....", ".SAAAAAAAS....", "..AAAAAAAA....", "..KKKKKBBBBFF.", "..KKKKKKKKKFF."],
-                dict(C="Y", L="w", H="s", S="@", E="k", W="b", A="R", K="U", B="w", F="&")),
-    "GATEKEEPER": ([".....AAAA.....", "....AAAAAA....", "....ABBBBA....", "....AwBBwA....", "....ABBBBA....", ".....AAAA.....",
-                    "...AAAAAAAA...", "..AAAAAAAAAA..", "..AA.AAAA.AA..", "..AA.AAAA.AA..", "..AAGAAAAGAA..", "..A..ATTA..A..",
-                    ".....ATTA.....", "....AAAAAA....", "....AATTAA....", "....AATTAA....", "...AAATTAAA...", "..CCCCCCCCCC..",
-                    "..CoCoCoCoCo..", ".CCCCCCCCCCCC.", ".DDDDDDDDDDDD.", "DDDDDDDDDDDDDD"],
-                   dict(A="s", B="d", w="c", G="s", T="b", C="X", o="!", D="d")),
-    "SURVEYOR": (["....CCCC......", "..CCCCCCCC....", "...HSSSSS.....", "...HSSESS.....", "...HSSSSS..LL.", "....$SS$..LL..",
-                  "...AAAAAA.LL..", "..AAAAAAAGL...", "..AOAAAAAA....", "..AAOAAAAA....", ".DDDOAAAAA....", ".DDDDAAAAA....",
-                  ".DDDDAAAAA....", "..AAAAAAAA....", "...KK..JJ.....", "...KK..JJ.....", "...KK..JJ.....", "..FFF..FFF...."],
-                 dict(C="W", H="&", S="@", E="k", A="P", O="&", D="S", L="z", G="@", K="W", J="P", F="&")),
-}
-
-
-def npc(name, frame):
-    rows, colours = NPC_TEMPLATES[name]
-    rows = [list(r) for r in rows]
-    w, h = len(rows[0]), len(rows)
-    assert all(len(r) == w for r in rows), name + ": rows of different widths"
-    if frame == 1 and name != "GATEKEEPER":   # breathe: the head and shoulders 1 px lower; blink
-        top = 8 if h >= 18 else 5
-        rows = [["."] * w] + rows[:top - 1] + rows[top:]
-        rows = [["S" if k == "E" else k for k in r] for r in rows]
-    g = Grid(w + 2, h + 2)
-    for r in range(h):
-        for c in range(w):
-            k = rows[r][c]
-            if k != ".":
-                col = colours.get(k, {"S": "@", "$": "$", "E": "k"}.get(k, k))
-                if name == "GATEKEEPER" and frame == 1 and k == "w":   # the statue doesn't breathe: its eyes glow
-                    col = "w"
-                g.set(c + 1, r + 1, col)
-    for (x, y) in [(x, y) for y in range(h + 2) for x in range(w + 2)]:
-        if g.get(x, y) == "." and any(g.get(x + dx, y + dy) not in (".", "#") for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
-            g.set(x, y, "#")
-    big = Grid((w + 2) * 2, (h + 2) * 2)
-    for y in range(h + 2):
-        for x in range(w + 2):
-            ch = g.get(x, y)
-            for dy in range(2):
-                for dx in range(2):
-                    big.set(x * 2 + dx, y * 2 + dy, "x" if ch == "#" else ch)
-    return big
-
-
 def lever(on):
     """A shortcut lever (8x14 dp): an iron box with a handle, tilted left (closed) or right (pulled)."""
     g = Grid(16, 28)
@@ -406,9 +312,6 @@ def build_objects():
     out.append(("CHEST_AJAR", chest_ajar()))
     out.append(("LEVER_OFF", lever(False)))
     out.append(("LEVER_ON", lever(True)))
-    for name in NPC_TEMPLATES:
-        for i, n in enumerate("AB"):
-            out.append(("NPC_%s_%s" % (name, n), npc(name, i)))
     for kind in ("RED", "BIG", "MANA", "WHETSTONE", "TONIC", "FEATHER"):
         out.append(("ICON_" + kind, item_icon(kind)))
     return out
@@ -420,12 +323,19 @@ def main():
     import world2   # The Greendeep's art, enemies and bosses
     import world3   # The White Silence's art, enemies and bosses
     import heroes   # The four heroes and their shots (phase 5b)
+    import npcs
     objects = build_objects()
+    npc_frames = list(npcs.frames())
     header = ["// NAME QUEST sprites (spec §21, §22), generated by docs/work-plan/name-quest/art-tools/make_quest_art.py: edit that",
               "// script, not this file. The heroes are in quest_sprites_hero.h (heroes.py).",
               "#pragma once", "#include \"sprites.h\"", ""]
-    for name, g in objects:
-        header.append(sprite_text(name, g))
+    header.extend(sprite_text(name, g) for name, g in objects if not name.startswith("ICON_"))
+    header.extend(heroes.sprite_rows(name, rows, "const Sprite") for name, rows in npc_frames)
+    header.append("const Sprite* const NPC_FRAMES[][2] = {")
+    for (a, _), (b, _) in zip(npc_frames[::2], npc_frames[1::2]):
+        header.append(f"    {{&{a}, &{b}}},")
+    header.append("};\n")
+    header.extend(sprite_text(name, g) for name, g in objects if name.startswith("ICON_"))
     header.append("// Namula's world art (palette sprites, '0'-'f'): quest_sprites_0.cpp.")
     header.append("#include \"quest_sprites_0.h\"")
     write(os.path.join(SOURCE, "quest_sprites.h"), "\n".join(header) + "\n")
@@ -437,6 +347,7 @@ def main():
     if "--preview" in sys.argv:
         folder = sys.argv[sys.argv.index("--preview") + 1]
         preview_objects(objects, folder)
+        npcs.preview(npc_frames, folder, save_png, global_palette())
         namula.preview(folder, save_png)
         world1.preview(folder, save_png, global_palette)
         world2.preview(folder, save_png, global_palette)

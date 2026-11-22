@@ -1,6 +1,6 @@
 # NAME game — Game Design Document
 
-**Version:** 0.36 · **Updated:** 2026-11-22 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
+**Version:** 0.37 · **Updated:** 2026-11-22 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
 
 ## Summary
 You pilot a small ship at the bottom of the screen against waves of pixel-art aliens. Hold R1 to spray bullets, and save the scarce R2 rocket for the moment a wave gets out of hand. Waves get harder, and every 5th wave is a boss. The run goes through five levels of 20 waves each, every one harder than the last: level 1 (space), the jungle, the glacier, the volcano and the deep sea. It ends when you beat the deep sea's wave-20 bosses or lose your last life, and you chase the saved high score. Big bosses drop level buffs that stack until you die. Classic offers a five-level run in 1–2 Players or expanded 1–4 Players, and its Level Picker plays any single level on its own. NAME QUEST is a separate RPG platformer on the main menu, set in the same worlds, with four classes, a hub village, checkpoints and three save slots.
@@ -158,6 +158,8 @@ Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN ME
 | D-063 | 2026-11-21 | NAME QUEST hero shots are drawn in class colours (never magenta) instead of pale yellow; melee basic hits add a 0.025 s hit-stop | all hero shots pale yellow (spec §21); no basic hit-stop | the user chose natural-looking arrows, bolts and stars; swings need weight | [NAME QUEST](features/name-quest/design.md) |
 | D-065 | 2026-11-22 | NAME QUEST heroes built on the user's reference archer: a 32x28 art-px canvas doubled, the reference's head, body and leg proportions, no outline | D-061's 24x24 canvas with a coloured outline | the user rejected the first drawing as not close to the references | [NAME QUEST](features/name-quest/design.md) |
 | D-064 | 2026-11-21 | No NAME QUEST strong attack roots the hero: Power Slash, Meteor and Blade Fury let the hero run and steer while they play; their damage and timing don't change | keep the 0.5-0.6 s roots as the skills' cost | the user wants to run during every skill | [NAME QUEST](features/name-quest/design.md) |
+| D-066 | 2026-11-22 | Give NAME QUEST NPCs the approved hero proportions and no-outline style. Use the same rules for new humanoid NPCs | keep the older outlined NPC art | the user wants the cast to share one visual style | [NAME QUEST](features/name-quest/design.md) |
+| D-067 | 2026-11-22 | Give each NAME QUEST class a three-strike R1 animation loop at its existing cadence | repeat one strike animation | the user asked for three distinct attacks in sequence | [NAME QUEST](features/name-quest/design.md) |
 
 ## Open questions
 - **Assumptions to confirm:** sprites as text grids in code (D-006); every number marked `[ASSUMPTION]` in the feature notes.
@@ -202,3 +204,4 @@ Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN ME
 **0.34 (2026-11-21):** NAME QUEST music from the user's songs, one per place plus a boss song (D-057); the hums heard as white noise under Namula and world 1 removed.
 **0.36 (2026-11-22):** NAME QUEST phase 5b: redrawn heroes, animation and combat feel; no R1 slowdown, no R2 roots (D-061 to D-065).
 **0.35 (2026-11-21):** NAME QUEST worlds 2 and 3, THE GREENDEEP and THE WHITE SILENCE: their looks (approved from the style frames), 40 areas, ten redrawn enemies, coconuts, thorns, crumbling ice, icicles and flipping wind, the MONKEY KING, the SILVERBACK, the YETI and THE GLACIER TITAN; Garrick in the Greendeep.
+**0.37 (2026-11-22):** NAME QUEST NPCs share the hero art style and all four classes cycle through three basic attack animations (D-066, D-067).

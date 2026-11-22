@@ -1,7 +1,7 @@
 """The four NAME QUEST heroes (spec §21, §22, phase 5b step 2), on the build of the user's reference archer (approved
 2026-11-22): a 32x28 art-px canvas doubled to 64x56 real px, facing right, no outline. Head rows 0-14 (face rows 10-13),
 body rows 15-21, legs rows 22-27 (feet on row 27); the 8x14 dp hitbox covers art columns 12-19, rows 14-27, and the
-canvas is symmetric around it. Per class: 15 body frames, and 8 arm poses (upper body) over 6 leg poses. Trim 'h' and
+canvas is symmetric around it. Per class: 15 body frames, and 14 arm poses (upper body) over 6 leg poses. Trim 'h' and
 tier details '1'-'3' are recoloured by job tier when drawn. Writes source/quest_sprites_hero.h/.cpp; called by
 make_quest_art.py. Standard library only."""
 import math
@@ -12,9 +12,11 @@ SHIFT = 4   # templates are written in the reference's columns; the canvas puts 
 CLASS_NAMES = ["KNIGHT", "ARCHER", "MAGICIAN", "THIEF"]
 BODY_FRAMES = ["IDLE_1", "IDLE_2", "RUN_1", "RUN_2", "RUN_3", "RUN_4", "JUMP", "PEAK", "FALL", "LAND", "CLIMB_1", "CLIMB_2",
                "ROLL_1", "ROLL_2", "HURT"]
-ARM_POSES = ["WINDUP", "ACTIVE", "RECOVER", "SKILL_1", "SKILL_2", "SKILL_3", "SKILL_4", "SKILL_5"]
+BASE_ARM_POSES = ["WINDUP", "ACTIVE", "RECOVER", "SKILL_1", "SKILL_2", "SKILL_3", "SKILL_4", "SKILL_5"]
+COMBO_ARM_POSES = ["WINDUP_2", "ACTIVE_2", "RECOVER_2", "WINDUP_3", "ACTIVE_3", "RECOVER_3"]
+ARM_POSES = BASE_ARM_POSES + COMBO_ARM_POSES
 LEG_POSES = ["STAND", "RUN_1", "RUN_2", "RUN_3", "RUN_4", "AIR"]
-# Authored: every body frame, the three basic attack poses and the five skill poses (step 6 table).
+# Authored: every body frame, three poses per basic attack and five skill poses.
 TIER_CHARS = "123"
 
 
@@ -171,6 +173,88 @@ ARMS = {
                      ".......h<hhhhhh", "........XXXXXXX", top=15),
     },
 }
+
+# The second and third basic strikes, in order: a rising cut and overhead chop, a low reload and snap shot,
+# a side cast and raised-staff cast, a reverse cut and downward jab.
+ARMS["KNIGHT"].update(
+    WINDUP_2=T(".......bbbbsbbsbbb", "....hhhsbbbbbbbsss", "...hsssh&bbbbbss", "...hsdsh&bbbbbs..]",
+               "...hsdsh&hhhhhhs.]@", "....hhh.@ssssss..hd", "........sssssdd...bw",
+               "...................bw", "....................bw", ".....................bw", top=15),
+    ACTIVE_2=T("..........................w", ".........................bw", "........................bw",
+               ".......................bw", "......................bw", ".....................bw", "....................bw",
+               "...................ddd", ".......bbbbsbbsbbb..h", "....hhhsbbbbbbbsss.@@", "...hsssh&bbbbbss]]]",
+               "...hsdsh&bbbbbs..]", "...hsdsh&hhhhhhs", "....hhh.@ssssss", "........sssssdd", top=7),
+    RECOVER_2=T("....................w", "...................bw", "...................bw", "..................bw",
+                "..................bw", ".................ddd", "..................h", "..................@",
+                ".......bbbbsbbsbbb]@", "....hhhsbbbbbbbsss]", "...hsssh&bbbbbss]", "...hsdsh&bbbbbs",
+                "...hsdsh&hhhhhhs", "....hhh.@ssssss", "........sssssdd", top=7),
+    WINDUP_3=T("................b", "...............bw", "..............bw", ".............bw", "............bw",
+               "...........bw", "..........bw", ".........ddd", "..........h.@@", "...........@]]]", "..............]]",
+               ".......bbbbsbbsbbb", "....hhhsbbbbbbbsss", "...hsssh&bbbbbss", "...hsdsh&bbbbbs",
+               "...hsdsh&hhhhhhs", "....hhh.@ssssss", "........sssssdd", top=4),
+    ACTIVE_3=T(".......bbbbsbbsbbb", "....hhhsbbbbbbbsss]", "...hsssh&bbbbbss]]@@", "...hsdsh&bbbbbs....hd",
+               "...hsdsh&hhhhhhs.....dbw", "....hhh.@ssssss........bw", "........sssssdd..........bw",
+               "..........................bw", "...........................w", top=15),
+    RECOVER_3=T(".......bbbbsbbsbbb", "....hhhsbbbbbbbsss", "...hsssh&bbbbbss]", "...hsdsh&bbbbbs..]]",
+                "...hsdsh&hhhhhhs...@@", "....hhh.@ssssss.....d", "........sssssdd.....bw",
+                ".....................bw", "......................bw", "......................b", top=15),
+)
+ARMS["ARCHER"].update(
+    WINDUP_2=T("....................//", ".................../:", "....................:/", ".................@...:/",
+               ".........@/&;;&.@////////bw", "........//&&&&&]@@@@@&", "........//&&&&&...:..:/",
+               ".........&&&&&&....::/", ".........&;;;;;...../", ".........;;;;;;...../", ".........;;;,,,", top=11),
+    ACTIVE_2=T("...................//", ".................../:", "....................:/", "....................:/",
+               "......@@..&&;;&......:&", "......./@@&&&&&]@@@@@&", "........//&&&&&.....:/",
+               ".........&&&&&&....:/", ".........&;;;;;...:/", ".........;;;;;;.../", ".........;;;,,,", top=11),
+    RECOVER_2=T(".........@/&;;&", "........//&&&&&.....//", "........//&&&&&]@@.::/",
+                ".........&&&&&&...@:&", ".........&;;;;;..::/", ".........;;;;;;.::/", ".........;;;,,,./", top=15),
+    WINDUP_3=T("......................./", "......................:/", ".....................:/", "....................:/",
+               "...................:/", ".................@//bw", ".........@/&;;&.@@@@@&",
+               "........//&&&&&]@@..:/", "........//&&&&&.....:/", ".........&&&&&&......:/",
+               ".........&;;;;;......./", ".........;;;;;;......./", ".........;;;,,,", top=9),
+    ACTIVE_3=T("......................./", "......................:/", "......................:/", ".....................:/",
+               ".....................:/", ".........@...........:&", ".......@@@/&;;&..@@@@&",
+               "........//&&&&&]@....:/", "........//&&&&&......:/", ".........&&&&&&.......:/",
+               ".........&;;;;;........//", ".........;;;;;;", ".........;;;,,,", top=9),
+    RECOVER_3=T("....................//", "....................:/", "....................:/", "...................:/",
+                ".........@/&;;&....:&", "........//&&&&&]@@@&", "........//&&&&&....:/",
+                ".........&&&&&&.....:/", ".........&;;;;;.....:/", ".........;;;;;;......//", ".........;;;,,,", top=11),
+)
+ARMS["MAGICIAN"].update(
+    WINDUP_2=T(".....w", ".....Ic", "......2c", ".......&", "........&", ".........&", "..........&", "...........&",
+               "......>>:@@^^^^^:", "......>:..@^^^^^\x60\x60", ".......:.@@^^^^^\x60\x60", top=7),
+    ACTIVE_2=T(".....................2cw", "....................&&c", "..................&&", "................&&",
+               "......>>:@^^^^^@@&", "......>:.@^^^^^@@", ".......:.@@^^^^^\x60\x60", top=11),
+    RECOVER_2=T("..................cww", "...................2c", "....................&", ".....................&",
+                "......>>:@^^^^^^:....&", "......>:.@^^^^^^\x60\x60@@&", ".......:.@@^^^^^\x60\x60.&",
+                "..................&", ".................&", top=11),
+    WINDUP_3=T(".....................w", "....................cIc", "....................2c2", ".....................&",
+               ".....................&", ".....................&", "...................@@&", "..................@@.&",
+               "......>>:@^^^^^:@@@@.&", "......>:.@^^^^^^\x60\x60...&", ".......:.@@^^^^^\x60\x60..&",
+               ".....................&", top=7),
+    ACTIVE_3=T(".....................w", "....................Icw", "...................&2c", "...................&",
+               "...................&", "......>>:@^^^^^^:@@&", "......>:.@^^^^^\x60\x60@@@@", ".......:.@@^^^^^\x60\x60.&",
+               "...................&", "...................&", "...................&", top=10),
+    RECOVER_3=T("....................cw", "....................2c", "....................&", "....................&",
+                "......>>:@^^^^^^:...&", "......>:.@^^^^^^\x60\x60@@&", ".......:.@@^^^^^\x60\x60..&",
+                "....................&", "....................&", "....................&", top=11),
+)
+ARMS["THIEF"].update(
+    WINDUP_2=T(".......pppppppp", ".......-ppppp-", "........<<<<<<X]", ".......@<<<<<X.]]", ".......@XXXXXXX..@@",
+               ".......h<hhhhhh....b", "........XXXXXXX.....bw", "......................w", top=15),
+    ACTIVE_2=T(".....................w", "....................bw", ".......pppppppp....bw", ".......-ppppp-..@@b",
+               "........<<<<<<X]]]]", ".......@<<<<<X]", ".......@XXXXXXX", ".......h<hhhhhh", "........XXXXXXX", top=13),
+    RECOVER_2=T(".................w", "................bw", "...............bw", ".......pppppppp@", ".......-ppppp-]]",
+                "........<<<<<<X]", ".......@<<<<<X]", ".......@XXXXXXX", ".......h<hhhhhh", "........XXXXXXX", top=12),
+    WINDUP_3=T("...................b", "...................bw", "...................bw", "...................@",
+               ".......pppppppp...]]", ".......-ppppp-...]]", "........<<<<<<X]]", ".......@<<<<<X]", ".......@XXXXXXX",
+               ".......h<hhhhhh", "........XXXXXXX", top=11),
+    ACTIVE_3=T(".......pppppppp", ".......-ppppp-...]]", "........<<<<<<X]]..@", ".......@<<<<<X].....bw",
+               ".......@XXXXXXX......bw", ".......h<hhhhhh.......w", "........XXXXXXX", top=15),
+    RECOVER_3=T(".......pppppppp", ".......-ppppp-", "........<<<<<<X]]", ".......@<<<<<X..]]", ".......@XXXXXXX..@",
+                ".......h<hhhhhh..bw", "........XXXXXXX...w", top=15),
+)
+
 
 # --- Climb (back view, arms up; CLIMB_2 is CLIMB_1 mirrored) and roll (a tucked ball; ROLL_2 turned half a circle).
 # Keys: A the back (cape, vest, robe, cloak), S the sleeves, H head/hair in the ball, B ball shade, F feet. ---
@@ -375,12 +459,16 @@ def arm_frame(cls, pose, legs):
 
 
 def all_frames():
-    """[(name, rows)] in the C++ order: per class the body frames, then the arm poses x legs."""
+    """Named frames for each class, including the extra basic attack poses over all six leg poses."""
     out = []
     for cls in CLASS_NAMES:
         for name in BODY_FRAMES:
             out.append(("HERO_%s_%s" % (cls, name), body_frame(cls, name)))
-        for pose in ARM_POSES:
+        for pose in BASE_ARM_POSES:
+            for legs in LEG_POSES:
+                out.append(("HERO_%s_%s_%s" % (cls, pose, legs), arm_frame(cls, pose, legs)))
+    for cls in CLASS_NAMES:
+        for pose in COMBO_ARM_POSES:
             for legs in LEG_POSES:
                 out.append(("HERO_%s_%s_%s" % (cls, pose, legs), arm_frame(cls, pose, legs)))
     return out
@@ -434,7 +522,7 @@ def write_all(write, sprite_text, root):
     frames = all_frames()
     h = ["// quest_sprites_hero.h (generated by docs/work-plan/name-quest/art-tools/heroes.py: edit that script, not this file)",
          "#pragma once", "#include \"sprites.h\"",
-         "const int HERO_CLASSES = 4, HERO_BODY_FRAMES = 15, HERO_ARM_POSES = 8, HERO_LEG_POSES = 6;",
+         f"const int HERO_CLASSES = 4, HERO_BODY_FRAMES = 15, HERO_ARM_POSES = {len(ARM_POSES)}, HERO_LEG_POSES = 6;",
          "// Heroes: 32x28 art px doubled (64x56 real px), facing right; trim 'h' and tier details '1'-'3' recoloured by job tier.",
          "extern const Sprite* const HERO_BODY[HERO_CLASSES][HERO_BODY_FRAMES];",
          "extern const Sprite* const HERO_ARMS[HERO_CLASSES][HERO_ARM_POSES][HERO_LEG_POSES];",
@@ -493,3 +581,13 @@ def preview(folder, save_png, global_palette):
                     if c != ".":
                         img[j * ch + 4 + y][job * cw + 4 + x] = pal[c]
     save_png(os.path.join(folder, "heroes_tiers.png"), cw * 4, ch * len(CLASS_NAMES), img, 3)
+    names = ["WINDUP", "ACTIVE", "RECOVER", "WINDUP_2", "ACTIVE_2", "RECOVER_2", "WINDUP_3", "ACTIVE_3", "RECOVER_3"]
+    width, height = cw * len(names), ch * len(CLASS_NAMES)
+    img = [[bg] * width for _ in range(height)]
+    for j, cls in enumerate(CLASS_NAMES):
+        for i, name in enumerate(names):
+            for y, line in enumerate(tinted(frames["HERO_%s_%s_STAND" % (cls, name)], 0)):
+                for x, c in enumerate(line):
+                    if c != ".":
+                        img[j * ch + 4 + y][i * cw + 4 + x] = pal[c]
+    save_png(os.path.join(folder, "basic-combos.png"), width, height, img, 2)

@@ -69,6 +69,8 @@ Rules and numbers: see the work-plan spec [`spec.md`](../../work-plan/name-quest
 50. A melee slash is brightest exactly while it can hit; the Knight's skills draw their crescents from the same timing. Melee basic hits stop the action for 0.025 s (D-063).
 51. Hero shots are sprites in class colours (wood and steel arrows, blue bolts, icy orbs, steel stars), never magenta; every hit throws a spark, gold for skills.
 52. Readability: hero effects draw under enemies, enemy shots and telegraphs draw on top; large hero fills are dithered; at most 200 particles live at once.
+53. The full NPC cast uses the hero art style (D-066). NPCs have two idle frames and recognizable silhouettes matched to their roles. The authoring rules for new humanoid NPCs live in spec §22.
+54. Holding R1 loops through three basic attacks per class (D-067). Knight uses a level slash, a rising cut and an overhead chop. Archer uses a standard shot, a low reload shot and a snap shot. Magician uses a staff thrust, a side cast and a raised-staff cast. Thief uses a straight stab, a reverse cut and a downward jab. The combo uses the attack cycles and damage in spec §5–§6.
 
 ## Edge cases
 - Start does nothing on the slot, class and intro screens; it pauses in play and while `YOU FADED` shows.
@@ -86,3 +88,4 @@ Rules and numbers: see the work-plan spec [`spec.md`](../../work-plan/name-quest
 - 2026-11-21: music from the user's songs per place plus a boss song (D-057, rule 29); the ambience hums removed.
 - 2026-11-21: the user approved world 1's style frame; world 1's 20 areas built (rule 37). PS3 check and the user's playtest open.
 - 2026-11-21: phase 5: worlds 2 and 3 (looks approved from their style frames), their hazards, four bosses, 40 areas, Garrick, Ilsa and Lio's lines (rules 38-46). PS3 checks and the user's playtest open.
+- 2026-11-22: extended the hero style to NPCs and added three R1 attack animations per class (D-066, D-067).

@@ -76,6 +76,7 @@ Dated; the newest rule wins if two conflict. (Seeded 2026-11-21 from `AGENTS.md`
 
 ### Graphics and art (NAME QUEST; full rules in spec §21-§22)
 - Draw at 640x360; sizes and speeds are in design pixels (dp) times `DP = 2`. Small old-school sprites: heroes and NPCs 16x20, thick 1 px dark outline on characters.
+- 2026-11-22 update to character art: heroes and humanoid NPCs share the 32 × 28 art-px grid at 2× scale with large heads, flat shades and no outline (D-065, D-066). See spec §22 for new NPC sprites.
 - Colour: world tiles, props and backgrounds use the 16-colour world palette (characters `0-9`, `a-f`); characters, enemies, NPCs, projectiles and UI use the global palette. Hero shots are pale yellow `y`; anything deadly is `m` (magenta). Never use `m` or `y` for decoration.
 - Gradients and fog use ordered 4x4 Bayer dithering, never noise.
 - Readability beats beauty: backgrounds darker and less saturated than the playfield, nothing in a background moves faster than 20 px/s or looks like a projectile, props never look like hazards.

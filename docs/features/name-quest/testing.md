@@ -79,6 +79,8 @@
 - [x] The melee slash is lit exactly in its hit window; melee basic hits stop 0.025 s and arrows don't; the bow draws while R1 is held; skills hit at their spec times; the standing and running frames fit the canvas with the feet on the hitbox line. *(`tests/quest_tests.cpp` › slashLitMatchesHitWindow, meleeBasicHitStops, rangedDrawShowsWhileHeld, skillTimingUnchanged, heroSpritesFitTheirBox)*
 - [x] On the Mac: every class attacks mid-run (crescent, arrow, bolt, stab), and every tier-3 skill plays while running and logs `quest: skill`. *(`make mac-run` 2026-11-22, world 1 area 0)*
 - [x] `make quest-anims`: 16 sheets and 4 lineups read; the flipbook sent to the user. *(2026-11-22)*
+- [x] All 28 NPCs have distinct art on the hero grid and two frames that meet the floor. Checked the lineup and the in-game scale beside the Knight in Namula. *(2026-11-22, `npcSpritesShareTheHeroGrid` and `make mac-run`)*
+- [x] Holding R1 cycles through three distinct strike poses and repeats for each class. Tested restart after an idle gap or an R2. Checked the attacks in the animation sheets and the Knight's third strike in Test Grounds. *(2026-11-22, `basicAttacksCycleThroughThreePoses`, `make quest-anims` and `make mac-run`)*
 - [ ] On the PS3 (when the user asks): dev saves per class at job 3; every R2 logs `quest: skill <NAME>`, fps ≥ 59 while effects play. *(PS3 log)*
 - [ ] The user plays each class for a minute on the TV: R1 held while running and jumping, every skill while running; enemy shots and hazards stay readable. Notes: *(user)*
 

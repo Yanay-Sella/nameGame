@@ -82,7 +82,7 @@ Full setup history, debugging toolkit and new-project checklist: `docs/ps3-new-p
   `game-feel` (juice), `input-systems`, `level-design`, `prototype-fast`. `.claude/skills/_third-party` is not a skill.
 - **Verify cheapest first:** `make test`, then `make mac-run` with a `BUTTONS=` script and `l1` screenshots (open `shots/shot.png` and look at it), the PS3 last.
   Known: `tests/game_tests.cpp` has 53 failing checks that fail the same way at commit `ab92b67` (shooter tests, not NAME QUEST); `tests/quest_tests.cpp` must stay green.
-- **Graphics:** NAME QUEST draws at 640x360 with small old-school sprites; match the existing sprites' palette, outline and proportions (`source/sprites.h`, `source/quest_sprites*.cpp`, spec §22).
+- **Graphics:** NAME QUEST draws at 640x360 with small old-school sprites; use the shared hero and NPC art style in [spec §22](docs/work-plan/name-quest/spec.md#22-art-direction-rich-pixel-art-at-640x360) for every new humanoid NPC. Match the existing enemy and boss palettes, outlines and proportions for their sprites.
   After every visual change take a screenshot and look at it before saying it is done; the user judges the art.
 - **Don't touch the PS3 unless asked.** PS3 steps go in one `scripts/ps3-lock.sh` command; if the PS3 doesn't answer, ask the user.
 

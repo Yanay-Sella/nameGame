@@ -47,7 +47,7 @@ Intro pages (QMODE_INTRO, after the class pick; exact text, `\n` = line break):
 |---|---|---|
 | Left stick / D-pad | walk; up/down climb ladders; down + X drops through a one-way platform | move the cursor |
 | X | jump (hold for a higher jump); Thief: X again in the air = double jump | confirm / next page |
-| R1 | basic attack; held = repeats at the attack's cycle | — |
+| R1 | basic attack. Hold to cycle through three strikes (§5) | — |
 | R2 | strong attack (costs MP) | — |
 | Circle | dodge (roll; Magician: blink) | back / close |
 | Square | use the selected item | — |
@@ -202,6 +202,10 @@ and lands while it plays (D-062, phase 5b; the old Archer and Magician x0.5 was 
 back). Movement built into a skill (Shadow Dash, Rising Slash's hop) stays part of that skill. **No strong attack roots
 the hero** either (D-064, phase 5b: Power Slash, Meteor and Blade Fury used to): the hero runs and steers while any
 skill plays; a skill only blocks starting a basic attack or a dodge until it ends. Drinking a potion takes 0.5 s, walking at x0.4.
+
+Basic attacks cycle through three distinct animations per class (D-067). Holding R1 carries directly into the next
+strike and repeats after the third. A gap between attack cycles or a successful R2 starts the next chain at strike one.
+Each strike uses the class's existing cycle, hit window, box or projectile, and damage. A tap starts one strike.
 
 ## §6 Classes and jobs (D-040)
 
@@ -418,7 +422,7 @@ Hitting a lever `K` with any attack opens every `k` in its area: SOUND_Q_GATE, s
 `shortcut`). Levers sit on the far side, so the door is a one-way way back to a checkpoint.
 
 ### Surveyors and the map (the only map)
-- A surveyor (16 x 20, telescope and a satchel of maps; author 12 names, 2 per world, e.g. SURVEYOR ANDO) stands on its tile. Up within
+- A surveyor (telescope and a satchel of maps, in the NPC style from §22; 12 names, 2 per world) stands on its tile. Up within
   20 px: one line of dialogue (author it; flavour about getting lost), then the world map opens. The game stays frozen
   while it is open; Circle or X closes it. There is no other way to see the map.
 - Map screen: full-screen `k` with a 1 px `n` border, the world name on top (scale 1, white). Cells are 12 x 8 px;
@@ -723,11 +727,11 @@ New palette characters (append to `paletteColor`; never reuse `m`, `y` outside t
 '?' 0xFF8A8478 citadel grey '!' 0xFF4E4A46 citadel dark  'z' 0xFFC8A040 citadel gold
 'Q' 0xFFD97757 Claude's cloak
 ```
-- Hero (phase 5b, D-061): per class 15 body frames and 8 arm poses x 6 leg poses (§22). The class's trim uses `h`; it is recoloured by job tier when drawn: tier 0 `h`, 1 `b`, 2 `Y`, 3 `N`. Tier details use `1`–`3` (shown in the tier colour from that tier on).
+- Hero (phase 5b, D-061): per class 15 body frames and 14 arm poses x 6 leg poses (§22). The class's trim uses `h`; it is recoloured by job tier when drawn: tier 0 `h`, 1 `b`, 2 `Y`, 3 `N`. Tier details use `1`–`3` (shown in the tier colour from that tier on).
   Hero palette characters (phase 5b): `+` blush, `[` skin outline, `]` leather outline, `(` steel outline, `)` cape outline, `{` green outline, `;` `,` sage green, `/` leather, `>` `:` pale hair, `_` hair outline, `^` `` ` `` navy robe, `|` navy outline, `<` cloak light, `-` scarf shade, `}` scarf outline (values in phase 5b step 2).
   Knight: grey plate `b`/`d`, red cape `r`. Archer: green hood `g`/`G`, bow `h`. Magician: blue robe `u`/`U`, hat.
   Thief: dark `x`/`X` with a purple scarf `p`.
-- NPCs 16 x 20 with 2–4 idle frames each (§22); the hearth checkpoint is 24 x 28 (bigger brazier with a stone ring).
+- NPCs use the same global character palette as heroes (§22). The hearth checkpoint is 24 x 28 (bigger brazier with a stone ring).
 - Projectiles: hero arrows, bolts, orbs and stars are drawn as sprites in their class's colours (D-063, phase 5b: wood and
   steel arrows, blue bolts, icy orbs, steel stars), never in `m`; enemy shots and every deadly enemy projectile in `m` (pillar 1). Deadly projectiles drawn with a themed sprite (banana, coconut, icicle, rock,
   fireball, boot, snowball, ice shard) get a 1 px `m` outline so they still read as danger.
@@ -807,16 +811,26 @@ game draws into a CPU pixel buffer (D-008), any blending is done in software and
   doubled to 64 x 56 real px, facing right, with **no outline** (like the references). Head rows 0-14 (the face on rows
   10-13: 2 x 2 eyes with a white highlight in the back eye, blush under each), body rows 15-21, legs rows 22-27 with the feet
   on row 27; the hitbox is still 8 x 14 (art columns 12-19), drawn at (x - 12, y + 14 - 28). 2-3 flat shades per material.
-  Frames: 15 body frames (idle, run, jump, peak, fall, land, climb, roll, hurt) and 8 arm poses (wind-up, active, recover,
-  5 skill poses) over 6 leg poses, so the legs keep running while the arms attack. The brightest frame of a melee slash is
+  Frames: 15 body frames (idle, run, jump, peak, fall, land, climb, roll, hurt) and 14 arm poses over 6 leg poses. Each
+  of the three basic strikes has wind-up, active and recovery poses. There are five additional skill poses. The legs keep
+  running while the arms attack. The brightest frame of a melee slash is
   its active hit window. Each job tier changes the trim colour (§21) and adds one visible detail. Full rules:
   [`phase-5b-character-art.md`](phase-5b-character-art.md).
 - **Enemies:** redrawn for NAME QUEST as side-view sprites based on the shooter's designs (same colours and shapes, so
   players recognise them), 12–20 px, 4-frame movement + a tell frame + an attack frame. New enemies the same way.
 - **Bosses:** redrawn at 40–64 px with 4–6 frames (idle, tell, attack, hurt, phase-2 look), based on the shooter's
   boss designs where §12 names one.
-- **NPCs:** 16 x 20, 2–4 idle frames (blink, breathe, a gesture).
-- Every character gets a 1 px outline in its darkest colour (`drawSpriteOutlined`), so it reads on any background; the heroes have none (D-065).
+- **NPCs (D-066):** Author every new humanoid NPC on the same 32 x 28 art-px grid as the heroes, doubled to 64 x 56
+  real px. Use the hero proportions above, with a large head, the 2 x 2 eyes and blush on visible faces, 2–3 flat shades
+  per material, and no outline. Use pose and silhouette to show age, size and character role. Tobin has shorter legs,
+  Garrick sits with his bandaged leg out, and the stone Gatekeeper has carved features. Ground feet, seats or plinths
+  on row 27. Compose facing right and flip toward the hero in play.
+  Give each NPC two readable idle frames with a blink, breath, or material-appropriate change. Make their role readable
+  from their clothing and one recognizable prop, such as Ilsa's lantern or Brann's hammer. Use the global character
+  palette. Reserve `m` and `y` for their established gameplay roles.
+  For new art, add the template in `art-tools/npcs.py` in `NpcId` order and regenerate with `make_quest_art.py --preview shots/art`.
+  Review both frames in the lineup and in the NPC's actual scene at 640 x 360.
+- Enemies and bosses use a 1 px outline in their darkest colour where their sprite rules call for it (`drawSpriteOutlined`).
 - Hit flashes stay white silhouettes; particles take the hit thing's colours.
 
 ### Style frames (the user approves each world's look before its areas are made)

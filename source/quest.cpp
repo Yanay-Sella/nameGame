@@ -679,8 +679,7 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
                 }
                 if (checkpoint < 0) checkpoint = bit;
             } else if (letter == 'M' && surveyor < 0 && sameFloor && dx <= SURVEYOR_REACH) {
-                int m = objectIndex(world, q.area.index, t, 'M');   // 2 per world; TEST GROUNDS uses the first
-                surveyor = world >= 1 && world <= 6 ? NPC_SURVEYOR_FIRST + (world - 1) * 2 + m % 2 : NPC_SURVEYOR_FIRST;
+                surveyor = surveyorId(world, q.area.index, t);
             } else if (letter == 'P') {
                 if (h.x < cx + 8 * DP && h.x + HERO_W > cx - 8 * DP && h.y < bottom && h.y + HERO_H > bottom - 24 * DP) portal = portals;
                 portals++;

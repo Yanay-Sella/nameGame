@@ -30,10 +30,7 @@ const int REACH_WORLDS[] = {WORLD_NAMULA, 1, 2, 3, WORLD_TEST};   // phases 5-9 
 
 static const Sprite* const ALL_QUEST_SPRITES[] = {
     &CHECKPOINT_UNLIT, &CHECKPOINT_LIT_A, &CHECKPOINT_LIT_B, &CHECKPOINT_LIT_C, &HEARTH_A, &HEARTH_B, &HEARTH_C,
-    &PORTAL_A, &PORTAL_B, &ARCH_CLOSED, &CHEST_CLOSED, &CHEST_OPEN, &CHEST_AJAR, &LEVER_OFF, &LEVER_ON, &NPC_ILSA_A,
-    &NPC_ILSA_B, &NPC_MARRA_A, &NPC_MARRA_B, &NPC_BRANN_A, &NPC_BRANN_B, &NPC_LIO_A, &NPC_LIO_B, &NPC_PELL_A, &NPC_PELL_B,
-    &NPC_SELA_A, &NPC_SELA_B, &NPC_ODO_A, &NPC_ODO_B, &NPC_WREN_A, &NPC_WREN_B, &NPC_YSOLDE_A, &NPC_YSOLDE_B, &NPC_KIT_A,
-    &NPC_KIT_B, &NPC_TOBIN_A, &NPC_TOBIN_B, &NPC_GATEKEEPER_A, &NPC_GATEKEEPER_B, &NPC_SURVEYOR_A, &NPC_SURVEYOR_B,
+    &PORTAL_A, &PORTAL_B, &ARCH_CLOSED, &CHEST_CLOSED, &CHEST_OPEN, &CHEST_AJAR, &LEVER_OFF, &LEVER_ON,
     &ICON_RED, &ICON_BIG, &ICON_MANA, &ICON_WHETSTONE, &ICON_TONIC, &ICON_FEATHER};
 
 // Every palette sprite of a world's art, for the size and character checks.
@@ -153,6 +150,23 @@ static void outlineSurroundsTheSprite() {
     CHECK(pixels[10 * 64 + 10] == 0xFF000001);   // the corner cell beside two arms
     CHECK(pixels[8 * 64 + 8] == 0);
     screenSetTarget(screenPixels, SCREEN_W, SCREEN_H);
+}
+
+static void npcSpritesShareTheHeroGrid() {
+    CHECK(sizeof NPC_FRAMES / sizeof NPC_FRAMES[0] == NPC_COUNT);
+    std::set<std::string> firstFrames;
+    for (const auto& frames : NPC_FRAMES) {
+        CHECK(strcmp(frames[0]->pixels, frames[1]->pixels) != 0);
+        firstFrames.insert(frames[0]->pixels);
+        for (const Sprite* s : frames) {
+            CHECK(s->w == 64 && s->h == 56 && (int)strlen(s->pixels) == s->w * s->h);
+            bool grounded = false;
+            for (int x = 0; x < s->w; x++) grounded |= s->pixels[(s->h - 1) * s->w + x] != '.';
+            CHECK(grounded);
+            CHECK(strchr(s->pixels, 'm') == nullptr && strchr(s->pixels, 'y') == nullptr);
+        }
+    }
+    CHECK(firstFrames.size() == NPC_COUNT);
 }
 
 static void areaLandmarksExist() {
@@ -1074,7 +1088,7 @@ static void rangedDrawShowsWhileHeld() {
     for (int i = 1; i < 27; i++) {
         play(q, a, 1);
         HeroPose pose = heroPose(q);
-        if (pose.arms == ARMS_WINDUP) {
+        if (pose.arms == ARMS_WINDUP_2) {
             drew = true;
             CHECK(pose.attackT >= 0.45f - 0.20f - 0.001f);
         }
@@ -1083,6 +1097,49 @@ static void rangedDrawShowsWhileHeld() {
     a.fire = false;
     play(q, a, 60);
     CHECK(heroPose(q).arms == ARMS_NONE);
+}
+
+static void basicAttacksCycleThroughThreePoses() {
+    TestArea t;
+    makeArea(t, {});
+    const int active[] = {ARMS_ACTIVE, ARMS_ACTIVE_2, ARMS_ACTIVE_3};
+    for (int cls = 0; cls < CLASS_COUNT; cls++) {
+        Quest q;
+        startQuest(q, t, cls, 10, 0, 14);
+        Actions fire = {};
+        fire.fire = true;
+        int strikes = 0;
+        int previousSwing = -1;
+        for (int i = 0; i < 150 && strikes < 4; i++) {
+            play(q, fire, 1);
+            int arms = heroPose(q).arms;
+            if (q.hero.swing == previousSwing || (arms != active[0] && arms != active[1] && arms != active[2])) continue;
+            CHECK(arms == active[strikes % 3]);
+            previousSwing = q.hero.swing;
+            strikes++;
+        }
+        CHECK(strikes == 4);
+        const Sprite& first = *HERO_ARMS[cls][active[0]][LEGS_STAND];
+        const Sprite& second = *HERO_ARMS[cls][active[1]][LEGS_STAND];
+        const Sprite& third = *HERO_ARMS[cls][active[2]][LEGS_STAND];
+        CHECK(strcmp(first.pixels, second.pixels) != 0 && strcmp(second.pixels, third.pixels) != 0
+              && strcmp(third.pixels, first.pixels) != 0);
+        play(q, fire, 35);
+        CHECK(q.hero.basicStep != 0);
+        play(q, Actions{}, 35);
+        play(q, fire, 1);
+        CHECK(q.hero.basicStep == 0);
+        play(q, fire, 35);
+        CHECK(q.hero.basicStep != 0);
+        q.hero.mp = q.stats.maxMp;
+        Actions skill = {};
+        skill.rocket = true;
+        play(q, skill, 1);
+        CHECK(q.hero.skill >= 0);
+        play(q, Actions{}, 40);
+        play(q, fire, 1);
+        CHECK(q.hero.basicStep == 0);
+    }
 }
 
 // The skills' damage timing is unchanged by phase 5b: the first damage lands at the spec's time after the press.
@@ -2322,7 +2379,7 @@ static void renderAnims() {
             screenSaveBmp(path);
         }
     // Sheets: run with R1 held, R1 standing, a pause, then R2 and its aftermath; a 160 x 90 dp crop every 2nd step.
-    const int CROP_W = 160 * DP, CROP_H = 90 * DP, COLS = 8, GAP = DP, STEPS = 120;
+    const int CROP_W = 160 * DP, CROP_H = 90 * DP, COLS = 8, GAP = DP, STEPS = 144;
     const int ROWS = (STEPS / 2 + COLS - 1) / COLS, SHEET_W = COLS * (CROP_W + GAP), SHEET_H = ROWS * (CROP_H + GAP);
     TestArea t;
     std::string letters = withLetter(30, 'A');
@@ -2337,8 +2394,8 @@ static void renderAnims() {
             for (int i = 0; i < STEPS; i++) {
                 Actions a = {};
                 a.moveX = i < 30 ? 1 : 0;
-                a.fire = i < 48;
-                if (i == 60) {
+                a.fire = i < 72;
+                if (i == 84) {
                     q.hero.mp = q.stats.maxMp;
                     a.rocket = true;
                 }
@@ -2385,6 +2442,7 @@ int main(int argc, char** argv) {
     propPlacementIsStable();
     layersObeyTheValueRules();
     outlineSurroundsTheSprite();
+    npcSpritesShareTheHeroGrid();
     areaLandmarksExist();
     areaSizesAndObjectsAreValid();
     linksArriveOnStandableTiles();
@@ -2409,6 +2467,7 @@ int main(int argc, char** argv) {
     slashLitMatchesHitWindow();
     meleeBasicHitStops();
     rangedDrawShowsWhileHeld();
+    basicAttacksCycleThroughThreePoses();
     skillTimingUnchanged();
     heroSpritesFitTheirBox();
     knightSwingHitsOnlyInItsWindow();

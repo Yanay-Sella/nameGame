@@ -27,11 +27,7 @@ const uint32_t HEARTH_LIGHT = 0xFFA05018, BRAZIER_LIGHT = 0xFF804010, LANTERN_LI
 const int HEARTH_LIGHT_RADIUS = 48 * DP, BRAZIER_LIGHT_RADIUS = 28 * DP, LANTERN_LIGHT_RADIUS = 24 * DP;
 const float NPC_FRAME = 0.7f, POPUP_SHOWN = 1.5f, POPUP_RISE = 6 * DP, REST_FADE = 0.3f, FADE_DEPTH = 60 * DP, GATE_SHAKE = 0.5f;
 const int MAP_CELL_W = 12 * DP, MAP_CELL_H = 8 * DP;
-// NPC idle frames by NpcId (Garrick, the Stranger, Calder and Claude are drawn in their phases); surveyors share one.
-#define NPC_ROW(N) {&NPC_##N##_A, &NPC_##N##_B}
-static const Sprite* const NPC_FRAMES[NPC_SURVEYOR_FIRST + 1][2] = {
-    NPC_ROW(ILSA), NPC_ROW(MARRA), NPC_ROW(BRANN), NPC_ROW(LIO), NPC_ROW(PELL), NPC_ROW(SELA), NPC_ROW(ODO), NPC_ROW(WREN),
-    NPC_ROW(YSOLDE), NPC_ROW(KIT), NPC_ROW(GATEKEEPER), NPC_ROW(TOBIN), NPC_ROW(GARRICK), {}, {}, {}, NPC_ROW(SURVEYOR)};
+static_assert(sizeof NPC_FRAMES / sizeof NPC_FRAMES[0] == NPC_COUNT, "Every NPC needs two idle frames");
 // Boss frames: idle 1-2, tell, attack, hurt, phase 2 (spec §22); bosses of later phases have none yet.
 #define BOSS_ROW(N) {&BOSS_##N##_IDLE_1, &BOSS_##N##_IDLE_2, &BOSS_##N##_TELL, &BOSS_##N##_ATTACK, &BOSS_##N##_HURT, &BOSS_##N##_PHASE2}
 static const Sprite* const BOSS_FRAMES[6][6] = {BOSS_ROW(OVERSEER), BOSS_ROW(STAR_MAGE), BOSS_ROW(MONKEY_KING), BOSS_ROW(SILVERBACK),
@@ -349,18 +345,21 @@ static void drawObject(const Quest& q, char letter, int tx, int ty, int camX, in
         if (state != 2) drawDoubled(ICICLE, cx - 2 * DP + shake, ty * TILE - camY, false);
         return;
     } else if (letter == 'N' || letter == 'M') {
-        int id = NPC_SURVEYOR_FIRST;
-        if (letter == 'N') {
+        int id;
+        if (letter == 'M') {
+            id = surveyorId(q.area.world, q.area.index, ty * def.cols + tx);
+        } else {
             int index = 0;
             for (int t = 0; t < ty * def.cols + tx; t++) index += def.tiles[t] == 'N';
             id = index < 8 ? def.npcs[index] : -1;
-            if (id < 0 || id > NPC_SURVEYOR_FIRST || !npcPresent(q.save, id, q.area.world, q.area.index)) return;
+            if (id < 0 || id >= NPC_COUNT || !npcPresent(q.save, id, q.area.world, q.area.index)) return;
         }
-        const Sprite* frame = NPC_FRAMES[id][(int)(q.time / NPC_FRAME + tx * 0.3f) % 2];
-        if (!frame) return;
+        int idle = (int)(q.time / NPC_FRAME + tx * 0.3f) % 2;
+        const Sprite& frame = *NPC_FRAMES[id][idle];
         bool flip = q.hero.x + HERO_W / 2 < tx * TILE + TILE / 2;
-        drawSpriteEx(*frame, cx - frame->w / 2, bottom - frame->h, flip);
-        if (id == NPC_ILSA) lights.push_back({cx + (flip ? -1 : 1) * (int)(11 * DP), bottom - (int)(14 * DP), LANTERN_LIGHT_RADIUS, LANTERN_LIGHT});
+        drawSpriteEx(frame, cx - frame.w / 2, bottom - frame.h, flip);
+        if (id == NPC_ILSA)
+            lights.push_back({cx + (flip ? -1 : 1) * (int)(8 * DP), bottom - (int)((13 - idle) * DP), LANTERN_LIGHT_RADIUS, LANTERN_LIGHT});
         return;
     }
     if (sprite) drawSpriteOutlined(*sprite, cx - sprite->w / 2, bottom - sprite->h, false, paletteColor('x'));
@@ -446,29 +445,34 @@ static void drawHeroSlash(const Quest& q, const HeroPose& p, int camX, int camY)
     for (int copy = 0; copy < (h.partnerTimer > 0 ? 2 : 1); copy++) {   // the Shadow Partner's copy 10 dp behind, in x and p
         uint32_t c = copy ? paletteColor('x') : core, e = copy ? paletteColor('p') : edge;
         int shift = copy ? (int)(-dir * PARTNER_BEHIND) : 0;
+        bool recovering = p.arms == ARMS_RECOVER || p.arms == ARMS_RECOVER_2 || p.arms == ARMS_RECOVER_3;
         if (cls == CLASS_KNIGHT && p.attackT >= 0) {   // 22 x 18 in front, centred on the hitbox's middle
             int w = (int)(22 * DP), bh = (int)(18 * DP);
             int x = (int)(left ? h.x - w : h.x + HERO_W) - camX + shift, y = (int)(h.y + HERO_H / 2 - bh / 2) - camY;
-            if (p.slashLit) {
-                drawCrescent(q, x, y, w, bh, left, false, 1, false, camX, camY, [&](float, float out, float in, int px, int py) -> uint32_t {
+            if (p.slashLit || (recovering && p.attackT <= 0.18f + 0.06f)) {
+                float sweep = fmaxf(0, fminf(1, (p.attackT - 0.08f) / 0.10f));
+                drawCrescent(q, x, y, w, bh, left, false, 1, true, camX, camY, [&](float, float out, float in, int px, int py) -> uint32_t {
+                    float row = (py - y) / (float)bh;
+                    float along = h.basicStep == 1 ? 1 - row : row;
+                    if (h.basicStep != 0 && (along > sweep + 0.60f || along < sweep - 0.55f)) return 0;
+                    if (!p.slashLit) return out < 2 * DP && bayer4(px, py) < 8 ? e : 0;
                     return out < 2 * DP ? e : in < 2 * DP ? c : bayer4(px, py) < 8 ? c : 0;
                 });
-                if (p.attackT < 0.08f + 1.0f / 60) fillRect(x, y + bh / 2, w, DP, c);   // the blade's streak, one frame
-            } else if (p.arms == ARMS_RECOVER && p.attackT <= 0.18f + 0.06f) {
-                drawCrescent(q, x, y, w, bh, left, false, 1, false, camX, camY, [&](float, float out, float, int px, int py) -> uint32_t {
-                    return out < 2 * DP && bayer4(px, py) < 8 ? e : 0;
-                });
+                if (h.basicStep == 0 && p.attackT < 0.08f + 1.0f / 60) fillRect(x, y + bh / 2, w, DP, c);
             }
         }
-        if (cls == CLASS_THIEF && p.attackT >= 0 && (p.slashLit || (p.arms == ARMS_RECOVER && p.attackT <= 0.10f + 0.04f))) {
-            // A straight stab streak from the hand to the box's far end, tapering from 1 dp at the hand to 3 dp at the tip.
+        if (cls == CLASS_THIEF && p.attackT >= 0 && (p.slashLit || (recovering && p.attackT <= 0.10f + 0.04f))) {
             int length = (int)(16 * DP), from = p.slashLit ? 0 : length * 2 / 3;
             for (int k = from; k < length; k += DP) {
-                int tall = 1 + 2 * k / length;   // dp: 1, 2, 3 toward the tip
-                for (int t = -tall / 2; t <= tall / 2 + (tall == 2 ? 0 : 0); t++) {
+                int tall = 1 + 2 * k / length;
+                int tilt = h.basicStep == 0 ? 0 : (h.basicStep == 1 ? -1 : 1) * 4 * k / length;
+                for (int t = -tall / 2; t <= tall / 2; t++) {
                     uint32_t color = t == 0 ? c : e;
-                    if (h.attackUp) fillRect((int)(h.x + HERO_W / 2) - camX + shift + t * DP, (int)h.y - camY - k - DP, DP, DP, color);
-                    else fillRect((int)(left ? h.x - k - DP : h.x + HERO_W + k) - camX + shift, (int)(h.y + HERO_H / 2) - camY + t * DP, DP, DP, color);
+                    if (h.attackUp)
+                        fillRect((int)(h.x + HERO_W / 2) - camX + shift + (t + dir * tilt) * DP, (int)h.y - camY - k - DP, DP, DP, color);
+                    else
+                        fillRect((int)(left ? h.x - k - DP : h.x + HERO_W + k) - camX + shift,
+                                 (int)(h.y + HERO_H / 2) - camY + (t + tilt) * DP, DP, DP, color);
                 }
             }
         }

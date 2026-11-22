@@ -11,7 +11,7 @@ import zlib
 
 CLASSES = ["knight", "archer", "magician", "thief"]
 COLS, CELL_W, CELL_H, GAP = 8, 320, 180, 2   # the crop (160 x 90 dp) and its 1 dp gap, in real px
-FRAMES = 60   # 120 steps, every 2nd
+FRAMES = 72   # 144 steps, every 2nd
 
 
 def read_bmp(path):
@@ -65,7 +65,7 @@ button, select { font: 14px monospace; margin-right: 6px; }
 <button id="speed">1x</button> <span id="info"></span>
 </div>
 <img id="view" alt="clip">
-<p>0-0.5 s run with R1 held, 0.5-0.8 s R1 standing, 0.8-1.0 s nothing, 1.0 s R2 pressed, then 1.0 s of its aftermath.</p>
+<p>0-0.5 s run with R1 held, 0.5-1.2 s R1 standing, 1.2-1.4 s idle, 1.4 s R2 pressed, then 1.0 s of its aftermath.</p>
 <script>
 const CLIPS = %(clips)s;
 const pick = document.getElementById("clip"), view = document.getElementById("view"), info = document.getElementById("info");

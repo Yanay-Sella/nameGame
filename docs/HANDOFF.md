@@ -1,7 +1,7 @@
 # Handoff: state of the work and how Claude and Codex share it
 
 **Read this first, update it before you stop.** Rules and commands are in `AGENTS.md`; conventions, questions between agents and the small-change lane are in `docs/COLLAB.md`; this file holds what changes between sessions.
-Updated: 2026-11-21 (Classic boss-wave revives and Magic Beam tuning, NAME QUEST phase 5 in progress).
+Updated: 2026-11-22 (NAME QUEST NPC art and three-strike R1 animations).
 
 ## Classic shooter
 
@@ -18,7 +18,7 @@ Updated: 2026-11-21 (Classic boss-wave revives and Magic Beam tuning, NAME QUEST
 | 3 RPG systems | `phase-3-rpg-systems.md` | done, merged into `main` (`1456d78`), Mac-checked, `make ps3` builds; PS3 check (step 12) open |
 | 4 world 1 | `phase-4-world-1.md` | **built on `claude/work`**: steps 0-9 done (Mac); step 10 (PS3 check, the user's playtest) open |
 | 5 worlds 2-3 | `phase-5-worlds-2-3.md` | **in progress on `claude/work`**: world 2 done (art, mechanics, bosses, all 20 areas, tests); worlds 2-3 done (art, mechanics, bosses, all areas, tests) step 8 (story lines) and step 9 (docs, `check_docs.py` clean); next step 10: the PS3 boss checks from dev saves (ask the user first) and the user's playtests |
-| 5b character art, animation, combat feel | `phase-5b-character-art.md` | **in progress on `claude/work`**: steps 0-12 done on the Mac (2026-11-22; heroes on the approved D-065 build); step 13 (PS3 check and the user's play notes) open |
+| 5b character art, animation, combat feel | `phase-5b-character-art.md` | merged into `main` (`93d53ef`), steps 0–12 checked on the Mac. Step 13 (PS3 and play notes) open. Codex extended the hero style to NPCs and added three R1 strike animations per class. |
 | 6-9 | `phase-6` .. `phase-9` | planned, not started |
 
 - Master plan and rules for working through a phase: `docs/work-plan/name-quest-plan.md`. Rules, numbers and strings: `docs/work-plan/name-quest/spec.md`.
@@ -51,6 +51,8 @@ Updated: 2026-11-21 (Classic boss-wave revives and Magic Beam tuning, NAME QUEST
 - Spec examples that disagree with the spec formula `round(100 * 1.2^(L-1))`: 39→40 is 102,067 (spec 102,064), 29→30 is 16,484 (spec 10,646). The code follows the formula; the user decides.
 
 ## Session log (newest first; add a line per session: date, agent, what changed, what is next)
+- 2026-11-22, Codex — Redrew all 16 named NPCs and 12 surveyors on the hero art grid (D-066). Spec §22 and AGENTS.md carry the future art rules. Added three R1 animations per class at the existing strike cadence (D-067). NAME QUEST tests passed. The Classic suite reported its 50 existing failures. Reviewed Namula and the combo renders on Mac. PS3 playtest pending.
+- 2026-11-22, Codex — Verified the desktop app's General setting for preventing sleep during a run. The worktree already matched local `main`.
 - 2026-11-22, Codex — Resolved the handoff conflict in the merge of `codex/work` into `main`, preserving both session logs.
 - 2026-11-22, Claude: phase 5b, all hero frames on the approved build (the user OK'd idle/run, jump/fall/land/hurt, climb/roll/attacks, skill poses in batches); tier details 1-3 for every class (archer: feather, headband tails, earring; magician 2 = bigger gem in the staff poses; thief 2 = dagger pommel in the idle pose; tier pixels can only sit where no body pixel is). Steps 7-9 built: slashes and Knight skill crescents drawn from `heroPose` (`drawHeroSlash`, `drawCrescent`), hit sparks (`FX_SPARK`), melee hit-stop 0.025 s, particle cap 200, draw order (hero effects and shots, enemies, enemy shots and markers), shot sprites, Arrow Rain zone, burst/ring, chain, meteor, blade fury, dash afterimages, partner dither and smoke, `quest: skill` log, sounds HEAVY/CHARGE/THROW. `make test` green, `make mac` builds, `make quest-anims` run. Next: step 10 (Mac checks), step 11 (the remaining tests), step 12 (docs: the new build overrides the plan's 24x24 canvas, body box and outline), step 13 PS3 only when asked.
 - 2026-11-22, Claude: the user rejected the first hero art ("not close to the references") and approved a new build copied from their reference archer: a 32x28 art-px canvas doubled to 64x56 real px, no outline, head rows 0-14 (face 10-13), body 15-21, legs 22-27, feet on row 27, drawn at (x - 12 dp, y + 14 - 28 dp). This overrides the plan's 24x24 canvas, the 16x22 body box and the coloured outline (D-061); update the plan, spec §21/§22 and the GDD in step 12. `heroes.py` rewritten on this build: IDLE_1/2 and RUN_1..4 authored for all classes; every other frame is the idle upper body for now. Tier details 2-3 still to place. Next: the user's OK on `shots/art/heroes.png`, then the jump/peak/fall/land/climb/roll/hurt frames and the basic attack poses, shown in small batches before the rest.

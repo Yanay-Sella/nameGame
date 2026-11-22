@@ -139,6 +139,7 @@ struct Hero {
     float buffTimers[3];         // ATK, DEF, SPD: s left of Whetstone, Iron Tonic, Swift Feather
     float drinkTimer;            // s left of drinking a potion (heals at its end)
     int drinkItem;               // the potion being drunk (ItemType)
+    int basicStep;               // zero-based step in the three-hit basic attack animation
     int swing;                   // id of the current melee swing (each enemy is hit once per swing)
     bool attackUp;               // the basic attack aims up (the Thief with up held)
     int skill = -1;              // the strong attack playing (job tier), -1 none
@@ -153,7 +154,8 @@ struct Hero {
 // The hero's drawn pose (spec §22): a body frame, or an arm pose over legs; t: s into the basic attack / skill, -1 none.
 enum HeroBody { BODY_IDLE_1, BODY_IDLE_2, BODY_RUN_1, BODY_RUN_2, BODY_RUN_3, BODY_RUN_4, BODY_JUMP, BODY_PEAK, BODY_FALL,
                 BODY_LAND, BODY_CLIMB_1, BODY_CLIMB_2, BODY_ROLL_1, BODY_ROLL_2, BODY_HURT };
-enum HeroArms { ARMS_NONE = -1, ARMS_WINDUP, ARMS_ACTIVE, ARMS_RECOVER, ARMS_SKILL_1, ARMS_SKILL_2, ARMS_SKILL_3, ARMS_SKILL_4, ARMS_SKILL_5 };
+enum HeroArms { ARMS_NONE = -1, ARMS_WINDUP, ARMS_ACTIVE, ARMS_RECOVER, ARMS_SKILL_1, ARMS_SKILL_2, ARMS_SKILL_3, ARMS_SKILL_4, ARMS_SKILL_5,
+               ARMS_WINDUP_2, ARMS_ACTIVE_2, ARMS_RECOVER_2, ARMS_WINDUP_3, ARMS_ACTIVE_3, ARMS_RECOVER_3 };
 enum HeroLegs { LEGS_STAND, LEGS_RUN_1, LEGS_RUN_2, LEGS_RUN_3, LEGS_RUN_4, LEGS_AIR };
 struct HeroPose { int body, arms, legs; float attackT, skillT; bool slashLit; };   // slashLit: the melee active window
 // Things lying in the area for a while: the Monkey King's peels and the Silverback's stink mist (spec §12 world 2).
@@ -302,6 +304,7 @@ enum NpcId { NPC_ILSA, NPC_MARRA, NPC_BRANN, NPC_LIO, NPC_PELL, NPC_SELA, NPC_OD
              NPC_GATEKEEPER, NPC_TOBIN, NPC_GARRICK, NPC_STRANGER, NPC_CALDER, NPC_CLAUDE, NPC_SURVEYOR_FIRST,
              NPC_COUNT = NPC_SURVEYOR_FIRST + 12 };
 const char* npcName(int id);
+int surveyorId(int world, int area, int tile);
 bool npcPresent(const SaveData& save, int id, int world, int area);   // the Stranger after world 3, Garrick moving, Claude after the credits
 void talkTo(Quest& q, int id);                                        // fills the dialogue pages and `after`, applies quest effects
 extern const char* const ITEM_NAMES[ITEM_COUNT];

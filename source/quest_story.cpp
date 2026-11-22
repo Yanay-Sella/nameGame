@@ -98,6 +98,11 @@ const char* npcName(int id) {
     return id >= 0 && id < NPC_COUNT ? NPC_NAMES[id] : "";
 }
 
+int surveyorId(int world, int area, int tile) {
+    if (world < 1 || world > 6) return NPC_SURVEYOR_FIRST;
+    return NPC_SURVEYOR_FIRST + (world - 1) * 2 + objectIndex(world, area, tile, 'M') % 2;
+}
+
 bool npcPresent(const SaveData& save, int id, int world, int area) {
     (void)area;
     switch (id) {

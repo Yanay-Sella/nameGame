@@ -12,6 +12,7 @@
 const float ROLL_TIME = 0.35f, ROLL_SPEED = 140 * DP, ROLL_IFRAMES = 0.25f, ROLL_COOLDOWN = 0.6f;
 const float BLINK_DISTANCE = 48 * DP, BLINK_IFRAMES = 0.2f, BLINK_COOLDOWN = 0.8f;
 const float HURT_VX = 90 * DP, HURT_TIME = 0.25f, HURT_IFRAMES = 1.0f;
+const int BASIC_COMBO_LENGTH = 3;
 const float BASIC_MULT_BY_JOB[4] = {1.0f, 1.15f, 1.3f, 1.5f};
 // The basic attack per class: cycle, multiplier, melee window and box, or the shot's speed, range and size.
 struct BasicAttack { float cycle, mult, from, to, boxW, boxH, speed, range, shotW, shotH; Sound sound; };
@@ -1009,9 +1010,12 @@ HeroPose heroPose(const Quest& q) {
         }
     } else if (p.attackT >= 0) {
         float at = p.attackT, c = basic.cycle;
-        if (melee) p.arms = at < basic.from ? ARMS_WINDUP : at <= basic.to ? ARMS_ACTIVE
-                          : at < basic.to + 0.6f * (c - basic.to) ? ARMS_RECOVER : ARMS_NONE;
-        else p.arms = at < 0.08f ? ARMS_ACTIVE : at >= c - 0.20f && h.fireHeld ? ARMS_WINDUP : ARMS_RECOVER;
+        const int windup[] = {ARMS_WINDUP, ARMS_WINDUP_2, ARMS_WINDUP_3};
+        int arms = windup[h.basicStep];
+        if (melee) p.arms = at < basic.from ? arms : at <= basic.to ? arms + 1
+                          : at < basic.to + 0.6f * (c - basic.to) ? arms + 2 : ARMS_NONE;
+        else p.arms = at < 0.08f ? arms + 1 : at >= c - 0.20f && h.fireHeld
+                      ? windup[(h.basicStep + 1) % BASIC_COMBO_LENGTH] : arms + 2;
     } else if (!melee && h.fireHeld) {
         p.arms = ARMS_WINDUP;   // the draw held before the first shot (it fires on the next free step)
     }
@@ -1057,6 +1061,7 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
     h.landTimer = fmaxf(0, h.landTimer - dt);
 
     // Timers and MP regen (HP never regenerates).
+    bool previousBasic = h.attackTimer > 0;
     h.attackTimer = fmaxf(0, h.attackTimer - dt);
     h.strongTimer = fmaxf(0, h.strongTimer - dt);
     h.rollTimer = fmaxf(0, h.rollTimer - dt);
@@ -1108,6 +1113,7 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
     // Strong attack (R2), then the basic attack (R1 held); neither while a skill plays.
     if (a.rocket && free && h.skill < 0) castSkill(q, cls, job);
     if (a.fire && free && h.skill < 0 && h.attackTimer <= 0) {
+        h.basicStep = previousBasic ? (h.basicStep + 1) % BASIC_COMBO_LENGTH : 0;
         h.attackTimer = basic.cycle;
         h.attackUp = cls == CLASS_THIEF && a.moveY < -0.5f;
         h.swing++;
