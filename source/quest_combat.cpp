@@ -50,6 +50,8 @@ const float SKILL_TIME[CLASS_COUNT][4] = {{0.6f, 0.3f, 0.3f, 0.3f}, {0.25f, 0.25
                                           {0.25f, 0.15f, 0.5f, 0.25f}};
 const float PARTNER_TIME = 12, PARTNER_BEHIND = 10 * DP, PARTNER_MULT = 0.5f;
 const float METEOR_TIME = 0.6f;   // Meteor lands 0.6 s after the press (spec §6)
+const float FROST_ORB_SIZE = 18 * DP, FROST_ORB_CORE = 8 * DP;
+const float FROST_BLAST_RADIUS = 32 * DP, FROST_SLOW_TIME = 3;
 const float SHADOW_DASH_SPEED = 72 * DP / 0.15f;
 const float RUN_FRAME = 0.1f;   // s per run frame (spec §22)
 // Hit feel (spec §7).
@@ -322,9 +324,9 @@ void spawnSummon(Quest& q, int slot, float x, float y) {
 }
 
 // Moves a walking enemy against the tiles (one-way tops hold it); true when a wall, a ledge or the area's edge stopped it.
-static bool moveEnemyBody(const AreaState& area, Enemy& e, float dt) {
+static bool moveEnemyBody(const AreaState& area, Enemy& e, float dt, float horizontalScale = 1) {
     bool blocked = false;
-    float nx = e.x + e.vx * dt, maxX = area.def->cols * TILE - e.w;
+    float nx = e.x + e.vx * dt * horizontalScale, maxX = area.def->cols * TILE - e.w;
     if (nx < 0 || nx > maxX) {
         nx = nx < 0 ? 0 : maxX;
         blocked = true;
@@ -380,7 +382,8 @@ static void updateEnemy(Quest& q, Enemy& e, float dt) {
     const EnemyType& type = rosterType(e.world, e.type);
     const AreaState& area = q.area;
     const Hero& h = q.hero;
-    float speed = type.speedScale * (e.slowTimer > 0 ? 0.5f : 1);
+    float slowScale = e.slowTimer > 0 ? 0.5f : 1;
+    float speed = type.speedScale * slowScale;
     float dx = h.x + HERO_W / 2 - (e.x + e.w / 2), dy = h.y + HERO_H / 2 - (e.y + e.h / 2);
     float distance = sqrtf(dx * dx + dy * dy), dir = e.facingLeft ? -1 : 1;
     bool heroInFront = e.facingLeft ? dx < 0 : dx > 0;
@@ -459,16 +462,16 @@ static void updateEnemy(Quest& q, Enemy& e, float dt) {
             e.facingLeft = e.targetX < e.x + e.w / 2;
             if (e.stateTimer >= FLYER_TELL) {
                 float tx = e.targetX - (e.x + e.w / 2), ty = e.targetY - (e.y + e.h / 2), length = fmaxf(1, sqrtf(tx * tx + ty * ty));
-                e.vx = tx / length * SWOOP_SPEED * speed;
-                e.vy = ty / length * SWOOP_SPEED * speed;
+                e.vx = tx / length * SWOOP_SPEED * type.speedScale;
+                e.vy = ty / length * SWOOP_SPEED * type.speedScale;
                 e.state = ES_ACT;
                 e.stateTimer = 0;
                 q.soundRequested[type.attackSound] = true;
             }
             break;
         case ES_ACT:
-            e.x += e.vx * dt;
-            e.y += e.vy * dt;
+            e.x += e.vx * dt * slowScale;
+            e.y += e.vy * dt * slowScale;
             if (e.stateTimer >= SWOOP_TIME) e.state = ES_RETURN, e.stateTimer = 0;
             break;
         case ES_RETURN: {
@@ -527,14 +530,14 @@ static void updateEnemy(Quest& q, Enemy& e, float dt) {
                 int feetRow = (int)floorf((e.y + e.h + 1) / TILE);
                 bool ground = false;
                 for (int r = feetRow - 1; r <= feetRow + 2; r++) ground |= holdsFeet(tileAt(area, (int)floorf(landX / TILE), r));
-                e.vx = near && ground ? (e.facingLeft ? -1 : 1) * JUMPER_VX * speed : 0;
+                e.vx = near && ground ? (e.facingLeft ? -1 : 1) * JUMPER_VX * type.speedScale : 0;
                 e.vy = -JUMPER_VY;
                 e.onGround = false;
                 e.stateTimer = 0;
                 q.soundRequested[type.attackSound] = true;
             }
         }
-        moveEnemyBody(area, e, dt);
+        moveEnemyBody(area, e, dt, slowScale);
         break;
 
     case BEH_ARMORED:
@@ -762,17 +765,22 @@ static int hitBox(Quest& q, float x, float y, float w, float h, float mult, bool
 }
 
 // Hits every living enemy whose hitbox touches the circle, once (each call is one hit).
-static void hitCircle(Quest& q, float cx, float cy, float radius, float mult) {
+static void hitCircle(Quest& q, float cx, float cy, float radius, float mult, float slow = 0) {
     touchLever(q, cx - radius, cy - radius, 2 * radius, 2 * radius);
     for (int i = 0; i < (int)q.enemies.size(); i++) {
         Enemy& e = q.enemies[i];
         float nx = fmaxf(e.x, fminf(cx, e.x + e.w)), ny = fmaxf(e.y, fminf(cy, e.y + e.h));
-        if (e.alive && e.state != ES_EMBER && (nx - cx) * (nx - cx) + (ny - cy) * (ny - cy) <= radius * radius) hitEnemy(q, i, mult, true, cx);
+        if (!e.alive || e.state == ES_EMBER || (nx - cx) * (nx - cx) + (ny - cy) * (ny - cy) > radius * radius) continue;
+        int hp = e.hp;
+        hitEnemy(q, i, mult, true, cx);
+        if (slow > 0 && e.hp < hp && e.hp > 0) e.slowTimer = slow;
     }
     for (int i = 0; i < (int)q.bosses.size(); i++) {
-        const QuestBoss& b = q.bosses[i];
+        QuestBoss& b = q.bosses[i];
         float nx = fmaxf(b.x, fminf(cx, b.x + b.w)), ny = fmaxf(b.y, fminf(cy, b.y + b.h));
-        if ((nx - cx) * (nx - cx) + (ny - cy) * (ny - cy) <= radius * radius) hitBoss(q, i, mult, true);
+        if (!bossHittable(b) || (nx - cx) * (nx - cx) + (ny - cy) * (ny - cy) > radius * radius) continue;
+        hitBoss(q, i, mult, true);
+        if (slow > 0 && b.hp > 0) b.slowTimer = slow;
     }
 }
 
@@ -875,7 +883,7 @@ static void castSkill(Quest& q, int cls, int job) {
         q.soundRequested[SOUND_Q_SPELL] = true;
         break;
     case CLASS_MAGICIAN * 4 + 1:   // Frost Orb
-        shoot(q, handX, handY, aim, 90 * DP, 200 * DP, 8 * DP, 8 * DP, PROJ_ORB, 2.8f, true, 0);
+        shoot(q, handX, handY, aim, 90 * DP, 200 * DP, FROST_ORB_SIZE, FROST_ORB_SIZE, PROJ_ORB, 2.8f, true, 0);
         q.soundRequested[SOUND_FREEZE] = true;
         break;
     case CLASS_MAGICIAN * 4 + 2: {   // Chain Lightning: the nearest within 140, then 3 more each within 64 of the last
@@ -1101,8 +1109,9 @@ void updateEffects(Quest& q, float dt) {
         else i++;
     }
     for (size_t i = 0; i < q.effects.size();) {
-        q.effects[i].age += dt;
-        if (q.effects[i].age >= q.effects[i].life) q.effects.erase(q.effects.begin() + i);
+        Effect& effect = q.effects[i];
+        if (q.mode != QMODE_PLAY || (effect.kind != FX_BEAM && effect.kind != FX_BALL)) effect.age += dt;
+        if (effect.age >= effect.life) q.effects.erase(q.effects.begin() + i);
         else i++;
     }
 }
@@ -1271,12 +1280,16 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
         p.y += my;
         p.range -= sqrtf(mx * mx + my * my);
         bool gone = p.range <= 0;
+        bool frostOrb = p.kind == PROJ_ORB;
         if (p.fromHero && p.kind == PROJ_WAVE && (int)(q.time * 60) % 3 == 0 && q.particles.size() < PARTICLE_CAP)   // quake dust
             q.particles.push_back({p.x + p.w / 2, p.y, -p.vx * 0.1f, -30 * DP, 0.3f, paletteColor('H'), 1});
         if (p.kind == PROJ_WAVE) {   // follows the floor; ends at a wall or a ledge
             float lead = p.vx > 0 ? p.x + p.w - 0.001f : p.x;
             int col = (int)floorf(lead / TILE), feetRow = (int)floorf((p.y + p.h + 1) / TILE);
             gone |= boxInSolid(q.area, p.x, p.y, (float)p.w, (float)p.h) || !holdsFeet(tileAt(q.area, col, feetRow));
+        } else if (frostOrb) {   // only the core collides with scenery, so the flake can skim the floor
+            float inset = (p.w - FROST_ORB_CORE) / 2;
+            gone |= boxInSolid(q.area, p.x + inset, p.y + inset, FROST_ORB_CORE, FROST_ORB_CORE);
         } else if (p.kind != PROJ_RAIN || p.range < 300 * DP - 120 * DP) {   // rain falls through tiles until it reaches the hero's height
             gone |= boxInSolid(q.area, p.x, p.y, (float)p.w, (float)p.h);
         }
@@ -1289,17 +1302,17 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
                 if (!e.alive || e.state == ES_EMBER || (p.hitMask >> k & 1) || (p.kind == PROJ_WAVE && !grounded) ||
                     !overlaps(p.x, p.y, (float)p.w, (float)p.h, e.x, e.y, e.w, e.h))
                     continue;
+                if (frostOrb) { gone = true; break; }
                 p.hitMask |= 1ull << k;
                 hitEnemy(q, k, p.mult, p.strong, p.x + p.w / 2, &p);
-                if (p.kind == PROJ_ORB) burst(q, p.x + p.w / 2, p.y + p.h / 2, paletteColor('i'), 6);
                 if (p.strong && p.kind == PROJ_ARROW && p.w >= 10 * DP) spark(q, p.x + p.w / 2, p.y + p.h / 2, 'c');   // the Piercing Bolt
-                if (p.kind == PROJ_ORB && e.alive) e.slowTimer = 3;
                 if (!p.strong) h.mp = h.mp < s.maxMp ? h.mp + 1 : s.maxMp;
                 if (p.pierce-- <= 0) gone = true;
             }
             for (int k = 0; k < (int)q.bosses.size() && k < 8 && !gone; k++) {
                 QuestBoss& b = q.bosses[k];
                 if (!bossHittable(b) || (p.bossMask >> k & 1) || !overlaps(p.x, p.y, (float)p.w, (float)p.h, b.x, b.y, (float)b.w, (float)b.h)) continue;
+                if (frostOrb) { gone = true; break; }
                 p.bossMask |= 1 << k;
                 hitBoss(q, k, p.mult, p.strong, &p);
                 if (!p.strong) h.mp = h.mp < s.maxMp ? h.mp + 1 : s.maxMp;
@@ -1315,7 +1328,13 @@ void updateCombat(Quest& q, const Actions& a, float dt) {
             hurtHero(q, p.trap ? p.damage : damageToHero(p.damage, s.def), p.x + p.w / 2);
             gone = true;
         }
-        if (gone && (p.kind == PROJ_PEEL || p.kind == PROJ_POOP) && p.range > 0) {   // a lobbed peel or poop lands where it hit
+        if (gone && frostOrb) {
+            float x = p.x + p.w / 2, y = p.y + p.h / 2;
+            hitCircle(q, x, y, FROST_BLAST_RADIUS, p.mult, FROST_SLOW_TIME);
+            addEffect(q, FX_FROST_BURST, x, y, FROST_BLAST_RADIUS, FROST_BLAST_RADIUS, 0.3f, 'i');
+            burst(q, x, y, paletteColor('i'), 16);
+            q.soundRequested[SOUND_FREEZE] = true;
+        } else if (gone && (p.kind == PROJ_PEEL || p.kind == PROJ_POOP) && p.range > 0) {   // a lobbed peel or poop lands where it hit
             float bottom = p.y + p.h;
             int row = (int)floorf(bottom / TILE);
             if (tileSolid(tileAt(q.area, (int)floorf((p.x + p.w / 2) / TILE), row))) bottom = (float)(row * TILE);

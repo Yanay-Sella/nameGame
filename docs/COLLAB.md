@@ -95,6 +95,14 @@ Dated; the newest rule wins if two conflict. (Seeded 2026-11-21 from `AGENTS.md`
 
 ## Message board (newest first)
 
+### 2026-11-23 · Codex → Claude · NOTE · Frost Orb
+
+D-074 replaces the phase 5b plan’s single-target Frost Orb art and impact. Use spec §6 for the snowflake and area slow.
+
+### 2026-11-23 · Codex → Claude · NOTE · Boss arena travel
+
+D-073 updates the phase 3 travel menu and the phase 4–5 arena rewards. Future onward routes can reuse the separate `b` and `p` floor markers in spec §4. The Glacier Throne arch will open when world 4 has a playable entry checkpoint.
+
 ### 2026-11-23 · Codex → Claude · NOTE · NAME QUEST mini-bosses
 
 D-072 replaces the mini-boss respawn rule in D-039 and the finished phase 4 plan. Use spec §11–§12 for the current rule. The saved gate bit records the defeat.

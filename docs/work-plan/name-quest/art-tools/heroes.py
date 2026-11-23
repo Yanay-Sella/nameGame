@@ -662,6 +662,19 @@ def all_frames():
 ARROW_UP = ["........bw", "......//b.", "....//....", ";;//......", ";;........"]
 STAR_A = ["..b..", "..s..", "bswss", "..s..", "..s.."]
 QUAKE_BASE = ["..ss.H", ".sdss.", "sdddss", "sddsds", "dddddd"]
+FROST_QUADRANT = [
+    "........w",
+    "........i",
+    ".....i..i",
+    "i.....i.i",
+    ".i.I...wi",
+    "..wiI...i",
+    ".Iiwii..i",
+    ".....iiiI",
+    ".......Iw",
+]
+FROST_HALF = [row + row[::-1] for row in FROST_QUADRANT]
+FROST_FLAKE = FROST_HALF + FROST_HALF[::-1]
 SHOTS = [
     ("ARROW_FLAT", [";;......b.", "////////bw", ";;......b."]),
     ("ARROW_UP", ARROW_UP),
@@ -670,8 +683,8 @@ SHOTS = [
     ("ARROW_BIG", ["ii.........c..", "bbbbbbbbbbbcww", "ii.........c.."]),
     ("BOLT_A", [".uuuu.", "uccccu", "ucwwcu", "ucwwcu", "uccccu", ".uuuu."]),
     ("BOLT_B", ["..uu..", ".uccu.", "ucwwcu", "ucwwcu", ".uccu.", "..uu.."]),
-    ("ORB_A", [".IIII.", "IwiiiI", "IiiiiI", "IiiiiI", "IiiiiI", ".IIII."]),
-    ("ORB_B", [".IIII.", "IiiwiI", "IiiiiI", "IIiiiI", "IiIiiI", ".IIII."]),
+    ("ORB_A", FROST_FLAKE),
+    ("ORB_B", [row.translate(str.maketrans("wiI", "iIw")) for row in FROST_FLAKE]),
     ("STAR_A", STAR_A),
     ("STAR_B", ["b...b", ".s.s.", "..w..", ".s.s.", "s...s"]),
     ("QUAKE_A", ["..H...", ".HsH.."] + QUAKE_BASE),

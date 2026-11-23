@@ -303,16 +303,23 @@ static void drawObject(const Quest& q, char letter, int tx, int ty, int camX, in
     int cx = tx * TILE + TILE / 2 - camX, bottom = (ty + 1) * TILE - camY;
     int flame = (int)(q.time / FLAME_FRAME) % 3;
     const Sprite* sprite = nullptr;
+    if ((letter == 'b' || letter == 'p') && !checkpointLit(q.save, q.area.world, BOSS_CHECKPOINT)) return;
     if (letter == 'C' && q.area.world == WORLD_NAMULA) {
         const Sprite* hearth[3] = {&HEARTH_A, &HEARTH_B, &HEARTH_C};
         sprite = hearth[flame];
         lights.push_back({cx, bottom - (int)(24 * DP), HEARTH_LIGHT_RADIUS, HEARTH_LIGHT});
-    } else if (letter == 'C') {
-        int bit = q.area.world * 2 + objectIndex(q.area.world, q.area.index, ty * def.cols + tx, 'C');
+    } else if (letter == 'C' || letter == 'b') {
+        int id = letter == 'b' ? BOSS_CHECKPOINT : objectIndex(q.area.world, q.area.index, ty * def.cols + tx, 'C');
         const Sprite* lit[3] = {&CHECKPOINT_LIT_A, &CHECKPOINT_LIT_B, &CHECKPOINT_LIT_C};
-        bool isLit = bit < 32 && (q.save.lit >> bit & 1);
+        bool isLit = checkpointLit(q.save, q.area.world, id);
         sprite = isLit ? lit[flame] : &CHECKPOINT_UNLIT;
         if (isLit) lights.push_back({cx, bottom - (int)(14 * DP), BRAZIER_LIGHT_RADIUS, BRAZIER_LIGHT});
+    } else if (letter == 'p') {
+        const WorldDef& next = worldDef(q.area.world + 1);
+        sprite = !next.count ? &ARCH_CLOSED : (int)(q.time / SHIMMER_FRAME) % 2 ? &PORTAL_B : &PORTAL_A;
+        int width = textWidth(next.name, DP);
+        drawPanel(cx - width / 2 - 3 * DP, bottom - sprite->h - 12 * DP, width + 6 * DP, 10 * DP, 'n');
+        drawText(cx - width / 2, bottom - sprite->h - 10 * DP, next.name, paletteColor('w'), DP);
     } else if (letter == 'P') {
         int index = 0;
         for (int t = 0; t < ty * def.cols + tx; t++) index += def.tiles[t] == 'P';
@@ -656,20 +663,30 @@ static void drawCombat(const Quest& q, int camX, int camY) {
             break;
         }
         case FX_ARC: drawArc(x, y, (int)f.w, (int)f.h, f.flip, color); break;
-        case FX_BURST: {   // a white disc, then a ring growing to exactly its reach (f.w), the inside dithered, fading at the end
+        case FX_FROST_BURST:
+        case FX_BURST: {   // a flash, then a ring growing to its reach (f.w)
+            bool frost = f.kind == FX_FROST_BURST;
             float t = f.age / f.life;
-            if (t < 0.3f) {
+            float flashEnd = frost ? 0.12f : 0.3f;
+            if (t < flashEnd) {
                 fillCircle(x, y, (int)(f.w * 0.4f), white);
                 break;
             }
-            int r = (int)(f.w * (0.4f + 0.6f * fminf(1, (t - 0.3f) / 0.4f)));
+            int r = (int)(f.w * (0.4f + 0.6f * fminf(1, (t - flashEnd) / (0.7f - flashEnd))));
             for (int dy = -r; dy <= r; dy += DP)
                 for (int dx = -r; dx <= r; dx += DP) {
                     int d2 = dx * dx + dy * dy, inner = r - 2 * (int)DP;
                     if (d2 > r * r) continue;
                     bool ring = d2 >= inner * inner;
-                    if (ring && (t < 0.7f || ((dx + dy) / (int)DP) % 2 == 0)) fillRect(x + dx, y + dy, DP, DP, color);
-                    else if (!ring && t < 0.7f && bayer4(x + dx, y + dy) < 8) fillRect(x + dx, y + dy, DP, DP, color);
+                    if (ring && (t < 0.7f || ((dx + dy) / (int)DP) % 2 == 0)) {
+                        fillRect(x + dx, y + dy, DP, DP, frost && d2 >= (r - DP) * (r - DP) && t < 0.7f ? white : color);
+                    } else if (!ring && t < 0.7f) {
+                        if (frost) {
+                            if (bayer4(dx / DP, dy / DP) < 4) fillRect(x + dx, y + dy, 1, 1, color);
+                        } else if (bayer4(x + dx, y + dy) < 8) {
+                            fillRect(x + dx, y + dy, DP, DP, color);
+                        }
+                    }
                 }
             break;
         }
@@ -841,6 +858,8 @@ static void drawCombat(const Quest& q, int camX, int camY) {
         } else {
             drawSpriteEx(sprite, x, y, b.facingLeft);
         }
+        for (int k = 0; k < 3 && b.slowTimer > 0 && shown >= 1; k++)
+            fillRect(x + (k + 1) * sprite.w / 4, y - (k % 2 + 1) * DP, DP, DP, paletteColor('i'));
     }
     for (const Effect& f : q.effects) {
         if (f.kind == FX_BASIC_IMPACT) drawBasicImpact(f, (int)f.x - camX, (int)f.y - camY, white);
@@ -999,7 +1018,7 @@ static void drawPlay(const Quest& q) {
     for (int ty = row0; ty <= row0 + QUEST_H / TILE + 4 && ty < def.rows; ty++)
         for (int tx = std::max(col0 - 2, 0); tx <= col0 + QUEST_W / TILE + 2 && tx < def.cols; tx++) {
             char letter = def.tiles[ty * def.cols + tx];
-            if (strchr("CPTKNMRY", letter)) drawObject(q, letter, tx, ty, camX, camY, lights);
+            if (strchr("CPTKNMRYbp", letter)) drawObject(q, letter, tx, ty, camX, camY, lights);
         }
 
     drawCombat(q, camX, camY);
@@ -1265,6 +1284,42 @@ static void drawShop(const Quest& q) {
     drawText(x + (w - textWidth("X BUY  O LEAVE", DP)) / 2, y + 118 * DP, "X BUY  O LEAVE", paletteColor('s'), DP);
 }
 
+// The highlighted world's landscape stays visible through both steps of travel.
+static void drawTravelMenu(const Quest& q) {
+    const MenuState& m = q.menu;
+    bool worlds = m.kind == MENU_TRAVEL_WORLDS;
+    int world = worlds ? m.travelIds[m.cursor] : m.travelWorld;
+    const WorldDef& w = worldDef(world);
+    if (worldArt(world)) drawLayers(world, 0, 0);
+    else drawPlainBackground(0, 0);
+
+    char region[24];
+    if (world == WORLD_NAMULA) snprintf(region, sizeof region, "HOME");
+    else if (world == WORLD_TEST) snprintf(region, sizeof region, "TEST AREA");
+    else snprintf(region, sizeof region, "WORLD %d", world);
+    int x = 10 * DP, width = textWidth(w.name, 2 * DP) + 16 * DP;
+    drawPanel(x, 10 * DP, width, 32 * DP, 'n');
+    drawText(x + 8 * DP, 15 * DP, region, paletteColor('b'), DP);
+    drawText(x + 8 * DP, 25 * DP, w.name, paletteColor('w'), 2 * DP);
+
+    int rows = std::min(MENU_ROWS, (int)m.items.size());
+    int height = (33 + rows * 11) * DP, top = QUEST_H - 10 * DP - height;
+    width = 176 * DP;
+    drawPanel(x, top, width, height, 'n');
+    drawText(x + 7 * DP, top + 5 * DP, worlds ? "CHOOSE WORLD" : "CHOOSE CHECKPOINT", paletteColor('w'), DP);
+    for (int row = 0; row < rows; row++) {
+        int index = m.scroll + row, y = top + (16 + row * 11) * DP;
+        bool selected = index == m.cursor;
+        if (selected) fillRect(x + 2 * DP, y - 2 * DP, width - 4 * DP, 10 * DP, paletteColor('n'));
+        uint32_t color = paletteColor(selected ? 'y' : 'w');
+        if (selected) drawText(x + 7 * DP, y, ">", color, DP);
+        drawText(x + 16 * DP, y, m.items[index].c_str(), color, DP);
+        bool here = worlds ? m.travelIds[index] == q.area.world : world == q.area.world && m.travelIds[index] == q.atCheckpoint;
+        if (here) drawText(x + width - 23 * DP, y, "HERE", paletteColor('b'), DP);
+    }
+    drawText(x + 7 * DP, top + height - 10 * DP, worlds ? "X CHOOSE   O BACK" : "X TRAVEL   O BACK", paletteColor('b'), DP);
+}
+
 // The quest menus: plain lists through drawMenu (8 rows, scrolling), Ilsa's panel for levels.
 static void drawQuestMenu(const Quest& q) {
     const MenuState& m = q.menu;
@@ -1272,7 +1327,12 @@ static void drawQuestMenu(const Quest& q) {
         drawLevelUp(q);
         return;
     }
-    std::string title = m.kind == MENU_CHECKPOINT ? checkpointName(q.atCheckpoint) : m.kind == MENU_TRAVEL ? "TRAVEL" : "ANOTHER ROUND?";
+    std::string title = "ANOTHER ROUND?";
+    if (m.kind == MENU_CHECKPOINT) {
+        if (q.area.world == WORLD_NAMULA) title = "HEARTH OF NAMES";
+        else if (q.atCheckpoint == BOSS_CHECKPOINT) title = q.area.def->name;
+        else title = std::string(worldDef(q.area.world).name) + (q.atCheckpoint == 0 ? " ENTRY" : " DEPTHS");
+    }
     if (m.kind == MENU_JOB_CONFIRM) {
         int cls = q.save.heroClass % CLASS_COUNT, tier = std::min(3, q.save.job + 1);
         title = std::string("BECOME ") + JOB_NAMES[cls][tier] + "?";
@@ -1341,9 +1401,9 @@ static void drawMap(const Quest& q) {
         bool gateDrawn = false;
         for (int t = 0; t < a.cols * a.rows; t++) {
             int px = x + (t % a.cols) * cw / a.cols, py = y + (t / a.cols) * ch / a.rows;
-            if (a.tiles[t] == 'C') {
-                int bit = world == WORLD_NAMULA ? 0 : world * 2 + objectIndex(world, i, t, 'C');
-                if (bit < 32 && (q.save.lit >> bit & 1)) fillRect(px - DP, py - DP, 2 * DP, 2 * DP, paletteColor('o'));
+            if (a.tiles[t] == 'C' || a.tiles[t] == 'b') {
+                int id = a.tiles[t] == 'b' ? BOSS_CHECKPOINT : objectIndex(world, i, t, 'C');
+                if (checkpointLit(q.save, world, id)) fillRect(px - DP, py - DP, 2 * DP, 2 * DP, paletteColor('o'));
             }
             if (a.tiles[t] == 'g' && !(q.save.gates >> world & 1) && !gateDrawn) {   // one bar per gate, on its nearer edge
                 gateDrawn = true;
@@ -1364,7 +1424,10 @@ void questDraw(const Quest& q) {
     case QMODE_PLAY:
     case QMODE_DEAD: drawPlay(q); break;
     case QMODE_DIALOGUE: drawPlay(q); drawDialogue(q); break;
-    case QMODE_MENU: drawPlay(q); drawQuestMenu(q); break;
+    case QMODE_MENU:
+        if (q.menu.kind == MENU_TRAVEL_WORLDS || q.menu.kind == MENU_TRAVEL_CHECKPOINTS) drawTravelMenu(q);
+        else { drawPlay(q); drawQuestMenu(q); }
+        break;
     case QMODE_SHOP: drawPlay(q); drawShop(q); break;
     case QMODE_MAP: drawMap(q); break;
     case QMODE_CREDITS: break;   // phase 8

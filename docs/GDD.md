@@ -1,6 +1,6 @@
 # NAME game — Game Design Document
 
-**Version:** 0.39 · **Updated:** 2026-11-23 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
+**Version:** 0.40 · **Updated:** 2026-11-23 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
 
 ## Summary
 You pilot a small ship at the bottom of the screen against waves of pixel-art aliens. Hold R1 to spray bullets, and save the scarce R2 rocket for the moment a wave gets out of hand. Waves get harder, and every 5th wave is a boss. The run goes through five levels of 20 waves each, every one harder than the last: level 1 (space), the jungle, the glacier, the volcano and the deep sea. It ends when you beat the deep sea's wave-20 bosses or lose your last life, and you chase the saved high score. Big bosses drop level buffs that stack until you die. Classic offers a five-level run in 1–2 Players or expanded 1–4 Players, and its Level Picker plays any single level on its own. NAME QUEST is a separate RPG platformer on the main menu, set in the same worlds, with four classes, a hub village, checkpoints and three save slots.
@@ -165,6 +165,8 @@ Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN ME
 | D-070 | 2026-11-22 | Every NAME QUEST promotion shortens the R1 cycle, grows the hitbox and reach, and adds stronger class-coloured hit effects | add only damage on promotion | the user wants a visible and playable upgrade to basic attacks for all four heroes | [NAME QUEST](features/name-quest/design.md) |
 | D-071 | 2026-11-22 | NAME QUEST promotions retain earlier strong attacks. R3 selects an unlocked skill and R2 casts it | replace the strong attack on promotion | players want to keep using earlier skills | [NAME QUEST](features/name-quest/design.md) |
 | D-072 | 2026-11-23 | Defeated NAME QUEST mini-bosses stay dead in the save slot | respawn mini-bosses after a rest or death | user's choice | [NAME QUEST](features/name-quest/design.md) |
+| D-073 | 2026-11-23 | World bosses reveal an arena checkpoint and a separate onward portal. Checkpoint travel previews worlds before listing their destinations | flat checkpoint list | the user wants to identify the destination and continue directly from a cleared arena | [NAME QUEST](features/name-quest/design.md) |
+| D-074 | 2026-11-23 | Adept’s Frost Orb is a snowflake three times wider and taller that bursts to damage and slow nearby enemies | single-target orb | user request for a bigger cast and area damage | [NAME QUEST](features/name-quest/design.md) |
 
 ## Open questions
 - **Assumptions to confirm:** sprites as text grids in code (D-006); every number marked `[ASSUMPTION]` in the feature notes.
@@ -212,3 +214,4 @@ Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN ME
 **0.37 (2026-11-22):** NAME QUEST NPCs share the hero art style and all four classes cycle through three basic attack animations (D-066, D-067).
 **0.38 (2026-11-22):** Each R1 tap advances a NAME QUEST combo, with nine drawings per strike and a braced stance for each class (D-068, D-069).
 **0.39 (2026-11-23):** Defeated NAME QUEST mini-bosses stay dead (D-072).
+**0.40 (2026-11-23):** NAME QUEST boss arena checkpoints, onward portals and world previews during travel (D-073).

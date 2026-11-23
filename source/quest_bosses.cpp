@@ -265,7 +265,7 @@ static void updateOverseer(Quest& q, QuestBoss& b, float dt) {
         if (b.step == 2 && b.timer >= RECOVER) endAttack(b);
         break;
     case OVERSEER_SLAM:   // its shadow marks the floor 0.8 s, it drops at 300, sits 1.5 s (open), rises
-        if (b.step == 0 && b.timer <= 0) q.markers.push_back({b.x, b.data[3] - 4 * DP, (float)b.w, 4 * DP, SLAM_MARK, 'm'});
+        if (b.step == 0 && b.timer <= 0) q.markers.push_back({b.x, b.data[3] - 4 * DP, (float)b.w, 4 * DP, SLAM_MARK, 'm', b.id});
         if (b.step == 0 && b.timer >= SLAM_MARK) b.step = 1, b.timer = 0;
         if (b.step == 1) {
             b.y += SLAM_SPEED * dt;
@@ -343,7 +343,7 @@ static void updateStarMage(Quest& q, QuestBoss& b, float dt) {
             b.data[4] = b.phase >= 2 ? second : -1;
             for (int k = 0; k < (b.phase >= 2 ? 2 : 1); k++) {
                 float x = b.data[3 + k] - BEAM_WIDTH / 2;
-                q.markers.push_back({x, starY, BEAM_WIDTH, b.data[5] - starY, BALL_TIME, 'm'});
+                q.markers.push_back({x, starY, BEAM_WIDTH, b.data[5] - starY, BALL_TIME, 'm', b.id});
             }
             q.effects.push_back({FX_BALL, starX, starY, 6 * DP, 6 * DP, 0, 0, 0, BALL_TIME, false, 'm'});
         }
@@ -411,7 +411,7 @@ static void updateMonkeyKing(Quest& q, QuestBoss& b) {
             b.data[2] = b.y;
             b.data[3] = (next ? ax1 : ax0) - b.w / 2.0f;
             b.data[4] = (next ? ay1 : ay0) - b.h;
-            q.markers.push_back({b.data[3], b.data[4] + b.h - 4 * DP, (float)b.w, 4 * DP, LEAP_MARK, 'm'});
+            q.markers.push_back({b.data[3], b.data[4] + b.h - 4 * DP, (float)b.w, 4 * DP, LEAP_MARK, 'm', b.id});
         }
         if (b.step == 0 && b.timer >= LEAP_MARK) b.step = 1, b.timer = 0, q.soundRequested[SOUND_Q_JUMP] = true;
         if (b.step == 1) {
@@ -448,7 +448,7 @@ static void updateMonkeyKing(Quest& q, QuestBoss& b) {
             for (int k = 0; k < RAIN_COCONUTS; k++) {
                 float x = heroX + (k - RAIN_COCONUTS / 2) * COCONUT_SPACING;
                 b.data[3 + k] = x;   // data 3-7: the coconuts' columns
-                q.markers.push_back({x - BOSS_COCONUT / 2, ceilingY(q.area, x), (float)BOSS_COCONUT, 4 * DP, COCONUT_MARK, 'm'});
+                q.markers.push_back({x - BOSS_COCONUT / 2, ceilingY(q.area, x), (float)BOSS_COCONUT, 4 * DP, COCONUT_MARK, 'm', b.id});
             }
         if (b.step == 0 && b.timer >= COCONUT_MARK) {
             for (int k = 0; k < RAIN_COCONUTS; k++) {
@@ -510,7 +510,7 @@ static void updateSilverback(Quest& q, QuestBoss& b) {
         if (b.step == 0 && b.timer <= 0) {
             b.data[1] = b.x;
             b.data[2] = fmaxf(minX, fminf(heroX - b.w / 2.0f, maxX));
-            q.markers.push_back({b.data[2], b.data[0] - 4 * DP, (float)b.w, 4 * DP, SILVER_MARK, 'm'});
+            q.markers.push_back({b.data[2], b.data[0] - 4 * DP, (float)b.w, 4 * DP, SILVER_MARK, 'm', b.id});
         }
         if (b.step == 0 && b.timer >= SILVER_MARK) b.step = 1, b.timer = 0, q.soundRequested[SOUND_Q_JUMP] = true;
         if (b.step == 1) {
@@ -662,7 +662,7 @@ static void updateTitan(Quest& q, QuestBoss& b) {
                 float x = heroX + (k - (RAIN_ICICLES - 1) / 2.0f) * RAIN_SPACING;
                 x = fmaxf(2.0f * TILE, fminf(x, (q.area.def->cols - 2) * TILE - 1.0f));
                 b.data[2 + k] = x;
-                q.markers.push_back({x - 2 * DP, ceilingY(q.area, x), 4 * DP, 4 * DP, RAIN_MARK, 'c'});
+                q.markers.push_back({x - 2 * DP, ceilingY(q.area, x), 4 * DP, 4 * DP, RAIN_MARK, 'c', b.id});
             }
         if (b.step == 0 && b.timer >= RAIN_MARK) {
             for (int k = 0; k < RAIN_ICICLES; k++) {
@@ -752,14 +752,21 @@ static void bossDown(Quest& q, QuestBoss& b) {
 }
 
 void updateBosses(Quest& q, float dt) {
+    const float FROST_BOSS_SLOW = 0.2f;   // spec §6
     for (size_t i = 0; i < q.markers.size();) {
-        q.markers[i].timer -= dt;
-        if (q.markers[i].timer <= 0) q.markers.erase(q.markers.begin() + i);
+        Marker& marker = q.markers[i];
+        float markerDt = dt;
+        for (const QuestBoss& b : q.bosses)
+            if (b.id == marker.bossId) markerDt -= FROST_BOSS_SLOW * fminf(dt, b.slowTimer);
+        marker.timer -= markerDt;
+        if (marker.timer <= 0) q.markers.erase(q.markers.begin() + i);
         else i++;
     }
     for (QuestBoss& b : q.bosses) {
         if (!b.alive) continue;
         b.flash = fmaxf(0, b.flash - dt);
+        float bossDt = dt - FROST_BOSS_SLOW * fminf(dt, b.slowTimer);
+        b.slowTimer = fmaxf(0, b.slowTimer - dt);
         if (b.hp <= 0) {
             bossDown(q, b);
             continue;
@@ -767,6 +774,10 @@ void updateBosses(Quest& q, float dt) {
         if (b.phase == 1 && b.hp * 2 <= b.maxHp) {   // phase 2 at 50 %: hit-stop, roar, trauma, 0.8 s invulnerable pose
             b.phase = 2;
             b.shift = PHASE_SHIFT;
+            if (b.id == QBOSS_STAR_MAGE) {
+                for (Effect& effect : q.effects)
+                    if (effect.kind == FX_BEAM || effect.kind == FX_BALL) effect.age = effect.life;
+            }
             if (b.id == QBOSS_MONKEY_KING && b.attack == MONKEY_LEAP && b.step == 1) b.x = b.data[3], b.y = b.data[4];   // a leap cut short: on its tree
             if (b.id == QBOSS_SILVERBACK && b.attack == SILVER_LEAP && b.step == 1) b.x = b.data[2], b.y = b.data[0] - b.h;   // landed
             if (b.id == QBOSS_YETI) yetiLies(b, false), b.data[1] = 0;   // a slide or sneeze cut short: back on its feet
@@ -783,8 +794,12 @@ void updateBosses(Quest& q, float dt) {
             b.shift = fmaxf(0, b.shift - dt);
             continue;
         }
-        if (b.attack >= 0) b.timer += dt;   // a running attack's clock; a new one starts at 0 on the frame it is chosen
-        else if ((b.gap -= dt) <= 0) {   // a random attack of the phase's list, never the last one twice
+        if (b.id == QBOSS_STAR_MAGE) {
+            for (Effect& effect : q.effects)
+                if (effect.kind == FX_BEAM || effect.kind == FX_BALL) effect.age += bossDt;
+        }
+        if (b.attack >= 0) b.timer += bossDt;   // a running attack's clock; a new one starts at 0 on the frame it is chosen
+        else if ((b.gap -= bossDt) <= 0) {   // a random attack of the phase's list, never the last one twice
             int count = ATTACKS[b.id][b.phase >= 2 ? 1 : 0];
             int pick = (int)(random01(q) * (count - (b.lastAttack >= 0 && b.lastAttack < count ? 1 : 0)));
             if (b.lastAttack >= 0 && b.lastAttack < count && pick >= b.lastAttack) pick++;
@@ -793,11 +808,11 @@ void updateBosses(Quest& q, float dt) {
             b.timer = 0;
         }
         switch (b.id) {
-        case QBOSS_OVERSEER: updateOverseer(q, b, dt); break;
-        case QBOSS_STAR_MAGE: updateStarMage(q, b, dt); break;
+        case QBOSS_OVERSEER: updateOverseer(q, b, bossDt); break;
+        case QBOSS_STAR_MAGE: updateStarMage(q, b, bossDt); break;
         case QBOSS_MONKEY_KING: updateMonkeyKing(q, b); break;
         case QBOSS_SILVERBACK: updateSilverback(q, b); break;
-        case QBOSS_YETI: updateYeti(q, b, dt); break;
+        case QBOSS_YETI: updateYeti(q, b, bossDt); break;
         case QBOSS_TITAN: updateTitan(q, b); break;
         }
         if (bossVisibility(b) >= 1 && overlaps(b.x, b.y, (float)b.w, (float)b.h, q.hero.x, q.hero.y, HERO_W, HERO_H))

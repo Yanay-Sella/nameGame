@@ -295,27 +295,34 @@ static void enterArea(Quest& q, int world, int index, int tx, int ty) {
     startArenaFight(q);   // after the area's log line, so "boss ... start" follows it
 }
 
-// Starts play at the respawn checkpoint: id n is the n-th C of the world, areas in order, rows top to bottom.
-static void enterAtCheckpoint(Quest& q) {
-    int world = q.save.checkpointWorld >= 0 && q.save.checkpointWorld < WORLD_COUNT ? q.save.checkpointWorld : WORLD_NAMULA;
+AreaLink checkpointLocation(int world, int id) {
     const WorldDef& w = worldDef(world);
-    if (w.count == 0) world = WORLD_NAMULA;
-    int seen = 0;
-    for (int i = 0; i < worldDef(world).count; i++) {
-        const AreaDef& def = worldDef(world).areas[i];
+    char marker = id == BOSS_CHECKPOINT ? 'b' : 'C';
+    int remaining = id == BOSS_CHECKPOINT ? 0 : id;
+    for (int i = 0; i < w.count; i++) {
+        const AreaDef& def = w.areas[i];
         for (int t = 0; t < def.cols * def.rows; t++) {
-            if (def.tiles[t] != 'C' || seen++ != q.save.checkpointId) continue;
-            q.hero = Hero();
-            questRefreshStats(q, true);
-            enterArea(q, world, i, t % def.cols, t / def.cols);
-            q.mode = QMODE_PLAY;
-            q.modeTimer = 0;
-            return;
+            if (def.tiles[t] == marker && remaining-- == 0)
+                return {i, t % def.cols, t / def.cols};
         }
     }
+    return {-1, -1, -1};
+}
+
+bool checkpointLit(const SaveData& save, int world, int id) {
+    if (id == BOSS_CHECKPOINT) return (save.bosses >> world & 1) != 0;
+    return (world == WORLD_NAMULA && id == 0) || (save.lit >> (world * 2 + id) & 1);
+}
+
+static void enterAtCheckpoint(Quest& q) {
+    int world = q.save.checkpointWorld;
+    if (world < 0 || world >= WORLD_COUNT || !worldDef(world).count) world = WORLD_NAMULA;
+    int id = q.save.checkpointId;
+    if (id == BOSS_CHECKPOINT && !checkpointLit(q.save, world, id)) id = 0;
+    AreaLink spot = checkpointLocation(world, id);
     q.hero = Hero();
     questRefreshStats(q, true);
-    enterArea(q, world, 0, -1, -1);
+    enterArea(q, world, std::max(0, spot.area), spot.tileX, spot.tileY);
     q.mode = QMODE_PLAY;
     q.modeTimer = 0;
 }
@@ -379,36 +386,21 @@ int objectIndex(int world, int area, int tile, char letter) {
     return n;
 }
 
-std::vector<int> travelCheckpoints(const SaveData& save) {
-    std::vector<int> list = {0};   // the hearth, always lit
-    for (int world = 1; world < WORLD_COUNT; world++) {
-        int count = objectIndex(world, worldDef(world).count, 0, 'C');   // every C of the world
-        for (int id = 0; id < count && id < 2; id++)
-            if (save.lit >> (world * 2 + id) & 1) list.push_back(world * 2 + id);
-    }
-    return list;
-}
-
-std::string checkpointName(int bit) {
-    if (bit == 0) return "HEARTH OF NAMES";
-    return std::string(worldDef(bit / 2).name) + (bit % 2 ? " DEPTHS" : " ENTRY");
-}
-
 // Rest resets the crumbled blocks (phase 4) and dropped icicles (phase 5) by reloading the area's tiles.
 static void resetHazards(Quest& q) {
     loadArea(q.area, q.area.world, q.area.index, q.save.gates, q.save.shortcuts[q.area.world]);
 }
 
 // REST (spec §11): refill HP and MP, respawn normal enemies, reset hazards, set the checkpoint and save.
-static void rest(Quest& q, int bit) {
+static void rest(Quest& q, int id) {
     for (auto& killed : q.killed) killed.assign(killed.size(), 0);
     resetHazards(q);
     spawnEnemies(q);
     questRefreshStats(q, true);
-    q.save.checkpointWorld = bit / 2;
-    q.save.checkpointId = bit % 2;
+    q.save.checkpointWorld = q.area.world;
+    q.save.checkpointId = id;
     q.fadeTimer = q.reduceFlashing ? 0 : REST_FADE;
-    logLine(q, "quest: rest at %d.%d", bit / 2, bit % 2);
+    logLine(q, "quest: rest at %d.%d", q.area.world, id);
     questSave(q);
 }
 
@@ -499,6 +491,40 @@ static void openMenu(Quest& q, int kind, std::vector<std::string> items) {
     q.menu.cursor = q.menu.scroll = 0;
     q.mode = QMODE_MENU;
     q.modeTimer = 0;
+}
+
+// Keep the displayed rows paired with their world or local checkpoint ids, including gaps in discovery.
+static void openTravelMenu(Quest& q, int kind, int world) {
+    MenuState& m = q.menu;
+    m.travelIds.clear();
+    std::vector<std::string> names;
+    int cursor = 0;
+    if (kind == MENU_TRAVEL_WORLDS) {
+        for (int w = 0; w < WORLD_COUNT; w++) {
+            for (int id = 0; id <= BOSS_CHECKPOINT; id++) {
+                if (!checkpointLit(q.save, w, id) || checkpointLocation(w, id).area < 0) continue;
+                if (w == world) cursor = (int)names.size();
+                names.push_back(worldDef(w).name);
+                m.travelIds.push_back(w);
+                break;
+            }
+        }
+    } else {
+        m.travelWorld = world;
+        for (int id = 0; id <= BOSS_CHECKPOINT; id++) {
+            if (!checkpointLit(q.save, world, id)) continue;
+            AreaLink spot = checkpointLocation(world, id);
+            if (spot.area < 0) continue;
+            if (world == q.area.world && id == q.atCheckpoint) cursor = (int)names.size();
+            const char* type = id == BOSS_CHECKPOINT ? "BOSS" : id == 1 ? "DEPTHS" : "ENTRY";
+            names.push_back(world == WORLD_NAMULA ? "HEARTH OF NAMES" :
+                            std::string(type) + " - " + worldDef(world).areas[spot.area].name);
+            m.travelIds.push_back(id);
+        }
+    }
+    openMenu(q, kind, names);
+    m.cursor = cursor;
+    m.scroll = std::max(0, cursor - MENU_ROWS + 1);
 }
 
 enum DevOption { DEV_CLASS, DEV_JOB, DEV_LEVEL, DEV_WARP, DEV_NAMES, DEV_BAG, DEV_HEAL, DEV_GOD_MODE };
@@ -784,10 +810,12 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
         // checkpoint, surveyor, portal (spec §2), and never grabs a ladder while one is touched.
         float heroCx = h.x + HERO_W / 2, heroBottom = h.y + HERO_H;
         int npc = -1, chestTile = -1, chestId = -1, checkpoint = -1, surveyor = -1, portal = -1;
+        bool nextWorldPortal = false;
         int npcs = 0, chests = 0, portals = 0;
         for (int t = 0; t < def.cols * def.rows; t++) {
             char letter = def.tiles[t];
-            if (!strchr("NTCMP", letter)) continue;
+            if (!strchr("NTCMPbp", letter)) continue;
+            if ((letter == 'b' || letter == 'p') && !checkpointLit(s, world, BOSS_CHECKPOINT)) continue;
             float cx = (t % def.cols) * TILE + TILE / 2.0f, bottom = (float)((t / def.cols + 1) * TILE);
             float dx = fabsf(cx - heroCx);
             bool sameFloor = fabsf(bottom - heroBottom) < TILE / 2.0f;
@@ -799,27 +827,30 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
                 int id = chests < 4 ? def.chests[chests] : -1;
                 chests++;
                 if (chestTile < 0 && id >= 0 && sameFloor && dx <= CHEST_REACH && !(s.chests[world] >> id & 1)) chestTile = t, chestId = id;
-            } else if (letter == 'C' && sameFloor && dx <= CHECKPOINT_REACH) {
-                int bit = world == WORLD_NAMULA ? 0 : world * 2 + objectIndex(world, q.area.index, t, 'C');
-                if (bit < 32 && !(s.lit >> bit & 1)) {   // touching an unlit brazier lights it (spec §11)
-                    s.lit |= 1u << bit;
+            } else if ((letter == 'C' || letter == 'b') && sameFloor && dx <= CHECKPOINT_REACH) {
+                int id = letter == 'b' ? BOSS_CHECKPOINT : objectIndex(world, q.area.index, t, 'C');
+                if (!checkpointLit(s, world, id)) {   // touching an unlit brazier lights it (spec §11)
+                    s.lit |= 1u << (world * 2 + id);
                     q.banner = "NAME KINDLED";
                     q.bannerScale = 2;
                     q.bannerColor = 'o';
                     q.bannerTimer = KINDLE_BANNER_TIME;
                     q.soundRequested[SOUND_Q_KINDLE] = true;
-                    logLine(q, "quest: checkpoint %d.%d lit", bit / 2, bit % 2);
+                    logLine(q, "quest: checkpoint %d.%d lit", world, id);
                     questSave(q);
                 }
-                if (checkpoint < 0) checkpoint = bit;
+                if (checkpoint < 0) checkpoint = id;
             } else if (letter == 'M' && surveyor < 0 && sameFloor && dx <= SURVEYOR_REACH) {
                 surveyor = surveyorId(world, q.area.index, t);
-            } else if (letter == 'P') {
-                if (h.x < cx + 8 * DP && h.x + HERO_W > cx - 8 * DP && h.y < bottom && h.y + HERO_H > bottom - 24 * DP) portal = portals;
-                portals++;
+            } else if (letter == 'P' || letter == 'p') {
+                if (h.x < cx + 8 * DP && h.x + HERO_W > cx - 8 * DP && h.y < bottom && h.y + HERO_H > bottom - 24 * DP) {
+                    if (letter == 'p') nextWorldPortal = true;
+                    else portal = portals;
+                }
+                if (letter == 'P') portals++;
             }
         }
-        bool touching = npc >= 0 || chestTile >= 0 || checkpoint >= 0 || surveyor >= 0 || portal >= 0;
+        bool touching = npc >= 0 || chestTile >= 0 || checkpoint >= 0 || surveyor >= 0 || portal >= 0 || nextWorldPortal;
         Actions move = a;
         if (touching && h.onGround && move.moveY < 0) move.moveY = 0;
         if (h.onGround && a.up && touching) {
@@ -832,6 +863,18 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
                 openMenu(q, MENU_CHECKPOINT, {"REST", "TRAVEL", "LEAVE"});
             } else if (surveyor >= 0) {
                 talkTo(q, surveyor);
+            } else if (nextWorldPortal) {
+                AreaLink entry = checkpointLocation(world + 1, 0);
+                if (entry.area >= 0) {
+                    h.vx = h.vy = 0;
+                    enterArea(q, world + 1, entry.area, entry.tileX, entry.tileY);
+                    q.soundRequested[SOUND_Q_PORTAL] = true;
+                    break;
+                }
+                q.banner = "THE WAY IS CLOSED";
+                q.bannerColor = 'w';
+                q.bannerScale = 1;
+                q.bannerTimer = BANNER_TIME;
             } else if (def.portals[portal].area >= 0 && !q.arenaLocked) {
                 AreaLink link = def.portals[portal];
                 q.soundRequested[SOUND_Q_PORTAL] = true;
@@ -976,7 +1019,11 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
             q.soundRequested[SOUND_Q_BLIP] = true;
         }
         if (a.back) {
-            if (q.devAids && m.kind == MENU_DEV_AREA) openDevWorldMenu(q);
+            if (m.kind == MENU_TRAVEL_CHECKPOINTS) openTravelMenu(q, MENU_TRAVEL_WORLDS, m.travelWorld);
+            else if (m.kind == MENU_TRAVEL_WORLDS) {
+                openMenu(q, MENU_CHECKPOINT, {"REST", "TRAVEL", "LEAVE"});
+                m.cursor = 1;
+            } else if (q.devAids && m.kind == MENU_DEV_AREA) openDevWorldMenu(q);
             else if (q.devAids && m.kind >= MENU_DEV_CLASS && m.kind <= MENU_DEV_WORLD) openDevMenu(q);
             else q.mode = QMODE_PLAY;
         } else if (a.jump) {
@@ -986,22 +1033,23 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
                     rest(q, q.atCheckpoint);
                     q.mode = QMODE_PLAY;
                 } else if (m.cursor == 1) {
-                    std::vector<std::string> names;
-                    for (int bit : travelCheckpoints(q.save)) names.push_back(bit == 0 ? "NAMULA" : checkpointName(bit));
-                    openMenu(q, MENU_TRAVEL, names);
+                    openTravelMenu(q, MENU_TRAVEL_WORLDS, q.area.world);
                 } else {
                     q.mode = QMODE_PLAY;
                 }
                 break;
-            case MENU_TRAVEL: {   // moves the hero to that checkpoint and rests there; buffs keep running
-                int bit = travelCheckpoints(q.save)[m.cursor];
+            case MENU_TRAVEL_WORLDS:
+                openTravelMenu(q, MENU_TRAVEL_CHECKPOINTS, m.travelIds[m.cursor]);
+                break;
+            case MENU_TRAVEL_CHECKPOINTS: {   // moves the hero to that checkpoint and rests there; buffs keep running
+                int id = m.travelIds[m.cursor];
                 float buffs[3] = {q.hero.buffTimers[0], q.hero.buffTimers[1], q.hero.buffTimers[2]};
-                q.save.checkpointWorld = bit / 2;
-                q.save.checkpointId = bit % 2;
-                logLine(q, "quest: travel to %d.%d", bit / 2, bit % 2);
+                q.save.checkpointWorld = m.travelWorld;
+                q.save.checkpointId = id;
+                logLine(q, "quest: travel to %d.%d", m.travelWorld, id);
                 enterAtCheckpoint(q);
                 for (int k = 0; k < 3; k++) q.hero.buffTimers[k] = buffs[k];
-                rest(q, bit);
+                rest(q, id);
                 q.soundRequested[SOUND_Q_PORTAL] = true;
                 break;
             }

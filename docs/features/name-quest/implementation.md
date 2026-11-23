@@ -55,7 +55,8 @@ Movement is `moveHero`: grace timers, ladders, walking, jumping (buffered, coyot
 ## RPG systems (phase 3)
 - Play mode collects what the hero touches (N, T, C, M, P) in one pass over the area's letters, lights unlit braziers on touch, then handles Up in the spec's order. Items and the drink timer run in `questUpdate` before `updateCombat`; the drink's x0.4 and the feather's x1.15 scale the stick in `updateCombat`.
 - `QMODE_DIALOGUE`, `QMODE_MENU` (one `MenuState`, one `switch (kind)` on X), `QMODE_SHOP` and `QMODE_MAP` each have one case in `questUpdate`; they draw the play picture behind their panel (the map is full-screen). `DialogueState::after` opens the next mode when the last page closes.
-- `rest` clears every killed list, calls `resetHazards` (reloads the area's tiles: crumbles in phase 4, icicles in phase 5), respawns enemies, heals, sets the respawn point and saves. Travel sets the checkpoint, `enterAtCheckpoint`, then `rest`.
+- `rest` clears every killed list, calls `resetHazards` (reloads the area's tiles: crumbles in phase 4, icicles in phase 5), respawns enemies, heals, sets the respawn point and saves. Travel groups lit destinations by world. Both menu steps draw the highlighted world’s background layers. Confirming a checkpoint calls `enterAtCheckpoint`, then `rest`.
+- Boss arena markers `b` and `p` use the existing saved boss bit for drawing and interaction. Checkpoint id 2 resolves to `b`, so earlier saves gain the arena destination automatically. The onward portal uses the next world’s entry tile and preserves the last rested checkpoint.
 - `objectIndex(world, area, tile, letter)` numbers checkpoints and surveyors across a world (shared by the rules, the HUD map and the drawing). `openGate` and `openShortcut` are public: mini-bosses call `openGate` from phase 4; `touchLever` in `quest_combat.cpp` calls `openShortcut` from every hero hit box, circle and shot.
 - `Quest::ambient` is set on area entry; main.cpp calls `audioSetQuestSound(place, quest.arenaLocked, music not OFF)` every frame; it returns early while nothing changed. It stops only a quest song, never the shooter's.
 
@@ -87,6 +88,7 @@ Movement is `moveHero`: grace timers, ladders, walking, jumping (buffered, coyot
 
 ## Deviations from design
 - D-072 replaces mini-boss respawns in the phase 4 plan. Rest and death clear the temporary enemy kills but keep saved mini-boss defeats.
+- D-074 replaces the single-target Frost Orb and 6 × 6 art in the phase 5b plan. `PROJ_ORB` uses its original 8 dp core against tiles so grounded casts clear the floor. On detonation, `hitCircle` applies one shared damage and slow event per target. Boss attack clocks, telegraphs and the Star Mage’s beam effects advance together during the slow.
 - `Hero` has two fields the plan didn't list: `dropTimer` (down + X drop-through) and `jumped` (for the jump sound).
 - `saveWrite` takes an optional `renameFailed` flag so `questSave` can log `rename failed, wrote directly`.
 - Holding Select 2 s goes to the TEST GROUNDS area 0 (`Actions::selectHeld`, phase 2).

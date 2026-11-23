@@ -1,7 +1,7 @@
 # Handoff: state of the work and how Claude and Codex share it
 
 **Read this first, update it before you stop.** Rules and commands are in `AGENTS.md`; conventions, questions between agents and the small-change lane are in `docs/COLLAB.md`; this file holds what changes between sessions.
-Updated: 2026-11-23 (NAME QUEST mini-boss persistence).
+Updated: 2026-11-23 (NAME QUEST boss arena and checkpoint travel).
 
 ## Classic shooter
 
@@ -51,6 +51,12 @@ Updated: 2026-11-23 (NAME QUEST mini-boss persistence).
 - Spec examples that disagree with the spec formula `round(100 * 1.2^(L-1))`: 39→40 is 102,067 (spec 102,064), 29→30 is 16,484 (spec 10,646). The code follows the formula; the user decides.
 
 ## Session log (newest first; add a line per session: date, agent, what changed, what is next)
+
+- 2026-11-23, Codex — Adept’s Frost Orb now flies as an 18 dp snowflake and bursts into a 32 dp radius for area damage and slow (D-074). NAME QUEST tests cover impact, maximum range and boss slow. Mac captures in `shots/frost-orb-flight.png` and `shots/frost-orb-enemy.png`. PS3 playtest pending.
+
+- 2026-11-23, Codex — Added permanent boss arena checkpoints and separate onward portals in worlds 1–3. Travel now previews the selected world and lists its lit checkpoints by area. NAME QUEST tests passed and Mac captures show the arena, the world list and the checkpoint list. The world 3 arch awaits world 4 content. Next is the user’s playtest.
+
+- 2026-11-23, Codex — Confirmed that job promotions shorten the R1 cycle to 90%, 80% and 70% of base for all four classes. R2 timing is set per skill.
 
 - 2026-11-23, Codex — Implemented the Magician’s R1 wand flick, rising crescent and approved wide spinning finisher. Mac Docking Ring capture in `shots/anims/magician-r1-in-game.gif`. NAME QUEST passed, with the 50 known Classic checks still failing. Ready for the user’s playtest.
 

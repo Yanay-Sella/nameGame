@@ -110,6 +110,8 @@ SLOTS: Circle → MAIN MENU
 |---|---|---|
 | `S` | hero start | Namula area 0 only (first spawn) |
 | `C` | checkpoint | 2 per world (area 0 and one more), 1 in Namula (the hearth) |
+| `b` | boss checkpoint | lit when the world boss falls, local checkpoint id 2 |
+| `p` | onward portal | appears at a separate floor tile after the world boss falls and leads to the next playable world’s entry |
 | `M` | surveyor (map NPC) | 2 per world |
 | `N` | NPC | which one: the area's `npcs[]` in order of appearance (row by row, left to right) |
 | `P` | portal | target: the area's `portals[]` in order of appearance |
@@ -244,7 +246,7 @@ skill's MP cost. Switching during an attack selects the next cast while the curr
 |---|---|---|---|---|
 | KNIGHT | KNIGHT: **Power Slash** — box 30 x 20, x2.4, 10 MP, 0.6 s | VANGUARD: **Rising Slash** — box 24 x 36 above-front, x3.0, hero hops vy -120, 12 MP | WARDEN: **Ground Quake** — two shockwaves 8 x 10 run along the ground 80 px each way at 200 px/s, x3.4, ground enemies only, 16 MP | LIONHEART: **Lion's Roar** — golden arc 72 x 40 in front, x5.0, stuns 0.5 s, 24 MP |
 | ARCHER | ARCHER: **Double Shot** — 2 arrows 4 px apart, x1.5 each, 8 MP | RANGER: **Arrow Rain** — 6 arrows fall in a 56 px zone centred 80 px ahead, from 120 px above the hero, x1.6 each, 14 MP | SHARPSHOOTER: **Piercing Bolt** — 360 px/s, range 300, pierces enemies (not tiles), x4.0, 18 MP | STORMBOW: **Storm Volley** — 5-arrow fan (-20° to +20°) three times over 0.45 s, x1.8 each, 26 MP |
-| MAGICIAN | MAGICIAN: **Arcane Burst** — radius 20 burst 40 px ahead, x2.6, 10 MP | ADEPT: **Frost Orb** — orb 90 px/s, x2.8, slows enemies 50 % for 3 s (bosses 20 %), 14 MP | ELEMENTALIST: **Chain Lightning** — hits the nearest enemy within 140 px, then 3 more each within 64 px of the last, x3.0 each, 20 MP | ARCHMAGE: **Meteor** — lands 0.6 s after the press (the hero keeps moving), falls 120 px ahead, radius 48, x6.0, 34 MP |
+| MAGICIAN | MAGICIAN: **Arcane Burst** — radius 20 burst 40 px ahead, x2.6, 10 MP | ADEPT: **Frost Orb** — 18 × 18 px snowflake at 90 px/s. Bursts on enemy, boss or solid tile contact, or after 200 px. Radius 32 px, x2.8 once per target, slows enemies 50 % for 3 s (bosses 20 %), 14 MP (D-074) | ELEMENTALIST: **Chain Lightning** — hits the nearest enemy within 140 px, then 3 more each within 64 px of the last, x3.0 each, 20 MP | ARCHMAGE: **Meteor** — lands 0.6 s after the press (the hero keeps moving), falls 120 px ahead, radius 48, x6.0, 34 MP |
 | THIEF | THIEF: **Star Toss** — 3 stars at -10°, 0°, +10°, 260 px/s, range 150, x1.2 each, 8 MP | ROGUE: **Shadow Dash** — dash 72 px in 0.15 s, invincible, x2.6 to every enemy passed, 12 MP | SHADOW: **Blade Fury** — 0.5 s spin, radius 30, 5 hits of x1.0, 16 MP | NIGHTBLADE: **Shadow Partner** — 12 s, a dark copy 10 px behind repeats every attack at 50 % damage, 30 MP, can't recast while active |
 
 Tier 1+ Archer arrows pierce one extra enemy. Not enough MP: no attack, SOUND_ROCKET_EMPTY.
@@ -404,11 +406,12 @@ stays closed until there is room. Opening: Up at the chest, 0.3 s lid animation,
 - A stone brazier (16 x 20): unlit grey; lit with a 3-frame flame. Touching an unlit one lights it: banner
   `NAME KINDLED` (scale 2, `o`, 1.5 s), SOUND_Q_KINDLE, autosave.
 - Up at a lit checkpoint → menu titled with the checkpoint's name (`<WORLD> ENTRY`, `<WORLD> DEPTHS`; Namula:
-  `HEARTH OF NAMES`): REST, TRAVEL, LEAVE.
+  `HEARTH OF NAMES`; boss checkpoint: the arena name): REST, TRAVEL, LEAVE.
   - REST: HP and MP full, normal enemies respawn (killed lists cleared), crumbled blocks and icicles
     reset, this becomes the respawn point, autosave. A short white fade (0.3 s, skipped with reduce flashing).
-  - TRAVEL: a list of every lit checkpoint in world order plus `NAMULA` first; choosing one moves the hero there and
-    rests there. The list scrolls if longer than 8 rows.
+  - TRAVEL opens on the current world. Highlighting a world previews its background. X lists its lit checkpoints
+    by area name, and X on a checkpoint travels there and rests. Circle goes back one level. HERE marks the origin.
+    A world appears once it has a lit checkpoint in a playable area (D-073).
 - World n+1's entry checkpoint is lit when world n's boss dies (1 → 2 → ... → 5). World 1's entry is lit from the
   start. World 6's entry is lit by the Sky Stair (§14). The secret world's entry by Pell's quest.
 - `highestWorld` = the highest world whose area 0 the hero has entered (starts at 1). It sets shop tiers and prices.
@@ -459,6 +462,9 @@ Hitting a lever `K` with any attack opens every `k` in its area: SOUND_Q_GATE, s
   or the hero dies (the boss resets).
 - Big boss death: hit-stop 0.15, trauma 1.0, 60 particles, `+n NAMES`, banner `GREAT NAME TAKEN` (scale 2, `Y`)
   for worlds 1–5, the sigil bit set, the next world's entry lit, autosave. Big bosses stay dead (bossesDead bit).
+  In the playable world boss arenas, the saved defeat reveals a lit brazier and a separately placed portal labelled
+  with the next world’s name. Up at the portal enters that world at its entry brazier. A future world with no areas
+  has a closed arch until its entry is playable (D-073).
 - Mini-boss death awards names and opens the gate (§11). Defeated mini-bosses stay dead in the slot (D-072).
 - HP from §7; names from §7; contact damage while the boss's body touches the hero.
 
@@ -615,7 +621,8 @@ A mentor of another class gives one flavour line about their craft.
   Thief 2/3/2 + `DOUBLE JUMP`), 2 lines of description (author). Selected card border `y`. Hint `X CHOOSE  O BACK`.
 - **Dialogue:** panel x 10, y 124, 300 x 52; name at (16, 128); lines at y 138, 147, 156, 165; a blinking `>` at
   (300, 168) when a page is complete.
-- **Shop / level up / checkpoint / travel / job:** use `drawMenu` (screen.cpp) when the content is a plain list;
+- **Travel:** show the highlighted world’s background, its name and the world or checkpoint list (§11).
+- **Shop / level up / checkpoint / job:** use `drawMenu` (screen.cpp) when the content is a plain list;
   shops use a 240 x 130 panel: title, then rows `RED POTION  15  2/5` (unaffordable or full rows in `s`), hint
   `X BUY  O LEAVE`. Level up panel: `LEVEL 7 > 8`, `COST 299`, `NAMES 1022`, and `HP 160 > 174`, `MP`, `ATK`, `DEF`
   lines; items LEVEL UP, LEAVE.
@@ -670,8 +677,8 @@ fails, log it and write `questN.txt` directly.
 version=1
 class=0..3   level=1..40   job=0..3   names=n   playtime=seconds
 hp=n mp=n                         (current; restored on load, but loading always puts you at the respawn checkpoint)
-checkpoint=<world>,<id>           (respawn: world 0 id 0 is the hearth; ids 0, 1 per world)
-lit=<hex>                         (bit world*2 + id; Namula hearth bit 0 always set)
+checkpoint=<world>,<id>           (respawn: world 0 id 0 is the hearth; ids 0 and 1 for ordinary checkpoints, 2 for the boss arena)
+lit=<hex>                         (ordinary checkpoints use bit world*2 + id; the boss checkpoint uses the bosses field)
 echo=<names>,<world>,<area>,<x>,<y>   (no line when none)
 visited<w>=<hex>  chests<w>=<hex>  shortcuts<w>=<hex>   (w = 0..7)
 gates=<hex>  bosses=<hex>         (bit = world; Name-Eater bit 8, Claude bit 9, First Name bit 10)

@@ -834,7 +834,7 @@ bool propTileExcluded(const AreaState& area, int tx, int ty) {
         for (int dx = -2; dx <= 2; dx++) {
             char t = tileAt(area, tx + dx, ty + dy);
             if (strchr("^~zf", t)) return true;
-            if (abs(dx) <= 1 && abs(dy) <= 1 && strchr("SCMNPTKQWXLORYg", t)) return true;
+            if (abs(dx) <= 1 && abs(dy) <= 1 && strchr("SCMNPTKQWXLORYgbp", t)) return true;
         }
     return false;
 }

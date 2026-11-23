@@ -119,7 +119,8 @@ struct Projectile { float x, y, vx, vy; int w, h; int damage; bool fromHero; int
                     float mult; bool strong; uint64_t hitMask; uint8_t bossMask; float gravity; bool trap; int basicJob; };
 struct DamageNumber { float x, y, age; int value; uint32_t color; float life; bool names; };   // names: "+n NAMES"
 // Short-lived shapes for drawing. x2/y2: a chain link's end or a basic impact's direction.
-enum EffectKind { FX_SWING, FX_ARC, FX_BURST, FX_CHAIN, FX_METEOR, FX_SPIN, FX_BEAM, FX_BALL, FX_SPARK, FX_ZONE, FX_GHOST, FX_BLINK_MIST, FX_BASIC_IMPACT };
+enum EffectKind { FX_SWING, FX_ARC, FX_BURST, FX_CHAIN, FX_METEOR, FX_SPIN, FX_BEAM, FX_BALL, FX_SPARK, FX_ZONE, FX_GHOST,
+                  FX_BLINK_MIST, FX_BASIC_IMPACT, FX_FROST_BURST };
 const size_t PARTICLE_CAP = 200;   // no new particle while this many are alive (phase 5b readability)
 struct Effect { int kind; float x, y, w, h, x2, y2, age, life; bool flip; char color; int basicJob = 0; };
 
@@ -180,13 +181,13 @@ struct QuestBoss {
     int step; float timer;   // the attack's own step machine: telegraph, act, recover
     float gap;               // s until the next attack
     float shift;             // s of the invulnerable phase-change pose
-    float flash; bool facingLeft, alive;
+    float flash, slowTimer; bool facingLeft, alive;
     float started;           // q.time when the fight began (the log's duration)
     float data[8];           // per-boss scratch (anchors chosen, wave counts...); each use named in quest_bosses.cpp
     int lastSwing, lastPartnerSwing;   // the hero's swing ids that already hit it
     bool big;                // the world's big boss, else its mini-boss
 };
-struct Marker { float x, y, w, h, timer; char color; };   // a telegraph drawn as dashes until timer runs out
+struct Marker { float x, y, w, h, timer; char color; int bossId; };   // a telegraph timed by its boss's attack clock
 enum BossPose { POSE_IDLE, POSE_TELL, POSE_ATTACK, POSE_OPEN };
 const char* bossName(int id);
 void startBoss(Quest& q, int id, float x, float y);       // stats from §7, banner, bar, exits closed, log "start"
@@ -208,10 +209,17 @@ struct AreaState {
 enum QuestMode { QMODE_SLOTS, QMODE_DELETE, QMODE_CLASS, QMODE_INTRO, QMODE_PLAY, QMODE_DEAD, QMODE_DIALOGUE, QMODE_MENU,
                  QMODE_SHOP, QMODE_MAP, QMODE_CREDITS };   // CREDITS: phase 8
 
+const int BOSS_CHECKPOINT = 2;   // local checkpoint id, unlocked by the saved boss defeat
+
 // One generic list menu (spec §15); the confirm is one switch on kind in questUpdate.
-enum MenuKind { MENU_CHECKPOINT, MENU_TRAVEL, MENU_LEVEL_UP, MENU_JOB_CONFIRM, MENU_YES_NO,
+enum MenuKind { MENU_CHECKPOINT, MENU_TRAVEL_WORLDS, MENU_TRAVEL_CHECKPOINTS, MENU_LEVEL_UP, MENU_JOB_CONFIRM, MENU_YES_NO,
                 MENU_DEV, MENU_DEV_CLASS, MENU_DEV_JOB, MENU_DEV_WORLD, MENU_DEV_AREA };
-struct MenuState { int kind; std::vector<std::string> items; int cursor, scroll, warpWorld; };
+struct MenuState {
+    int kind, cursor, scroll, warpWorld;
+    std::vector<std::string> items;
+    std::vector<int> travelIds;   // world ids in the first list, local checkpoint ids in the second
+    int travelWorld;
+};
 const int MENU_ROWS = 8;                                   // rows shown before the list scrolls
 // The NPC dialogue box (spec §14): pages of up to 4 lines split by '\n'; `after` opens when the last page closes.
 enum DialogueAfter { AFTER_NONE, AFTER_POTION_SHOP, AFTER_GEAR_SHOP, AFTER_LEVEL_UP, AFTER_JOB, AFTER_MAP, AFTER_YES_NO, AFTER_DEV };
@@ -252,7 +260,7 @@ struct Quest {
     char bannerColor;
     DialogueState dialogue;
     MenuState menu;
-    int atCheckpoint;                   // world * 2 + id of the checkpoint whose menu is open
+    int atCheckpoint;                   // local id of the checkpoint whose menu is open
     int shopKind, shopCursor;           // AFTER_POTION_SHOP or AFTER_GEAR_SHOP; the selected row
     int selectedItem;                   // ItemType Square uses
     std::string popup; float popupTimer, popupX, popupY;   // chest text over the chest (shown after the lid opens)
@@ -294,8 +302,8 @@ bool panelOn(const Quest& q);                             // electric panels `z`
 bool jetBurning(const Quest& q);                          // fire jets `f`
 float jetWarning(const Quest& q);                         // > 0 while a jet sparks before burning
 int objectIndex(int world, int area, int tile, char letter);   // the n-th `letter` of the world (areas in order, rows top to bottom)
-std::string checkpointName(int bit);                      // spec §11: <WORLD> ENTRY / DEPTHS, HEARTH OF NAMES
-std::vector<int> travelCheckpoints(const SaveData& save); // world * 2 + id: the hearth, then every lit checkpoint in world order
+bool checkpointLit(const SaveData& save, int world, int id);
+AreaLink checkpointLocation(int world, int id);   // area and standing tile, or area -1 if unauthored
 void openGate(Quest& q, int world);                       // spec §11: the mini-boss's death opens the world's gate
 void openShortcut(Quest& q);                              // a hero attack touched the area's lever K
 const float HURT_VY = 140 * DP;                           // the hurt hop (spec §5)

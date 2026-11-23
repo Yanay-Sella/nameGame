@@ -24,8 +24,8 @@ static int failures = 0;
     } while (0)
 
 const float DT = 1.0f / 60;
-const char* const LEGEND = ".#-|^~icgkzf<>vuSCMNPTKABDEFQWRYXLO";
-const char* const OBJECTS_TO_REACH = "CMNTKQW";
+const char* const LEGEND = ".#-|^~icgkzfbp<>vuSCMNPTKABDEFQWRYXLO";
+const char* const OBJECTS_TO_REACH = "CMNTKQWbp";
 const int REACH_WORLDS[] = {WORLD_NAMULA, 1, 2, 3, WORLD_TEST};   // phases 5-9 add their worlds
 
 static const Sprite* const ALL_QUEST_SPRITES[] = {
@@ -93,7 +93,7 @@ static void propsNeverBlockSpots() {
         for (const PlacedProp& p : props) {
             CHECK(!propTileExcluded(area, p.tx, p.ty));
             for (int dy = -1; dy <= 1; dy++)
-                for (int dx = -1; dx <= 1; dx++) CHECK(!strchr("SCMNPTKQWXLO", tileAt(area, p.tx + dx, p.ty + dy)));
+                for (int dx = -1; dx <= 1; dx++) CHECK(!strchr("SCMNPTKQWXLObp", tileAt(area, p.tx + dx, p.ty + dy)));
         }
     }
 }
@@ -1038,6 +1038,81 @@ static void arrowsHitEveryGroundEnemy() {
     }
 }
 
+static void frostOrbDetonatesOnceAndSlowsNearbyTargets() {
+    TestArea t;
+    makeArea(t, {{19, withLetter(24, 'A')}});
+    Quest q;
+    startQuest(q, t, CLASS_MAGICIAN, 5, 1, 14);
+    Enemy target = q.enemies.front();
+    target.hp = target.maxHp = 1000;
+    target.stunTimer = 5;
+    target.x = q.hero.x + 60 * DP;
+    q.enemies = {target, target, target};
+    q.enemies[1].x += 16 * DP;
+    q.enemies[2].x += 55 * DP;
+    startBoss(q, QBOSS_OVERSEER, target.x, target.y + target.h);
+    QuestBoss& boss = q.bosses.front();
+    boss.x = target.x + 12 * DP;
+    boss.y = target.y;
+    boss.hp = boss.maxHp = 1000;
+    boss.vx = 0;
+    boss.gap = 5;
+    q.markers.push_back({boss.x, boss.y, (float)boss.w, 4 * DP, 5, 'm', boss.id});
+
+    Actions cast = {};
+    cast.rocket = true;
+    int mp = q.hero.mp;
+    play(q, cast, 1);
+    CHECK(q.hero.mp == mp - 14);
+    CHECK(q.projectiles.size() == 1);
+    if (q.projectiles.empty()) return;
+    CHECK(q.projectiles[0].kind == PROJ_ORB && q.projectiles[0].w == 18 * DP && q.projectiles[0].h == 18 * DP);
+    CHECK(ORB_A.w == 18 * DP && ORB_A.h == 18 * DP && ORB_B.w == ORB_A.w && ORB_B.h == ORB_A.h);
+    for (int i = 0; i < 60 && !q.projectiles.empty(); i++) play(q, Actions(), 1);
+    CHECK(q.projectiles.empty());
+    int minDamage = damageToEnemy(q.stats.atk, 2.8f, 0.9f, false, q.stats.critMult, 1);
+    int maxDamage = damageToEnemy(q.stats.atk, 2.8f, 1.1f, false, q.stats.critMult, 1);
+    for (int i = 0; i < 2; i++) {
+        CHECK(q.enemies[i].hp >= 1000 - maxDamage && q.enemies[i].hp <= 1000 - minDamage);
+        CHECK(q.enemies[i].slowTimer == 3);
+    }
+    CHECK(q.enemies[2].hp == 1000 && q.enemies[2].slowTimer == 0);
+    CHECK(boss.hp >= 1000 - maxDamage && boss.hp <= 1000 - minDamage && fabsf(boss.slowTimer - (3 - DT)) < 0.0001f);
+    int blasts = 0;
+    for (const Effect& effect : q.effects)
+        if (effect.kind == FX_FROST_BURST && effect.w == 32 * DP) blasts++;
+    CHECK(blasts == 1);
+
+    float gap = boss.gap, tellTime = q.markers.front().timer;
+    play(q, Actions(), 4);   // three hit-stop frames, then one movement step
+    CHECK(fabsf(gap - boss.gap - 0.8f * DT) < 0.0001f);
+    CHECK(fabsf(tellTime - q.markers.front().timer - 0.8f * DT) < 0.0001f);
+    int hp = q.enemies[0].hp;
+    play(q, Actions(), 180);
+    CHECK(q.enemies[0].hp == hp && q.enemies[0].slowTimer < DT && boss.slowTimer < DT);
+}
+
+static void frostOrbBurstsAtWallsAndAtMaximumRange() {
+    for (bool wall : {false, true}) {
+        TestArea t;
+        makeArea(t, wall ? std::map<int, std::string>{{19, withLetter(20, '#')}} : std::map<int, std::string>{});
+        Quest q;
+        startQuest(q, t, CLASS_MAGICIAN, 5, 1, 14);
+        Actions cast = {};
+        cast.rocket = true;
+        play(q, cast, 1);
+        CHECK(q.projectiles.size() == 1);
+        if (q.projectiles.empty()) continue;
+        float castX = q.projectiles[0].x + q.projectiles[0].w / 2 - 90 * DP * DT;
+        for (int i = 0; i < 140 && !q.projectiles.empty(); i++) play(q, Actions(), 1);
+        CHECK(q.projectiles.empty());
+        CHECK(q.effects.size() == 1 && q.effects.front().kind == FX_FROST_BURST);
+        if (q.effects.empty()) continue;
+        float blastX = wall ? 20 * TILE - 4 * DP : castX + 200 * DP;
+        CHECK(fabsf(q.effects.front().x - blastX) <= 90 * DP * DT);
+    }
+}
+
 // No R2 skill roots the hero (D-064): running through a skill ends where running without it does; Meteor mid-jump too.
 static void skillsNeverRootTheHero() {
     TestArea t;
@@ -1927,7 +2002,7 @@ static void restHealsAndRespawnsEnemies() {
     standAt(q, 3, 19);   // touching the brazier lights it
     CHECK(logged(q, "quest: checkpoint 8.0 lit") && (q.save.lit >> 16 & 1));
     pressUp(q);
-    CHECK(q.mode == QMODE_MENU && q.menu.kind == MENU_CHECKPOINT && q.atCheckpoint == 16);
+    CHECK(q.mode == QMODE_MENU && q.menu.kind == MENU_CHECKPOINT && q.atCheckpoint == 0);
     pressX(q);   // REST
     CHECK(q.mode == QMODE_PLAY && q.hero.hp == q.stats.maxHp && q.killed[WORLD_TEST][0] == 0);
     int alive = 0;
@@ -1937,21 +2012,35 @@ static void restHealsAndRespawnsEnemies() {
 }
 
 static void travelListsLitCheckpoints() {
-    SaveData s;
-    CHECK(travelCheckpoints(s) == std::vector<int>({0, 2}));   // world 1's entry is lit from the start (spec §11)
-    s.lit |= 1u << 17 | 1u << 16;
-    CHECK(travelCheckpoints(s) == std::vector<int>({0, 2, 16, 17}));
     Quest q;
     startDev(q, "slot=3 class=0 world=8 area=0");
     standAt(q, 3, 19);
     pressUp(q);
     pressDown(q);
-    pressX(q);   // TRAVEL
-    CHECK(q.mode == QMODE_MENU && q.menu.kind == MENU_TRAVEL && q.menu.items.size() == 3 && q.menu.items[0] == "NAMULA");
-    CHECK(q.menu.items[1] == "THE DRIFTING STATION ENTRY" && q.menu.items[2] == "TEST GROUNDS ENTRY");
     pressX(q);
-    CHECK(q.mode == QMODE_PLAY && q.area.world == WORLD_NAMULA && q.area.index == 0 && logged(q, "quest: travel to 0.0"));
-    CHECK(q.save.checkpointWorld == 0 && q.save.checkpointId == 0);
+    CHECK(q.menu.kind == MENU_TRAVEL_WORLDS && q.menu.travelIds == std::vector<int>({0, 1, WORLD_TEST}));
+    CHECK(q.menu.cursor == 2);
+    pressDown(q);
+    pressDown(q);
+    pressX(q);
+    CHECK(q.menu.kind == MENU_TRAVEL_CHECKPOINTS && q.menu.travelWorld == 1);
+    CHECK(q.menu.items == std::vector<std::string>({"ENTRY - DOCKING RING"}));
+    Actions back = {};
+    back.back = true;
+    play(q, back, 1);
+    CHECK(q.menu.kind == MENU_TRAVEL_WORLDS && q.menu.cursor == 1 && q.area.world == WORLD_TEST);
+    play(q, back, 1);
+    CHECK(q.menu.kind == MENU_CHECKPOINT && q.menu.cursor == 1);
+    q.save.lit |= 1u << 3;
+    q.hero.buffTimers[0] = 50;
+    pressX(q);
+    pressUp(q);
+    pressX(q);
+    CHECK(q.menu.travelIds == std::vector<int>({0, 1}));
+    pressDown(q);
+    pressX(q);
+    CHECK(q.mode == QMODE_PLAY && q.area.world == 1 && !strcmp(q.area.def->name, "MED BAY"));
+    CHECK(q.hero.buffTimers[0] > 49 && q.save.checkpointWorld == 1 && q.save.checkpointId == 1);
     saveDelete(SAVE_FOLDER, 2);
 }
 
@@ -2338,6 +2427,65 @@ static void bossDeathLightsTheNextWorld() {
     CHECK(q.banner && !strcmp(q.banner, "GREAT NAME TAKEN") && logged(q, "quest: boss THE STAR MAGE down after"));
     startArenaFight(q);
     CHECK(q.bosses.size() == 1 && !q.bosses[0].alive);   // the old one, dead: no new fight
+    saveDelete(SAVE_FOLDER, 2);
+}
+
+static void bossArenaCheckpointAndPortal() {
+    for (int world = 1; world <= 3; world++) {
+        Quest q;
+        std::string spec = "world=" + std::to_string(world) + " area=19";
+        startDev(q, spec.c_str());
+        q.godMode = true;
+        AreaLink brazier = checkpointLocation(world, BOSS_CHECKPOINT);
+        const AreaDef& def = *q.area.def;
+        const char* portal = strchr(def.tiles, 'p');
+        CHECK(brazier.area == 19 && portal && q.bosses.size() == 1);
+        if (brazier.area != 19 || !portal || q.bosses.empty()) continue;
+        int tile = (int)(portal - def.tiles);
+        int px = tile % def.cols, py = tile / def.cols;
+        CHECK(abs(px - brazier.tileX) >= 4);
+        standAt(q, brazier.tileX, brazier.tileY);
+        pressUp(q);
+        CHECK(q.mode == QMODE_PLAY && q.arenaLocked);
+        standAt(q, px, py);
+        pressUp(q);
+        CHECK(q.area.world == world && q.arenaLocked);
+        q.bosses[0].hp = 0;
+        play(q, Actions(), 30);
+        CHECK(checkpointLit(q.save, world, BOSS_CHECKPOINT));
+        standAt(q, brazier.tileX, brazier.tileY);
+        pressUp(q);
+        CHECK(q.mode == QMODE_MENU && q.atCheckpoint == BOSS_CHECKPOINT);
+        pressDown(q);
+        pressX(q);
+        pressX(q);
+        CHECK(q.menu.kind == MENU_TRAVEL_CHECKPOINTS && q.menu.travelIds[q.menu.cursor] == BOSS_CHECKPOINT);
+        pressX(q);
+        CHECK(q.area.index == 19 && q.save.checkpointId == BOSS_CHECKPOINT && q.bosses.empty());
+        questOpen(q, SAVE_FOLDER);
+        q.cursor = 2;
+        pressX(q);
+        CHECK(q.area.world == world && q.area.index == 19 && q.bosses.empty());
+        CHECK(q.hero.x == brazier.tileX * TILE);
+        standAt(q, px, py);
+        pressUp(q);
+        if (worldDef(world + 1).count) {
+            AreaLink entry = checkpointLocation(world + 1, 0);
+            CHECK(q.area.world == world + 1 && q.area.index == entry.area && q.hero.x == entry.tileX * TILE);
+            CHECK(q.save.checkpointWorld == world);
+            standAt(q, entry.tileX, entry.tileY);
+            pressUp(q);
+            pressDown(q);
+            pressX(q);
+            pressUp(q);   // previous world
+            pressX(q);
+            pressUp(q);   // last destination is the cleared arena
+            pressX(q);
+            CHECK(q.area.world == world && q.area.index == 19 && q.hero.x == brazier.tileX * TILE);
+        } else {
+            CHECK(q.area.world == world && q.banner && !strcmp(q.banner, "THE WAY IS CLOSED"));
+        }
+    }
     saveDelete(SAVE_FOLDER, 2);
 }
 
@@ -2804,6 +2952,8 @@ int main(int argc, char** argv) {
     thiefStabsUp();
     arrowsHitEveryGroundEnemy();
     basicAttackKeepsFullSpeed();
+    frostOrbDetonatesOnceAndSlowsNearbyTargets();
+    frostOrbBurstsAtWallsAndAtMaximumRange();
     skillsNeverRootTheHero();
     slashLitMatchesHitWindow();
     meleeBasicHitStops();
@@ -2854,6 +3004,7 @@ int main(int argc, char** argv) {
     bossFightLocksAndUnlocksExits();
     defeatedBossesStayDead();
     bossDeathLightsTheNextWorld();
+    bossArenaCheckpointAndPortal();
     coconutDropsWhenHeroPassesUnder();
     treeMonkeyThrowsOnLanding();
     peelSlidesTheHero();
