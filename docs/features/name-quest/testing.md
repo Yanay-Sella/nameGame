@@ -43,7 +43,7 @@
 - [x] The Overseer telegraphs every shot, slam and summon (0.4 s; the slam 0.8 s with a marker); all 4 attacks and phase 2 appear. *(`tests/quest_tests.cpp` › overseerTellsBeforeEveryAttack)*
 - [x] The Star Mage's beam column is marked for 1.2 s and burns exactly there; phase 2 marks and burns two columns 64 apart. *(`tests/quest_tests.cpp` › starMageBeamMarksItsColumn)*
 - [x] A boss fight closes the edges and portals and opens them when the boss dies; the hero's death ends the fight. *(`tests/quest_tests.cpp` › bossFightLocksAndUnlocksExits)*
-- [x] The mini-boss stays down until a rest or death; the big boss stays dead. *(`tests/quest_tests.cpp` › bigBossStaysDeadMiniBossReturns)*
+- [x] Defeated bosses stay dead on revisiting their arenas and after reloading the slot. Mini-bosses also stay down after resting and dying. *(`tests/quest_tests.cpp` › defeatedBossesStayDead)*
 - [x] The Star Mage's death sets its bit, lights world 2's entry, gives 150 x names and shows `GREAT NAME TAKEN`. *(`tests/quest_tests.cpp` › bossDeathLightsTheNextWorld)*
 - [x] An Archer's basic arrow hits every world 1 ground enemy (the crawler was once too low: its arrows flew over it). *(`tests/quest_tests.cpp` › arrowsHitEveryGroundEnemy)*
 - [x] World 1's layers keep the value rules; its props never block spots; every ground shape has art. *(`tests/quest_tests.cpp` › layersObeyTheValueRules, propsNeverBlockSpots, everyGroundShapeHasArt)*
@@ -83,6 +83,7 @@
 - [x] `make quest-anims`: 16 sheets and 4 lineups read; the flipbook sent to the user. *(2026-11-22)*
 - [x] All 28 NPCs have distinct art on the hero grid and two frames that meet the floor. Checked the lineup and the in-game scale beside the Knight in Namula. *(2026-11-22, `npcSpritesShareTheHeroGrid` and `make mac-run`)*
 - [x] Each class plays nine distinct drawings for each of its three strikes at 60 Hz. All six leg poses support the full sequence. *(`tests/quest_tests.cpp` › everyBasicStrikeShowsNineDrawings)*
+- [x] Reviewed the Magician’s flick, rising crescent and spinning release at game speed in the Docking Ring. Each of the three taps fired a horizontal bolt. *(2026-11-23, Mac, `shots/anims/magician-r1-in-game.gif`)*
 - [x] Each strike changes the knee silhouette through at least three shapes in all six leg poses. The standing front foot stays planted. The Archer’s rear foot plants four art pixels back at full brace. The head moves backward on the Archer and forward on the other three heroes. *(`tests/quest_tests.cpp` › basicAttacksShiftWeightThroughTheLegs)*
 - [x] R1 taps cycle through three distinct strikes for each class. Holding R1 fires once. An idle gap or R2 resets the chain, and a press during hit-stop is queued with the Thief's upward aim. *(2026-11-22, `basicAttacksCycleThroughThreePoses`, `basicAttackPressSurvivesHitStop`)*
 - [x] Each promotion shortens the next-strike wait for every class and brings farther and higher targets into reach. Promoted hits start the correct impact tier and the effect expires. *(`tests/quest_tests.cpp` › everyJobShortensBasicCombos, everyJobGrowsBasicHitsAndImpacts)*

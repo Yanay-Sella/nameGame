@@ -1,6 +1,6 @@
 # NAME game — Game Design Document
 
-**Version:** 0.38 · **Updated:** 2026-11-22 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
+**Version:** 0.39 · **Updated:** 2026-11-23 · [Features](#feature-index) · [Decisions](#decisions) · [Change log](#change-log)
 
 ## Summary
 You pilot a small ship at the bottom of the screen against waves of pixel-art aliens. Hold R1 to spray bullets, and save the scarce R2 rocket for the moment a wave gets out of hand. Waves get harder, and every 5th wave is a boss. The run goes through five levels of 20 waves each, every one harder than the last: level 1 (space), the jungle, the glacier, the volcano and the deep sea. It ends when you beat the deep sea's wave-20 bosses or lose your last life, and you chase the saved high score. Big bosses drop level buffs that stack until you die. Classic offers a five-level run in 1–2 Players or expanded 1–4 Players, and its Level Picker plays any single level on its own. NAME QUEST is a separate RPG platformer on the main menu, set in the same worlds, with four classes, a hub village, checkpoints and three save slots.
@@ -134,7 +134,7 @@ Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN ME
 | D-036 | 2026-11-20 | 6 worlds in a fixed order: the 5 shooter themes, then The Nameless Citadel; 20 areas each; a secret world unlocked by a quest | free world order; fewer, larger worlds | user's choice | [NAME QUEST](features/name-quest/design.md) |
 | D-037 | 2026-11-20 | 3 save slots with autosave (rest, level up, purchase, quest step, boss kill, quit); no manual save | one slot; manual saves at checkpoints | user's choice | [NAME QUEST](features/name-quest/design.md) |
 | D-038 | 2026-11-20 | Death drops all carried names where you died; touching them recovers them; dying again first loses them | keep names on death; lose them for good | user's choice | [NAME QUEST](features/name-quest/design.md) |
-| D-039 | 2026-11-20 | Healing only from bought potions; resting at a checkpoint heals fully and respawns enemies; big bosses stay dead, mini-bosses respawn | regenerating HP; enemies that stay dead | user's choice | [NAME QUEST](features/name-quest/design.md) |
+| D-039 | 2026-11-20 | Healing only from bought potions; resting at a checkpoint heals fully and respawns enemies; big bosses stay dead, mini-bosses respawn → mini-boss rule superseded by D-072 | regenerating HP; enemies that stay dead | user's choice | [NAME QUEST](features/name-quest/design.md) |
 | D-040 | 2026-11-20 | Max level 40, no stat points; jobs at levels 5, 15, 30 through the class mentor | stat points to spend; a higher level cap | user's choice | [NAME QUEST](features/name-quest/design.md) |
 | D-041 | 2026-11-20 | The strong attack costs MP | a cooldown only | user's choice | [NAME QUEST](features/name-quest/design.md) |
 | D-042 | 2026-11-20 | Controls: X jump, R1 attack (hold to repeat, superseded by D-068), R2 strong attack, Circle dodge, Square drink potion, Triangle switch potion, Up talk / portal / climb, Start pause | attack on Square or X; jump on a shoulder button | user's choice | [NAME QUEST](features/name-quest/design.md) |
@@ -164,6 +164,7 @@ Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN ME
 | D-069 | 2026-11-22 | Each NAME QUEST R1 strike plays nine poses with bent knees and a weight shift toward the target for Knight, Magician and Thief, and away from it for Archer | three upper-body poses per strike | the user wants smoother attacks with visible body weight for all four heroes | [NAME QUEST](features/name-quest/design.md) |
 | D-070 | 2026-11-22 | Every NAME QUEST promotion shortens the R1 cycle, grows the hitbox and reach, and adds stronger class-coloured hit effects | add only damage on promotion | the user wants a visible and playable upgrade to basic attacks for all four heroes | [NAME QUEST](features/name-quest/design.md) |
 | D-071 | 2026-11-22 | NAME QUEST promotions retain earlier strong attacks. R3 selects an unlocked skill and R2 casts it | replace the strong attack on promotion | players want to keep using earlier skills | [NAME QUEST](features/name-quest/design.md) |
+| D-072 | 2026-11-23 | Defeated NAME QUEST mini-bosses stay dead in the save slot | respawn mini-bosses after a rest or death | user's choice | [NAME QUEST](features/name-quest/design.md) |
 
 ## Open questions
 - **Assumptions to confirm:** sprites as text grids in code (D-006); every number marked `[ASSUMPTION]` in the feature notes.
@@ -210,3 +211,4 @@ Boot → MAIN MENU; PLAYING ⇄ (Start) PAUSED ─ RETURN TO MENU ─→ MAIN ME
 **0.35 (2026-11-21):** NAME QUEST worlds 2 and 3, THE GREENDEEP and THE WHITE SILENCE: their looks (approved from the style frames), 40 areas, ten redrawn enemies, coconuts, thorns, crumbling ice, icicles and flipping wind, the MONKEY KING, the SILVERBACK, the YETI and THE GLACIER TITAN; Garrick in the Greendeep.
 **0.37 (2026-11-22):** NAME QUEST NPCs share the hero art style and all four classes cycle through three basic attack animations (D-066, D-067).
 **0.38 (2026-11-22):** Each R1 tap advances a NAME QUEST combo, with nine drawings per strike and a braced stance for each class (D-068, D-069).
+**0.39 (2026-11-23):** Defeated NAME QUEST mini-bosses stay dead (D-072).

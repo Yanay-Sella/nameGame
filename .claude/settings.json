@@ -1,4 +1,7 @@
 {
+  "skillOverrides": {
+    "developer-guidelines": "off"
+  },
   "permissions": {
     "additionalDirectories": [
       "/Users/yanaysella/git/nameGame",

@@ -340,7 +340,7 @@ static void die(Quest& q, const char* cause) {
         float angle = i * 6.2832f / DEATH_PARTICLES, speed = (40 + 20 * (i % 3)) * DP;
         q.particles.push_back({h.x + HERO_W / 2, h.y + HERO_H / 2, cosf(angle) * speed, sinf(angle) * speed, 0.8f, paletteColor('w'), 1});
     }
-    q.bosses.clear();   // the fight ends; the boss is back at full HP next time (spec §12)
+    q.bosses.clear();   // an undefeated boss starts the next attempt at full HP (spec §12)
     q.markers.clear();
     q.arenaLocked = false;
     q.mode = QMODE_DEAD;
@@ -399,7 +399,7 @@ static void resetHazards(Quest& q) {
     loadArea(q.area, q.area.world, q.area.index, q.save.gates, q.save.shortcuts[q.area.world]);
 }
 
-// REST (spec §11): HP and MP full, every enemy and mini-boss back, hazards reset, the respawn point, a white fade, autosave.
+// REST (spec §11): refill HP and MP, respawn normal enemies, reset hazards, set the checkpoint and save.
 static void rest(Quest& q, int bit) {
     for (auto& killed : q.killed) killed.assign(killed.size(), 0);
     resetHazards(q);
@@ -1043,7 +1043,7 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
     case QMODE_CREDITS: break;   // phase 8
     case QMODE_DEAD:
         updateEffects(q, dt);
-        if (q.modeTimer >= DEATH_TIME) {   // respawn: every enemy back, full HP and MP, buffs off
+        if (q.modeTimer >= DEATH_TIME) {   // normal enemies return, HP and MP refill, buffs end
             for (auto& killed : q.killed) killed.assign(killed.size(), 0);
             q.save.deaths++;
             enterAtCheckpoint(q);

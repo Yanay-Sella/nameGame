@@ -299,8 +299,8 @@ multiplies enemy HP, attack and names by `1 + 0.5 * n` (n at most 3).
 - All carried names drop as a **name echo** where the hero last stood on safe ground (a solid, non-crumbling tile
   with no hazard within 2 tiles); an older echo is lost. Touching the echo gives the names back (`+n NAMES` text,
   SOUND_Q_NAMES). Echo: 8 x 8 pale-yellow wisp bobbing 2 px.
-- Death also: respawns every normal enemy and mini-boss, ends buffs, closes any boss fight (the boss is back at full
-  HP next time), resets crumbled blocks and dropped icicles. Potions used stay used.
+- Death also respawns normal enemies, ends buffs, closes any active boss fight and resets crumbled blocks and dropped
+  icicles. Undefeated bosses start the next attempt at full HP. Potions used stay used.
 
 ## §8 Enemies
 
@@ -405,7 +405,7 @@ stays closed until there is room. Opening: Up at the chest, 0.3 s lid animation,
   `NAME KINDLED` (scale 2, `o`, 1.5 s), SOUND_Q_KINDLE, autosave.
 - Up at a lit checkpoint → menu titled with the checkpoint's name (`<WORLD> ENTRY`, `<WORLD> DEPTHS`; Namula:
   `HEARTH OF NAMES`): REST, TRAVEL, LEAVE.
-  - REST: HP and MP full, every normal enemy and mini-boss respawns (killed lists cleared), crumbled blocks and icicles
+  - REST: HP and MP full, normal enemies respawn (killed lists cleared), crumbled blocks and icicles
     reset, this becomes the respawn point, autosave. A short white fade (0.3 s, skipped with reduce flashing).
   - TRAVEL: a list of every lit checkpoint in world order plus `NAMULA` first; choosing one moves the hero there and
     rests there. The list scrolls if longer than 8 rows.
@@ -426,8 +426,8 @@ hearth's crackle (§16). Its palette is warm stone and firelight (§21).
 
 ### Gates (D-050)
 `g` tiles are solid until `gatesOpen` has the world's bit. The mini-boss's death sets it: banner `THE GATE OPENS`,
-SOUND_Q_GATE, the gate tiles shake 0.5 s then vanish top to bottom over 0.5 s if on screen, autosave. Mini-bosses
-respawn after rests (D-039) but the gate stays open.
+SOUND_Q_GATE, the gate tiles shake 0.5 s then vanish top to bottom over 0.5 s if on screen, autosave. The saved gate
+bit also records the mini-boss's defeat (D-072).
 
 ### Shortcuts
 Hitting a lever `K` with any attack opens every `k` in its area: SOUND_Q_GATE, saved per world (bit = the area's
@@ -459,7 +459,7 @@ Hitting a lever `K` with any attack opens every `k` in its area: SOUND_Q_GATE, s
   or the hero dies (the boss resets).
 - Big boss death: hit-stop 0.15, trauma 1.0, 60 particles, `+n NAMES`, banner `GREAT NAME TAKEN` (scale 2, `Y`)
   for worlds 1–5, the sigil bit set, the next world's entry lit, autosave. Big bosses stay dead (bossesDead bit).
-- Mini-boss death: names, the gate opens (§11). Mini-bosses come back after a rest; their arena then fights again.
+- Mini-boss death awards names and opens the gate (§11). Defeated mini-bosses stay dead in the slot (D-072).
 - HP from §7; names from §7; contact damage while the boss's body touches the hero.
 
 ### The bosses (the design it is redrawn from at 40–64 px, §22; gap; phase 1 attacks; phase 2 changes)

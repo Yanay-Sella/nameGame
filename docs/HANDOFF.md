@@ -1,7 +1,7 @@
 # Handoff: state of the work and how Claude and Codex share it
 
 **Read this first, update it before you stop.** Rules and commands are in `AGENTS.md`; conventions, questions between agents and the small-change lane are in `docs/COLLAB.md`; this file holds what changes between sessions.
-Updated: 2026-11-22 (NAME QUEST basic attack progression).
+Updated: 2026-11-23 (NAME QUEST mini-boss persistence).
 
 ## Classic shooter
 
@@ -51,6 +51,21 @@ Updated: 2026-11-22 (NAME QUEST basic attack progression).
 - Spec examples that disagree with the spec formula `round(100 * 1.2^(L-1))`: 39→40 is 102,067 (spec 102,064), 29→30 is 16,484 (spec 10,646). The code follows the formula; the user decides.
 
 ## Session log (newest first; add a line per session: date, agent, what changed, what is next)
+
+- 2026-11-23, Codex — Implemented the Magician’s R1 wand flick, rising crescent and approved wide spinning finisher. Mac Docking Ring capture in `shots/anims/magician-r1-in-game.gif`. NAME QUEST passed, with the 50 known Classic checks still failing. Ready for the user’s playtest.
+
+- 2026-11-23, Codex — Revised the Magician finisher study to a tighter pivot with a one-handed wand release. Preview in `shots/anims/mage-pivot-one-hand.gif`, with stills in `shots/anims/mage-pivot-one-hand-poses.png`. Awaiting user feedback before previewing the three-cast chain.
+
+- 2026-11-23, Codex — The user requested a wand sweep in place of the overhead seal. Sketched the third R1 cast as a waist-high spin with the standard horizontal bolt in `shots/anims/mage-spin-study.gif` and `mage-spin-poses.png`. Awaiting motion feedback before the full combo preview.
+
+- 2026-11-23, Codex — Disabled the personal `developer-guidelines` skill for NAME game through the project’s Codex and Claude settings. Other projects retain the skill.
+
+- 2026-11-23, Codex — Reviewed the developer-guidelines skill for token overhead and user involvement in major technology decisions. Advice only. No game changes.
+
+- 2026-11-23, Codex — Sketched three Magician R1 key poses in `shots/anims/mage-combo-direction.png` for the user's first review. Awaiting art direction before animating the combo or editing game code.
+
+- 2026-11-23 · Codex · Added shared `sprite-animation` and `pixel-art-fundamentals` skills for NAME QUEST. Apply them on the next character motion or sprite review.
+- 2026-11-23, Codex — Defeated mini-bosses stay dead in their slot (D-072). The saved gate bit records the kill. Quest tests passed for revisits, rest, death and reload. Mac screenshots confirmed the Overseer fight starts with a fresh gate and the cleared Hangar has no boss bar. PS3 playtest pending.
 - 2026-11-22, Codex — Job promotions retain all earlier R2 skills and equip the new one (D-071). R3 cycles through unlocked skills and the HUD shows the selection. All four classes passed quest tests. Reviewed the Mac Elementalist HUD and Frost Orb cast. PS3 playtest pending.
 - 2026-11-22, Codex — All four heroes gain faster R1 cycles, larger hitboxes, longer reach and class-coloured impact bursts at each job (D-070). Quest tests passed and Mac impact frames reviewed. TV playtest pending.
 - 2026-11-22, Codex — Added the Dev Tester to Namula and the Proving Floor. All 16 R2 casts, a direct arena warp and the dev-aids gate passed quest tests. Reviewed the Mac menus and built `build/nameGame-dev-tester.pkg`. PS3 installation and playtest are pending.

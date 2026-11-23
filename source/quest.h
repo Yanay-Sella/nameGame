@@ -184,7 +184,7 @@ struct QuestBoss {
     float started;           // q.time when the fight began (the log's duration)
     float data[8];           // per-boss scratch (anchors chosen, wave counts...); each use named in quest_bosses.cpp
     int lastSwing, lastPartnerSwing;   // the hero's swing ids that already hit it
-    bool big;                // the world's big boss (stays dead), else its mini-boss (back after a rest)
+    bool big;                // the world's big boss, else its mini-boss
 };
 struct Marker { float x, y, w, h, timer; char color; };   // a telegraph drawn as dashes until timer runs out
 enum BossPose { POSE_IDLE, POSE_TELL, POSE_ATTACK, POSE_OPEN };

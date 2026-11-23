@@ -372,11 +372,6 @@ STRIKE_PATHS = {
         [(25,18,9), (25,18,14), (24,19,19), (23,20,24), (22,20,30), (21,20,39), (21,19,43), (20,19,35), (20,18,26)],
         [(24,14,-18), (25,14,-24), (25,15,-17), (24,16,-9), (23,17,0), (22,18,9), (21,19,17), (20,19,23), (20,18,32)],
     ],
-    "MAGICIAN": [
-        [(23,16,-16), (24,16,-10), (24,17,0), (23,18,9), (22,19,2), (22,18,-18), (21,18,-42), (21,18,-62), (21,17,-81)],
-        [(22,19,2), (23,18,-7), (24,17,-18), (23,16,-34), (22,15,-53), (21,15,-72), (20,16,-90), (20,17,-102), (21,18,-96)],
-        [(22,14,-56), (24,14,-42), (24,15,-28), (23,16,-12), (23,17,2), (22,18,-14), (21,18,-40), (20,17,-66), (20,16,-87)],
-    ],
     "THIEF": [
         [(19,18,16), (18,19,25), (20,19,13), (24,18,2), (26,17,-4), (25,17,0), (23,18,11), (21,19,25), (20,19,37)],
         [(19,20,43), (18,20,65), (20,20,38), (23,19,8), (25,16,-24), (24,15,-49), (22,15,-65), (21,16,-40), (20,17,-20)],
@@ -389,9 +384,6 @@ DRAW_PATHS = {
     "ARCHER": [[(22,19,14), (23,17,7), (24,16,0)],
                [(22,20,24), (23,19,15), (24,18,9)],
                [(22,17,2), (23,15,-9), (24,14,-18)]],
-    "MAGICIAN": [[(21,18,-65), (21,17,-49), (22,16,-31)],
-                 [(20,17,-101), (20,18,-65), (21,19,-25)],
-                 [(20,17,-78), (21,15,-90), (22,13,-74)]],
 }
 
 # The free arm is part of each tunic. The weapon arm is drawn from shoulder through elbow to hand.
@@ -479,8 +471,105 @@ def strike_legs(cls, legs, load, hip_x, drop):
     return grid
 
 
+# Knee bend, shoulder turn (degrees), grip x/y and wand tip x/y on the hero grid.
+# The bolt crosses row 20 on release. Queued draws occupy the preceding cast's last three poses.
+MAGICIAN_CASTS = [
+    [(3,12,22,20,29,20), (4,5,24,19,31,19), (3,0,24,18,31,16),
+     (2,0,23,18,30,17), (2,0,22,19,29,21), (1,0,21,19,27,23),
+     (1,0,21,18,27,20), (1,0,21,17,25,13), (0,0,21,17,22,10)],
+    [(3,18,23,20,29,20), (4,26,24,17,30,14), (4,32,23,15,27,9),
+     (3,40,22,14,24,7), (2,46,21,14,21,7), (2,54,20,15,18,8),
+     (1,98,17,16,14,10), (1,182,11,18,5,16), (0,298,17,17,19,10)],
+    [(3,308,22,20,29,20), (4,346,24,20,31,20), (4,375,24,20,31,21),
+     (3,400,23,21,29,23), (2,415,21,21,26,24), (2,402,20,20,25,23),
+     (1,385,20,19,26,20), (1,368,21,18,26,15), (0,360,21,17,22,10)],
+]
+MAGICIAN_DRAWS = [
+    [(1,18,20,20,24,23), (2,26,20,20,24,20), (2,22,21,20,26,19)],
+    [(1,8,21,20,26,24), (2,14,21,21,26,25), (3,20,22,21,28,24)],
+    [(2,100,16,17,13,12), (3,182,8,19,1,19), (3,260,14,19,11,18)],
+]
+
+
+def magician_cast(strike, frame, legs, drawing):
+    """Draw the flick, lifting crescent and broad turning sweep around the current gait's feet."""
+    poses = MAGICIAN_DRAWS[strike] if drawing else MAGICIAN_CASTS[strike]
+    index = frame - 6 if drawing else frame
+    load, turn, hx, hy, tx, ty = poses[index]
+    side = math.cos(math.radians(turn))
+    hip = round(load * 0.4)
+    drop = round(load * 0.5)
+    bob = int(legs in ("RUN_1", "RUN_3"))
+    grid = strike_legs("MAGICIAN", legs, load, hip, drop)
+
+    # Each afterimage follows the tip. The lifting arc rises in front and the pivot passes behind the body.
+    if drawing and strike == 2:
+        traces = [((18,9),(15,9),(13,12)), ((12,13),(6,14),(2,16),(1,19)),
+                  ((2,20),(4,21),(7,21),(11,18))]
+    elif not drawing and strike == 1:
+        traces = [((26,25),(28,23),(29,20)), ((28,23),(30,21),(31,18),(30,14)),
+                  ((31,18),(31,14),(30,11),(27,9)), ((30,13),(29,10),(27,8),(24,7))]
+    elif not drawing and strike == 2:
+        traces = [((11,18),(15,17),(23,17),(27,18),(29,20)), ((22,17),(27,18),(30,19),(31,20)),
+                  ((26,18),(29,19),(31,21))]
+    else:
+        traces = []
+    if index < len(traces):
+        path = traces[index]
+        for k, ((x0, y0), (x1, y1)) in enumerate(zip(path, path[1:])):
+            color = "i" if k == len(path) - 2 else "u"
+            pixel_line(grid, x0, y0 + bob, x1, y1 + bob, color)
+
+    top = [["."] * W for _ in range(H)]
+    costume = CLASSES["MAGICIAN"]
+    stamp(top, STRIKE_CORE["MAGICIAN"])
+    stamp(top, costume["head"])
+    stamp(top, costume["back"]["flutter" if load >= 2 else "rest"], only_empty=True)
+    stamp(top, costume["tier"], only_empty=True)
+    # Project the shoulders, hat and hair through profile. Hide the face on the back half of the pivot.
+    width = (0.52 + 0.48 * abs(side)) * (-1 if side < 0 else 1)
+    for y in range(H - drop - bob):
+        weight = min(1, max(0, (23 - y) / 13))
+        shift = hip + round(load * weight)
+        for x in range(W):
+            src_x = round(16 + (x - 16 - shift) / width)
+            if not 0 <= src_x < W:
+                continue
+            ch = top[y][src_x]
+            if ch == ".":
+                continue
+            if 95 <= turn <= 290 and y >= 8 and ch in FACE_CHARS:
+                ch = ":" if src_x % 5 == 0 else ">"
+            grid[y + drop + bob][x] = ch
+
+    sy = 16 + drop + bob
+    sx = 16 + hip + round(3 * side)
+    # The empty arm counterbalances the sweep. The casting wrist leads the tip.
+    free_x = round(15 + hip - (5 + load) * side)
+    free_y = sy + (0 if strike == 1 else 3)
+    pixel_line(grid, 16 + hip, sy, free_x, free_y, "^")
+    pixel_line(grid, free_x, free_y, free_x - round(side), free_y + 1, "@")
+    hy += bob
+    ty += bob
+    elbow_x = round((sx + hx) / 2 - side)
+    elbow_y = max(sy, hy) + 1
+    for offset in (0, 1):
+        pixel_line(grid, sx, sy + offset, elbow_x, elbow_y + offset, "^")
+        pixel_line(grid, elbow_x, elbow_y + offset, hx, hy + offset, "`")
+    butt_x = hx - (tx - hx) * 0.75
+    butt_y = hy - (ty - hy) * 0.75
+    pixel_line(grid, butt_x, butt_y, tx, ty, "&")
+    grid[hy][hx] = "@"
+    grid[ty][tx] = "w"
+    grid[ty - 1][tx] = "c"
+    grid[ty + 1][tx] = "2"
+    return doubled(grid)
+
+
 def strike_frame(cls, strike, frame, legs, drawing=False):
     """Pose the legs, torso and weapon together on one R1 frame."""
+    if cls == "MAGICIAN":
+        return magician_cast(strike, frame, legs, drawing)
     ranged = cls in DRAW_PATHS
     hand_x, hand_y, angle = STRIKE_PATHS[cls][strike][frame]
     load = (3, 4, 4, 3, 2, 2, 1, 1, 0) if ranged else (0, 1, 1, 2, 4, 4, 3, 1, 0)
@@ -514,7 +603,7 @@ def strike_frame(cls, strike, frame, legs, drawing=False):
     hx = hand_x + (hip_x if cls == "ARCHER" else 0)
     hy = hand_y + bob
     ex, ey = (sx + hx) / 2 - 1, max(sy, hy) + 1
-    sleeve = {"KNIGHT": "s", "ARCHER": "&", "MAGICIAN": "^", "THIEF": "<"}[cls]
+    sleeve = {"KNIGHT": "s", "ARCHER": "&", "THIEF": "<"}[cls]
     pixel_line(grid, sx, sy, ex, ey, sleeve)
     pixel_line(grid, sx, sy + 1, ex, ey + 1, sleeve)
     pixel_line(grid, ex, ey, hx, hy, "]")
@@ -538,13 +627,6 @@ def strike_frame(cls, strike, frame, legs, drawing=False):
         if drawing:
             stroke(-pull, 0, 2, 0, "/")
             stroke(3, 0, 3, 0, "w")
-    elif cls == "MAGICIAN":
-        rear = min(9, (H - 3 - hy) / -si) if si < 0 else 9
-        stroke(-rear, 0, 6, 0, "&")
-        stroke(5, -1, 6, -1, "c")
-        stroke(5, 1, 6, 1, "2")
-        stroke(6, 0, 7, 0, "c")
-        stroke(7, 0, 7, 0, "w")
     else:
         length = 7 if cls == "KNIGHT" else 4
         stroke(-1, 0, 2, 0, "h" if cls == "KNIGHT" else "2")

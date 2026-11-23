@@ -195,9 +195,8 @@ void startArenaFight(Quest& q) {
     int world = statsWorld(q.area.world);
     bool big = def.flags & AREA_BOSS, mini = def.flags & AREA_MINIBOSS;
     if ((!big && !mini) || world < 1 || world > 6) return;
-    std::vector<uint64_t>& killed = q.killed[q.area.world];
-    if (big && (q.save.bosses >> q.area.world & 1)) return;   // big bosses stay dead
-    if (mini && q.area.index < (int)killed.size() && (killed[q.area.index] >> 63 & 1)) return;   // until the next rest or death
+    uint32_t defeated = big ? q.save.bosses : q.save.gates;
+    if (defeated >> q.area.world & 1) return;
     int id = big ? BIG_BOSS[world] : MINI_BOSS[world];
     if (id > QBOSS_TITAN) return;   // the other worlds' bosses come in their phases
     const char* spot = strchr(def.tiles, big ? 'W' : 'Q');
@@ -749,10 +748,7 @@ static void bossDown(Quest& q, QuestBoss& b) {
         questSave(q);
         return;
     }
-    std::vector<uint64_t>& killed = q.killed[world];
-    if (q.area.index < (int)killed.size()) killed[q.area.index] |= 1ull << 63;
-    if (q.save.gates >> world & 1) questSave(q);
-    else openGate(q, world);   // banner, sound, autosave
+    openGate(q, world);   // records the defeat, opens the gate and saves
 }
 
 void updateBosses(Quest& q, float dt) {

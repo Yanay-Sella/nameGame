@@ -2262,12 +2262,14 @@ static void bossFightLocksAndUnlocksExits() {
     saveDelete(SAVE_FOLDER, 2);
 }
 
-// Leaving and coming back: the mini-boss stays down until a rest or death, the big boss for good.
-static void bigBossStaysDeadMiniBossReturns() {
+static void defeatedBossesStayDead() {
     Quest q;
     startDev(q, "slot=3 class=0 world=8 area=4 level=4");
+    CHECK(q.bosses.size() == 1 && q.bosses[0].id == QBOSS_OVERSEER);
     q.bosses[0].hp = 0;
     play(q, Actions(), 30);   // past the death's hit-stop
+    SaveData saved;
+    CHECK(saveRead(SAVE_FOLDER, 2, saved) && (saved.gates >> WORLD_TEST & 1));
     standAt(q, 75, 18);
     pressUp(q);   // the portal to the dome
     CHECK(q.area.index == 5 && q.bosses.size() == 1 && q.bosses[0].id == QBOSS_STAR_MAGE);
@@ -2280,17 +2282,38 @@ static void bigBossStaysDeadMiniBossReturns() {
     standAt(q, 75, 18);
     pressUp(q);   // and the dome stays empty
     CHECK(q.area.index == 5 && q.bosses.empty());
-    q.hero.hp = 0;   // a death clears the killed lists: the mini-boss is due again, the big boss is not
+
+    q.devAids = true;
+    Actions select = {};
+    select.selectHeld = true;
+    play(q, select, 123);   // return to the Proving Floor brazier
+    CHECK(q.area.index == 0);
+    standAt(q, 3, 19);
+    pressUp(q);
+    CHECK(q.mode == QMODE_MENU && q.menu.kind == MENU_CHECKPOINT);
+    pressX(q);   // REST
+    CHECK(q.mode == QMODE_PLAY && logged(q, "quest: rest at 8.0"));
+    loadArea(q.area, WORLD_TEST, 4, q.save.gates, 0);
+    startArenaFight(q);
+    CHECK(q.bosses.empty() && !q.arenaLocked);
+
+    q.hero.hp = 0;
     play(q, Actions(), 1);
     play(q, Actions(), 160);
-    CHECK(q.mode == QMODE_PLAY);
+    CHECK(q.mode == QMODE_PLAY && q.area.world == WORLD_TEST && q.area.index == 0);
     loadArea(q.area, WORLD_TEST, 4, q.save.gates, 0);
-    spawnEnemies(q);
     startArenaFight(q);
-    CHECK(q.bosses.size() == 1 && q.bosses[0].hp == q.bosses[0].maxHp);
+    CHECK(q.bosses.empty() && !q.arenaLocked);
+
+    questOpen(q, SAVE_FOLDER);
+    pressUp(q);   // select slot 3
+    pressX(q);
+    CHECK(q.mode == QMODE_PLAY && q.area.world == WORLD_TEST && q.area.index == 0);
+    loadArea(q.area, WORLD_TEST, 4, q.save.gates, 0);
+    startArenaFight(q);
+    CHECK(q.bosses.empty() && !q.arenaLocked);
     q.bosses.clear();
     loadArea(q.area, WORLD_TEST, 5, q.save.gates, 0);
-    spawnEnemies(q);
     startArenaFight(q);
     CHECK(q.bosses.empty());
     saveDelete(SAVE_FOLDER, 2);
@@ -2829,7 +2852,7 @@ int main(int argc, char** argv) {
     overseerTellsBeforeEveryAttack();
     starMageBeamMarksItsColumn();
     bossFightLocksAndUnlocksExits();
-    bigBossStaysDeadMiniBossReturns();
+    defeatedBossesStayDead();
     bossDeathLightsTheNextWorld();
     coconutDropsWhenHeroPassesUnder();
     treeMonkeyThrowsOnLanding();
