@@ -2019,6 +2019,7 @@ static void restHealsAndRespawnsEnemies() {
     CHECK(q.mode == QMODE_MENU && q.menu.kind == MENU_CHECKPOINT && q.atCheckpoint == 0);
     pressX(q);   // REST
     CHECK(q.mode == QMODE_PLAY && q.hero.hp == q.stats.maxHp && q.killed[WORLD_TEST][0] == 0);
+    CHECK(q.spawnFade > 0);   // the rest fades in from black
     int alive = 0;
     for (const Enemy& e : q.enemies) alive += e.alive;
     CHECK(alive == 3 && q.save.checkpointWorld == WORLD_TEST && q.save.checkpointId == 0 && logged(q, "quest: rest at 8.0"));

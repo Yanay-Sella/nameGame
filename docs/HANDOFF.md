@@ -58,7 +58,7 @@ Updated: 2026-11-23 (NAME QUEST boss arena and checkpoint travel).
 
 - 2026-11-24, Claude — Added the NAME QUEST player's guide `docs/quest-guide/NAME-quest-guide.pdf` (28 pages: heroes and their four skills, Namula, worlds 1–3 with maps, every area, monsters and all six bosses). `python3 docs/quest-guide/make_quest_guide.py` rebuilds it; `render_quest_guide.cpp` draws every picture and reads every number from the game code. Rerun it when worlds 4+ land. Claude (the final boss) is left out on purpose (spec §1).
 
-- 2026-11-24, Claude — Death now evaporates the hero into drifting motes of its sprite colours while `YOU FADED` shows and the picture sinks to black; every checkpoint entry (death, travel, slot load) fades in from black (`Quest::spawnFade`, `SPAWN_FADE` 1.2 s; travel drops the rest's white frame). Departs from spec §20 "play picture frozen behind it"; the user asked for it. Quest tests pass, Mac captures checked. PS3 look and timing open.
+- 2026-11-24, Claude — Death now evaporates the hero into drifting motes of its sprite colours while `YOU FADED` shows and the picture sinks to black; every checkpoint entry (death, travel, slot load) fades in from black (`Quest::spawnFade`, `SPAWN_FADE` 1.2 s; resting fades in from black too, replacing the white frame and `fadeTimer`). Departs from spec §20 "play picture frozen behind it"; the user asked for it. Quest tests pass, Mac captures checked. PS3 look and timing open.
 
 - 2026-11-24, Codex — Verified that NAME QUEST restores MP passively and grants 1 MP per R1 hit, with no bonus on kills. No gameplay changes.
 
