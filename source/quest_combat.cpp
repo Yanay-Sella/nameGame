@@ -54,8 +54,6 @@ const float FROST_ORB_SIZE = 18 * DP, FROST_ORB_CORE = 8 * DP;
 const float FROST_BLAST_RADIUS = 32 * DP, FROST_SLOW_TIME = 3;
 const float SHADOW_DASH_SPEED = 72 * DP / 0.15f;
 const float RUN_FRAME = 0.1f;   // s per run frame (spec §22)
-const float RANGED_RELEASE_POSE_TIME = 0.06f, ATTACK_RECOVER_POSE_TIME = 0.065f;
-const float QUICK_SKILL_POSE_TIME = 0.10f;
 // Hit feel (spec §7).
 const float BOSS_FLASH = 0.2f;   // a boss is white for its first 0.08 s, then shows its hurt frame
 const float FLASH_TIME = 0.08f, KNOCK_TIME = 0.1f, KNOCK_SPEED = 40 * DP, HIT_STOP = 0.04f, HURT_STOP = 0.08f, HURT_TRAUMA = 0.3f;
@@ -1051,62 +1049,43 @@ HeroPose heroPose(const Quest& q) {
         p.arms = ARMS_NONE;
     } else if (h.skill >= 0) {
         switch (cls * 4 + h.skill) {
-        case CLASS_KNIGHT * 4 + 0:
-            if (t < 0.1f) p.arms = ARMS_SKILL_1;
-            else if (t <= 0.25f) p.arms = ARMS_SKILL_2;
-            else if (t < 0.25f + ATTACK_RECOVER_POSE_TIME) p.arms = ARMS_RECOVER;
-            break;
-        case CLASS_KNIGHT * 4 + 1:
-        case CLASS_KNIGHT * 4 + 3:
-            if (t <= 0.15f) p.arms = h.skill == 1 ? ARMS_SKILL_3 : ARMS_SKILL_5;
-            else if (t < 0.15f + ATTACK_RECOVER_POSE_TIME) p.arms = ARMS_RECOVER;
-            break;
-        case CLASS_KNIGHT * 4 + 2: if (t < QUICK_SKILL_POSE_TIME) p.arms = ARMS_SKILL_4; break;
+        case CLASS_KNIGHT * 4 + 0: p.arms = t < 0.1f ? ARMS_SKILL_1 : t <= 0.25f ? ARMS_SKILL_2 : ARMS_RECOVER; break;
+        case CLASS_KNIGHT * 4 + 1: p.arms = t <= 0.15f ? ARMS_SKILL_3 : ARMS_RECOVER; break;
+        case CLASS_KNIGHT * 4 + 2: p.arms = ARMS_SKILL_4; break;
+        case CLASS_KNIGHT * 4 + 3: p.arms = t <= 0.15f ? ARMS_SKILL_5 : ARMS_RECOVER; break;
         case CLASS_ARCHER * 4 + 0:
-        case CLASS_ARCHER * 4 + 2:
-        case CLASS_MAGICIAN * 4 + 0:
-        case CLASS_MAGICIAN * 4 + 1:
-            if (t < QUICK_SKILL_POSE_TIME) p.arms = cls == CLASS_MAGICIAN && h.skill == 1 ? ARMS_SKILL_5 : ARMS_SKILL_2;
-            else if (t < QUICK_SKILL_POSE_TIME + ATTACK_RECOVER_POSE_TIME) p.arms = ARMS_RECOVER;
-            break;
-        case CLASS_ARCHER * 4 + 1:
-            if (t < QUICK_SKILL_POSE_TIME) p.arms = ARMS_SKILL_4;
-            else if (t < QUICK_SKILL_POSE_TIME + ATTACK_RECOVER_POSE_TIME) p.arms = ARMS_SKILL_3;
-            break;
-        case CLASS_ARCHER * 4 + 3: p.arms = fmodf(t, 0.225f) < RANGED_RELEASE_POSE_TIME ? ARMS_SKILL_2 : ARMS_SKILL_5; break;
-        case CLASS_MAGICIAN * 4 + 2: if (t < QUICK_SKILL_POSE_TIME) p.arms = ARMS_SKILL_4; break;
+        case CLASS_ARCHER * 4 + 2: p.arms = t < 0.12f ? ARMS_SKILL_2 : ARMS_RECOVER; break;
+        case CLASS_ARCHER * 4 + 1: p.arms = t < 0.12f ? ARMS_SKILL_4 : ARMS_SKILL_3; break;
+        case CLASS_ARCHER * 4 + 3: p.arms = fmodf(t, 0.225f) < 0.08f ? ARMS_SKILL_2 : ARMS_SKILL_5; break;
+        case CLASS_MAGICIAN * 4 + 0: p.arms = t < 0.12f ? ARMS_SKILL_2 : ARMS_RECOVER; break;
+        case CLASS_MAGICIAN * 4 + 1: p.arms = t < 0.12f ? ARMS_SKILL_5 : ARMS_RECOVER; break;
+        case CLASS_MAGICIAN * 4 + 2: p.arms = ARMS_SKILL_4; break;
         case CLASS_MAGICIAN * 4 + 3: p.arms = t < 0.3f ? ARMS_SKILL_1 : ARMS_SKILL_3; break;
-        case CLASS_THIEF * 4 + 0:
-            if (t < QUICK_SKILL_POSE_TIME) p.arms = ARMS_SKILL_1;
-            else if (t < QUICK_SKILL_POSE_TIME + ATTACK_RECOVER_POSE_TIME) p.arms = ARMS_RECOVER;
-            break;
+        case CLASS_THIEF * 4 + 0: p.arms = t < 0.1f ? ARMS_SKILL_1 : ARMS_RECOVER; break;
         case CLASS_THIEF * 4 + 1: p.arms = ARMS_SKILL_2; break;
         case CLASS_THIEF * 4 + 2: p.arms = (int)(t / 0.05f) % 2 == 0 ? ARMS_SKILL_3 : ARMS_SKILL_4; break;
-        case CLASS_THIEF * 4 + 3: if (t < QUICK_SKILL_POSE_TIME) p.arms = ARMS_SKILL_5; break;
+        case CLASS_THIEF * 4 + 3: p.arms = ARMS_SKILL_5; break;
         }
     } else if (p.attackT >= 0) {
-        float firstEnd = melee ? basic.from : RANGED_RELEASE_POSE_TIME;
-        float secondEnd = melee ? basic.to : 2 * RANGED_RELEASE_POSE_TIME;
-        float recoverEnd = secondEnd + ATTACK_RECOVER_POSE_TIME;
-        if (p.attackT < recoverEnd) {
-            // Three drawings per phase, with melee contact covering its hit window.
-            int phase = 0;
-            float start = 0, end = firstEnd;
-            if (p.attackT > secondEnd) {
-                phase = 2;
-                start = secondEnd;
-                end = recoverEnd;
-            } else if (p.attackT >= firstEnd) {
-                phase = 1;
-                start = firstEnd;
-                end = secondEnd;
-            }
-            int frame = std::min(2, (int)(3 * (p.attackT - start) / (end - start)));
-            p.arms = ARMS_BASIC + h.basicStep * BASIC_STRIKE_FRAMES + phase * 3 + frame;
-            if (!melee && phase == 2 && h.queuedAttack != BASIC_NONE) {
-                int nextStrike = (h.basicStep + 1) % BASIC_COMBO_LENGTH;
-                p.arms = ARMS_QUEUED_DRAW + nextStrike * 3 + frame;
-            }
+        // Each phase has three drawings. Melee contact tracks the hit window, and ranged release starts at the shot.
+        float firstEnd = melee ? basic.from : 0.08f;
+        float secondEnd = melee ? basic.to : basic.cycle - 0.20f * BASIC_CYCLE_BY_JOB[job];
+        int phase = 0;
+        float start = 0, end = firstEnd;
+        if (p.attackT > secondEnd) {
+            phase = 2;
+            start = secondEnd;
+            end = basic.cycle;
+        } else if (p.attackT >= firstEnd) {
+            phase = 1;
+            start = firstEnd;
+            end = secondEnd;
+        }
+        int frame = std::min(2, (int)(3 * (p.attackT - start) / (end - start)));
+        p.arms = ARMS_BASIC + h.basicStep * BASIC_STRIKE_FRAMES + phase * 3 + frame;
+        if (!melee && phase == 2 && h.queuedAttack != BASIC_NONE) {
+            int nextStrike = (h.basicStep + 1) % BASIC_COMBO_LENGTH;
+            p.arms = ARMS_QUEUED_DRAW + nextStrike * 3 + frame;
         }
     }
 
