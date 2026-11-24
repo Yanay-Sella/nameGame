@@ -24,7 +24,7 @@ const float STEP_TIME = 0.28f, LAND_SOUND_SPEED = 120 * DP;
 const float LAND_TIME = 0.08f;   // s of the landing pose (drawing only)
 const float BANNER_TIME = 2;
 const float TRAUMA_DECAY = 1.5f, TRAUMA_DEATH = 0.6f;
-const float ECHO_SIZE = 8 * DP, NAMES_TEXT_TIME = 1.2f, DEATH_PARTICLES = 20;
+const float ECHO_RECOVERY_TIME = 0.65f, NAMES_TEXT_TIME = 1.2f, DEATH_PARTICLES = 20;
 const float SELECT_HOLD_TIME = 2;                   // dev: Select held this long → TEST GROUNDS area 0 (spec §20)
 const float CAMERA_LEAD = 32 * DP, CAMERA_EASE_X = 5, CAMERA_EASE_Y = 6;
 // RPG systems (spec §10, §11, §14): how near Up must be (dp from the hero's centre, same floor), and the timings.
@@ -278,7 +278,9 @@ static void enterArea(Quest& q, int world, int index, int tx, int ty) {
     updateCamera(q, 0, true);
     q.bosses.clear();
     q.markers.clear();
-    q.effects.erase(std::remove_if(q.effects.begin(), q.effects.end(), [](const Effect& f) { return f.kind == FX_BLINK_MIST; }), q.effects.end());
+    q.effects.erase(std::remove_if(q.effects.begin(), q.effects.end(), [](const Effect& f) {
+        return f.kind == FX_BLINK_MIST || f.kind == FX_NAME_RECOVERY;
+    }), q.effects.end());
     q.arenaLocked = false;
     spawnEnemies(q);
     if (index == 0 && world >= 1 && world <= 6 && world > q.save.highest) q.save.highest = world;   // spec §11 highestWorld
@@ -969,6 +971,9 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
         if (q.mode == QMODE_PLAY && s.echoNames > 0 && s.echoWorld == q.area.world && s.echoArea == q.area.index &&
             h.x < s.echoX + ECHO_SIZE && s.echoX < h.x + HERO_W && h.y < s.echoY + ECHO_SIZE && s.echoY < h.y + HERO_H) {
             s.names = s.names > MAX_NAMES - s.echoNames ? MAX_NAMES : s.names + s.echoNames;
+            float echoX = s.echoX + ECHO_SIZE / 2;
+            float echoY = s.echoY + ECHO_SIZE / 2 + ECHO_BOB * sinf(q.time * ECHO_BOB_SPEED);
+            q.effects.push_back({FX_NAME_RECOVERY, echoX, echoY, 0, 0, 0, 0, 0, ECHO_RECOVERY_TIME, false, 'y'});
             q.numbers.push_back({h.x + HERO_W / 2, h.y, 0, s.echoNames, paletteColor('y'), NAMES_TEXT_TIME, true});
             q.soundRequested[SOUND_Q_NAMES] = true;
             logLine(q, "quest: names recovered %d", s.echoNames);

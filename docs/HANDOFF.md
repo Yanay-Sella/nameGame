@@ -52,6 +52,10 @@ Updated: 2026-11-23 (NAME QUEST boss arena and checkpoint travel).
 
 ## Session log (newest first; add a line per session: date, agent, what changed, what is next)
 
+- 2026-11-24, Codex — Shortened all four heroes' R1 pose sequences and single-cast R2 follow-through. R1 shows its nine drawings before the existing cycle ends. Quest tests verified the original cadence across all four job tiers and the existing hit and skill timings. Reviewed headless Mac captures of the Magician settling after R1 and the Knight's active Power Slash. PS3 playtest pending.
+
+- 2026-11-24, Codex — Recovering a name echo now sends two pale-gold trails spiraling into the moving hero over 0.65 s. The quest suite passed, and a headless Mac run through Namula Shore recovered 500 names and showed the trails curling, following the Archer and clearing. The capture is in `shots/name-echo-spiral.png`. PS3 playtest pending.
+
 - 2026-11-24, Claude — Added the NAME QUEST player's guide `docs/quest-guide/NAME-quest-guide.pdf` (28 pages: heroes and their four skills, Namula, worlds 1–3 with maps, every area, monsters and all six bosses). `python3 docs/quest-guide/make_quest_guide.py` rebuilds it; `render_quest_guide.cpp` draws every picture and reads every number from the game code. Rerun it when worlds 4+ land. Claude (the final boss) is left out on purpose (spec §1).
 
 - 2026-11-24, Claude — Death now evaporates the hero into drifting motes of its sprite colours while `YOU FADED` shows and the picture sinks to black; every checkpoint entry (death, travel, slot load) fades in from black (`Quest::spawnFade`, `SPAWN_FADE` 1.2 s; travel drops the rest's white frame). Departs from spec §20 "play picture frozen behind it"; the user asked for it. Quest tests pass, Mac captures checked. PS3 look and timing open.

@@ -22,7 +22,9 @@ float questDrawMs[3];
 const float SHAKE_X = 4 * DP, SHAKE_Y = 3 * DP;   // at trauma 1 and full strength, like the shooter
 const float SHIMMER_FRAME = 0.25f, FLAME_FRAME = 0.15f, LIQUID_FRAME = 0.2f;
 const float ENEMY_FRAME = 0.25f, TELL_FLASH = 0.1f, IFRAME_BLINK = 0.1f;
-const float NUMBER_RISE = 12 * DP, ECHO_BOB = 2 * DP, PARTNER_BEHIND = 10 * DP;
+const float NUMBER_RISE = 12 * DP, PARTNER_BEHIND = 10 * DP;
+const float ECHO_SPIRAL_RADIUS = 28 * DP, ECHO_SPIRAL_TURN = 9.42478f, ECHO_TRAIL = 0.30f;
+const int ECHO_TRAIL_POINTS = 16;
 const char TRIM_BY_JOB[4] = {'h', 'b', 'Y', 'N'};
 const uint32_t HEARTH_LIGHT = 0xFFA05018, BRAZIER_LIGHT = 0xFF804010, LANTERN_LIGHT = 0xFF704018;
 const int HEARTH_LIGHT_RADIUS = 48 * DP, BRAZIER_LIGHT_RADIUS = 28 * DP, LANTERN_LIGHT_RADIUS = 24 * DP;
@@ -602,7 +604,7 @@ static void drawBasicImpact(const Effect& f, int x, int y, uint32_t core) {
 static void drawCombat(const Quest& q, int camX, int camY) {
     const SaveData& s = q.save;
     if (s.echoNames > 0 && s.echoWorld == q.area.world && s.echoArea == q.area.index) {   // 8 x 8 wisp, bobbing 2 px
-        int ex = (int)s.echoX - camX, ey = (int)(s.echoY + ECHO_BOB * sinf(q.time * 3)) - camY;
+        int ex = (int)s.echoX - camX, ey = (int)(s.echoY + ECHO_BOB * sinf(q.time * ECHO_BOB_SPEED)) - camY;
         fillRect(ex + 2 * DP, ey + 2 * DP, 4 * DP, 5 * DP, paletteColor('y'));
         fillRect(ex + DP, ey + 4 * DP, 6 * DP, 3 * DP, paletteColor('y'));
         fillRect(ex + 3 * DP, ey, 2 * DP, 2 * DP, paletteColor('y'));
@@ -629,7 +631,7 @@ static void drawCombat(const Quest& q, int camX, int camY) {
     const Hero& h = q.hero;
     const uint32_t white = paletteColor(q.reduceFlashing ? 'b' : 'w');   // the white cores and sparks (reduce flashing: grey)
     for (const Effect& f : q.effects) {
-        if (f.kind == FX_BASIC_IMPACT) continue;
+        if (f.kind == FX_BASIC_IMPACT || f.kind == FX_NAME_RECOVERY) continue;
         int x = (int)f.x - camX, y = (int)f.y - camY;
         uint32_t color = paletteColor(f.color);
         switch (f.kind) {
@@ -928,6 +930,27 @@ static void drawCombat(const Quest& q, int camX, int camY) {
 // Particles and floating numbers: damage white, crits orange, the hero's red, "+n NAMES" pale yellow.
 static void drawNumbers(const Quest& q, int camX, int camY) {
     for (const Particle& p : q.particles) fillRect((int)p.x - camX, (int)p.y - camY, DP, DP * p.h, p.color);
+    for (const Effect& f : q.effects) {
+        if (f.kind != FX_NAME_RECOVERY) continue;
+        float chestX = q.hero.x + HERO_W / 2, chestY = q.hero.y + HERO_H * 0.55f;
+        float head = (1 + ECHO_TRAIL) * f.age / f.life;
+        uint32_t gold = paletteColor(f.color), core = paletteColor(q.reduceFlashing ? f.color : 'w');
+        // Sample both trails behind their moving tips, from the wisp to the hero's current position.
+        for (int i = ECHO_TRAIL_POINTS - 1; i >= 0; i--) {
+            float u = head - ECHO_TRAIL * i / (ECHO_TRAIL_POINTS - 1);
+            if (u < 0 || u >= 1) continue;
+            float pull = u * u * (3 - 2 * u);
+            float radius = ECHO_SPIRAL_RADIUS * sinf(u * 3.14159f) * (1 - u);
+            float angle = ECHO_SPIRAL_TURN * u;
+            float x = f.x + (chestX - f.x) * pull - camX;
+            float y = f.y + (chestY - f.y) * pull - camY;
+            float dx = cosf(angle) * radius, dy = sinf(angle) * radius * 0.7f;
+            int size = i < ECHO_TRAIL_POINTS / 2 ? (int)DP : 1;
+            uint32_t color = i < 2 ? core : gold;
+            fillRect((int)lroundf(x + dx), (int)lroundf(y + dy), size, size, color);
+            fillRect((int)lroundf(x - dx), (int)lroundf(y - dy), size, size, color);
+        }
+    }
     char text[24];
     for (const DamageNumber& n : q.numbers) {
         if (n.names) snprintf(text, sizeof text, "+%d NAMES", n.value);

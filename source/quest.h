@@ -7,6 +7,7 @@
 
 // Design pixels (dp, the 320x180 design's units) → real pixels at 640x360 (spec "Resolution", D-053).
 const float DP = 2;
+const float ECHO_SIZE = 8 * DP, ECHO_BOB = 2 * DP, ECHO_BOB_SPEED = 3;
 const int TILE = (int)(8 * DP), WIDE_COLS = 80, WIDE_ROWS = 23, TALL_COLS = 40, TALL_ROWS = 45;
 const int WORLD_NAMULA = 0, WORLD_SECRET = 7, WORLD_TEST = 8, WORLD_COUNT = 9;   // 1-6 the worlds
 const int SAVED_WORLDS = 9;   // per-world save keys for 0-7 (spec §17) and TEST GROUNDS' dev progress
@@ -120,7 +121,7 @@ struct Projectile { float x, y, vx, vy; int w, h; int damage; bool fromHero; int
 struct DamageNumber { float x, y, age; int value; uint32_t color; float life; bool names; };   // names: "+n NAMES"
 // Short-lived shapes for drawing. x2/y2: a chain link's end or a basic impact's direction.
 enum EffectKind { FX_SWING, FX_ARC, FX_BURST, FX_CHAIN, FX_METEOR, FX_SPIN, FX_BEAM, FX_BALL, FX_SPARK, FX_ZONE, FX_GHOST,
-                  FX_BLINK_MIST, FX_BASIC_IMPACT, FX_FROST_BURST };
+                  FX_BLINK_MIST, FX_BASIC_IMPACT, FX_FROST_BURST, FX_NAME_RECOVERY };
 const float DEATH_TIME = 2.5f, SPAWN_FADE = 1.2f;   // s from death to the checkpoint; s of the fade in from black there
 const size_t PARTICLE_CAP = 200;   // no new particle while this many are alive (phase 5b readability)
 struct Effect { int kind; float x, y, w, h, x2, y2, age, life; bool flip; char color; int basicJob = 0; };
