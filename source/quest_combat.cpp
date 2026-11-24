@@ -614,6 +614,7 @@ void hurtHero(Quest& q, int damage, float sourceX, float bounceVy) {
     h.rollTimer = 0;
     h.skill = -1;
     q.soundRequested[SOUND_Q_HURT] = true;
+    q.rumbleRequested = std::max(q.rumbleRequested, QUEST_RUMBLE_HURT);
     q.hitStop = fmaxf(q.hitStop, HURT_STOP);
     q.trauma = fminf(1, q.trauma + HURT_TRAUMA);
     addNumber(q, h.x + HERO_W / 2, h.y, damage, 'r');

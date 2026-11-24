@@ -735,6 +735,7 @@ static void bossDown(Quest& q, QuestBoss& b) {
     q.markers.clear();
     q.arenaLocked = false;
     q.soundRequested[SOUND_EXPLOSION] = true;
+    q.rumbleRequested = QUEST_RUMBLE_BOSS;
     logLine(q, "quest: boss %s down after %.0f s", bossName(b.id), q.time - b.started);
     if (b.big) {
         q.save.bosses |= 1u << world;

@@ -226,6 +226,8 @@ enum DialogueAfter { AFTER_NONE, AFTER_POTION_SHOP, AFTER_GEAR_SHOP, AFTER_LEVEL
 struct DialogueState { std::vector<std::string> pages; int page; float typed; std::string speaker; int after; };
 const float TALK_CHARS_PER_S = 50;
 
+enum QuestRumble { QUEST_RUMBLE_NONE, QUEST_RUMBLE_HURT, QUEST_RUMBLE_DEATH, QUEST_RUMBLE_BOSS };
+
 struct Quest {
     QuestMode mode;
     std::string folder;                 // folder of quest1..3.txt
@@ -239,6 +241,7 @@ struct Quest {
     int introPage;
     const char* banner; int bannerScale; float bannerTimer;
     bool soundRequested[SOUND_COUNT];
+    QuestRumble rumbleRequested = QUEST_RUMBLE_NONE;
     bool wantsMainMenu;                 // main.cpp goes back to the main menu and clears it
     bool devAids, godMode;
     float trauma;

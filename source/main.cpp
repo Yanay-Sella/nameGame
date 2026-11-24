@@ -664,7 +664,18 @@ int main(int argc, char** argv) {
                 inputRumblePulse(port, 0.8f, 0.25f);
             if (bossesAlive < bossesBefore) inputRumblePulse(port, 1.0f, 1.5f);
         }
-        inputRumbleUpdate(activePorts, game.trauma * settings.shake / 100.0f, steps * STEP);
+        if (scene == SCENE_QUEST) {
+            activePorts = 1u;   // NAME QUEST uses controller port 0
+            switch (quest.rumbleRequested) {
+            case QUEST_RUMBLE_NONE: break;
+            case QUEST_RUMBLE_HURT: inputRumblePulse(0, 0.28f, 0.10f); break;
+            case QUEST_RUMBLE_DEATH: inputRumblePulse(0, 0.45f, 0.32f); break;
+            case QUEST_RUMBLE_BOSS: inputRumblePulse(0, 0.60f, 0.65f); break;
+            }
+        }
+        quest.rumbleRequested = QUEST_RUMBLE_NONE;
+        float rumbleShake = scene == SCENE_PLAYING ? game.trauma * settings.shake / 100.0f : 0;
+        inputRumbleUpdate(activePorts, rumbleShake, steps * STEP);
 
         game.highScore = highScore;
         game.shakeStrength = settings.shake / 100.0f;

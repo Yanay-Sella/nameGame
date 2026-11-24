@@ -1660,11 +1660,13 @@ static void iframesBlockDamage() {
         updateCombat(q, Actions(), DT);
     }
     CHECK(q.hero.hp == hp);
+    CHECK(q.rumbleRequested == QUEST_RUMBLE_NONE);
     for (int i = 0; i < 30; i++) {
         q.enemies[0].x = q.hero.x;
         updateCombat(q, Actions(), DT);
     }
     CHECK(q.hero.hp < hp && q.hero.iframes > 0.5f);
+    CHECK(q.rumbleRequested == QUEST_RUMBLE_HURT);
 }
 
 static void rollGivesIframes() {
@@ -1768,6 +1770,7 @@ static void deathDropsNamesAtLastSafeGround() {
     a.moveX = 1;
     for (int i = 0; i < 600 && q.mode == QMODE_PLAY; i++) play(q, a, 1);
     CHECK(q.mode == QMODE_DEAD && q.save.names == 0 && q.save.echoNames == 500);
+    CHECK(q.rumbleRequested == QUEST_RUMBLE_DEATH);
     CHECK(q.save.echoWorld == WORLD_TEST && q.save.echoArea == 0);
     CHECK(q.save.echoX + 8 * DP <= 30 * TILE + HERO_W && q.save.echoX >= 26 * TILE);
     CHECK(logged(q, "(pit), dropped 500 names"));
@@ -1781,9 +1784,10 @@ static void secondDeathLosesTheOldEcho() {
     q.save.echoNames = 500;
     q.save.echoX = 60 * TILE;
     q.save.names = 200;
-    q.hero.hp = 0;
+    hurtHero(q, q.hero.hp, q.hero.x);
     play(q, Actions(), 1);
     CHECK(q.mode == QMODE_DEAD && q.save.echoNames == 200 && q.save.names == 0);
+    CHECK(q.rumbleRequested == QUEST_RUMBLE_DEATH);
     CHECK(logged(q, "(hp), dropped 200 names"));
 }
 
@@ -2353,7 +2357,10 @@ static void bossFightLocksAndUnlocksExits() {
     q.bosses[0].hp = 0;
     play(q, Actions(), 1);
     CHECK(!q.arenaLocked && q.save.gates >> 1 & 1 && logged(q, "quest: boss THE OVERSEER down after"));
+    CHECK(q.rumbleRequested == QUEST_RUMBLE_BOSS);
+    q.rumbleRequested = QUEST_RUMBLE_NONE;
     play(q, right, 60);
+    CHECK(q.rumbleRequested == QUEST_RUMBLE_NONE);
     CHECK(q.area.def != &t.def && q.area.world == 1 && q.area.index == 0);
     // The hangar's ladder down to the bulkhead is closed too: climbing down it holds the hero at the bottom.
     startDev(q, "slot=3 class=0 world=1 area=9 level=4");
@@ -2447,6 +2454,7 @@ static void bossDeathLightsTheNextWorld() {
     CHECK(q.save.lit >> 4 & 1);   // world 2's entry
     CHECK(q.save.names == names + enemyNames(1, 150, 0, false));
     CHECK(q.banner && !strcmp(q.banner, "GREAT NAME TAKEN") && logged(q, "quest: boss THE STAR MAGE down after"));
+    CHECK(q.rumbleRequested == QUEST_RUMBLE_BOSS);
     startArenaFight(q);
     CHECK(q.bosses.size() == 1 && !q.bosses[0].alive);   // the old one, dead: no new fight
     saveDelete(SAVE_FOLDER, 2);

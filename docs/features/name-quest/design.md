@@ -73,6 +73,7 @@ Rules and numbers: see the work-plan spec [`spec.md`](../../work-plan/name-quest
 54. Tap R1 during a basic attack to queue the next of three strikes (D-067, D-068). Holding R1 plays a single strike. Knight uses a level slash, a rising cut and an overhead chop. Archer uses a standard shot, a low reload shot and a snap shot. The Magician flicks her wand forward, sweeps a rising crescent, then pivots through a wide waist-high sweep. Each cast fires one horizontal bolt. Thief uses a straight stab, a reverse cut and a downward jab. The combo uses the attack cycles and damage in spec §5–§6.
 55. Each promotion shortens the basic attack cycle and makes swings taller and longer or shots bigger, faster and longer-ranged. The hit bursts grow from class-coloured sparks to sparks with one and then two expanding arcs. See spec §6 for the tuning.
 56. Adept’s Frost Orb flies as a snowflake three times the old orb’s width and height. It bursts into an expanding ice ring and shards on impact or at maximum range, damaging and slowing nearby enemies and bosses. See spec §6 for tuning (D-074).
+57. The PS3 controller gives a light 0.10 s pulse when the hero takes damage, a 0.32 s pulse when the hero dies, and a 0.65 s pulse when a boss or mini-boss falls.
 
 ## Dev playtesting
 

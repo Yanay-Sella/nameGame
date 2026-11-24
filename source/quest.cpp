@@ -354,6 +354,7 @@ static void die(Quest& q, const char* cause) {
     h.queuedAttack = BASIC_NONE;
     q.modeTimer = 0;
     q.soundRequested[SOUND_Q_DEATH] = true;
+    q.rumbleRequested = std::max(q.rumbleRequested, QUEST_RUMBLE_DEATH);
     if (!strcmp(cause, "liquid")) q.soundRequested[SOUND_Q_SPLASH] = true;
     q.trauma = fminf(1, q.trauma + TRAUMA_DEATH);
     logLine(q, "quest: hero died in %d.%d (%s), dropped %d names", q.area.world, q.area.index, cause, dropped);
