@@ -52,6 +52,8 @@ Updated: 2026-11-23 (NAME QUEST boss arena and checkpoint travel).
 
 ## Session log (newest first; add a line per session: date, agent, what changed, what is next)
 
+- 2026-11-23, Codex — Restored compact checkpoint travel over the current area. Browsing uses baked world thumbnails. A Mac benchmark across 200 switches measured median draw time of 0.39 ms (previously 4.24 ms). NAME QUEST tests passed. PS3 timing awaits a hardware playtest.
+
 - 2026-11-23, Codex — Adept’s Frost Orb now flies as an 18 dp snowflake and bursts into a 32 dp radius for area damage and slow (D-074). NAME QUEST tests cover impact, maximum range and boss slow. Mac captures in `shots/frost-orb-flight.png` and `shots/frost-orb-enemy.png`. PS3 playtest pending.
 
 - 2026-11-23, Codex — Added permanent boss arena checkpoints and separate onward portals in worlds 1–3. Travel now previews the selected world and lists its lit checkpoints by area. NAME QUEST tests passed and Mac captures show the arena, the world list and the checkpoint list. The world 3 arch awaits world 4 content. Next is the user’s playtest.

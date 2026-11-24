@@ -2,6 +2,7 @@
 // objects, hero, lights, HUD (spec §13, §15, §21, §22). Layout numbers are in dp, multiplied by DP.
 #include "quest.h"
 #include "quest_art.h"
+#include "quest_travel_previews.h"
 #include "quest_sprites.h"
 #include "quest_sprites_1.h"
 #include "quest_sprites_2.h"
@@ -1284,31 +1285,35 @@ static void drawShop(const Quest& q) {
     drawText(x + (w - textWidth("X BUY  O LEAVE", DP)) / 2, y + 118 * DP, "X BUY  O LEAVE", paletteColor('s'), DP);
 }
 
-// The highlighted world's landscape stays visible through both steps of travel.
+// Travel previews use baked thumbnails so browsing keeps the current area’s parallax layers warm.
 static void drawTravelMenu(const Quest& q) {
     const MenuState& m = q.menu;
     bool worlds = m.kind == MENU_TRAVEL_WORLDS;
     int world = worlds ? m.travelIds[m.cursor] : m.travelWorld;
     const WorldDef& w = worldDef(world);
-    if (worldArt(world)) drawLayers(world, 0, 0);
-    else drawPlainBackground(0, 0);
+    int rows = std::min(MENU_ROWS, (int)m.items.size());
+    int width = 164 * DP, height = (54 + rows * 11) * DP;
+    int x = (QUEST_W - width) / 2, top = (QUEST_H - height) / 2;
+    drawPanel(x, top, width, height, 'n');
 
+    const Sprite& preview = TRAVEL_PREVIEWS[world];
+    int px = x + width - 54 * DP, py = top + 5 * DP;
+    if (preview.pixels) {
+        drawSpritePal(preview, px, py, false, worldArt(world)->palette);
+    } else {   // Test Grounds uses the same grid as its playfield.
+        for (int col = 0; col < 48; col += 8) fillRect(px + col * DP, py, DP, 20 * DP, paletteColor('n'));
+        for (int row = 0; row < 20; row += 8) fillRect(px, py + row * DP, 48 * DP, DP, paletteColor('n'));
+    }
     char region[24];
     if (world == WORLD_NAMULA) snprintf(region, sizeof region, "HOME");
     else if (world == WORLD_TEST) snprintf(region, sizeof region, "TEST AREA");
     else snprintf(region, sizeof region, "WORLD %d", world);
-    int x = 10 * DP, width = textWidth(w.name, 2 * DP) + 16 * DP;
-    drawPanel(x, 10 * DP, width, 32 * DP, 'n');
-    drawText(x + 8 * DP, 15 * DP, region, paletteColor('b'), DP);
-    drawText(x + 8 * DP, 25 * DP, w.name, paletteColor('w'), 2 * DP);
-
-    int rows = std::min(MENU_ROWS, (int)m.items.size());
-    int height = (33 + rows * 11) * DP, top = QUEST_H - 10 * DP - height;
-    width = 176 * DP;
-    drawPanel(x, top, width, height, 'n');
-    drawText(x + 7 * DP, top + 5 * DP, worlds ? "CHOOSE WORLD" : "CHOOSE CHECKPOINT", paletteColor('w'), DP);
+    drawText(x + 7 * DP, top + 7 * DP, region, paletteColor('b'), DP);
+    drawText(x + 7 * DP, top + 17 * DP, w.name, paletteColor('w'), DP);
+    fillRect(x + DP, top + 28 * DP, width - 2 * DP, DP, paletteColor('n'));
+    drawText(x + 7 * DP, top + 33 * DP, worlds ? "CHOOSE WORLD" : "CHOOSE CHECKPOINT", paletteColor('b'), DP);
     for (int row = 0; row < rows; row++) {
-        int index = m.scroll + row, y = top + (16 + row * 11) * DP;
+        int index = m.scroll + row, y = top + (44 + row * 11) * DP;
         bool selected = index == m.cursor;
         if (selected) fillRect(x + 2 * DP, y - 2 * DP, width - 4 * DP, 10 * DP, paletteColor('n'));
         uint32_t color = paletteColor(selected ? 'y' : 'w');
@@ -1425,8 +1430,9 @@ void questDraw(const Quest& q) {
     case QMODE_DEAD: drawPlay(q); break;
     case QMODE_DIALOGUE: drawPlay(q); drawDialogue(q); break;
     case QMODE_MENU:
+        drawPlay(q);
         if (q.menu.kind == MENU_TRAVEL_WORLDS || q.menu.kind == MENU_TRAVEL_CHECKPOINTS) drawTravelMenu(q);
-        else { drawPlay(q); drawQuestMenu(q); }
+        else drawQuestMenu(q);
         break;
     case QMODE_SHOP: drawPlay(q); drawShop(q); break;
     case QMODE_MAP: drawMap(q); break;

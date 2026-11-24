@@ -36,7 +36,7 @@
 - [x] Buffs end on death; a potion heals after its 0.5 s drink. *(`tests/quest_tests.cpp` › buffsEndOnDeath, drinkHealsAfterHalfASecond)*
 - [x] NPC presence follows the quest stages; every line fits the dialogue box (4 lines of 72). *(`tests/quest_tests.cpp` › npcPresenceFollowsQuestStages, dialogueFitsTheBox)*
 - [x] All three world bosses reveal a usable checkpoint and separate onward portal on defeat. The arena checkpoint survives a reload. Worlds 1 and 2 lead to the next entry, and world 3 identifies the closed route. *(`tests/quest_tests.cpp` › bossArenaCheckpointAndPortal)*
-- [x] The travel menu identifies the current location and previews the highlighted world in both lists. *(Mac screenshots, 2026-11-23)*
+- [x] The compact travel menu marks the current location and shows a destination thumbnail in both lists. Browsing the four authored landscapes keeps the current area’s scenery loaded. *(Mac screenshots, 2026-11-23, and `tests/quest_tests.cpp` › travelPreviewsKeepTheCurrentAreaArt)*
 - [x] On the Mac: Namula's NPCs stand at the stalls, the hearth and the stage facing the hero, Ilsa's lantern glows; four talks with Ilsa and two levels (`quest: level 3 (spent 120, names left 1780)`); two MANA POTION from Marra; the TEST GROUNDS brazier lights and rests (`checkpoint 8.0 lit`, `rest at 8.0`); the surveyor's line and the TEST GROUNDS map (current area blinking, the gate's red bar). *(`make mac-run` 2026-11-21)*
 - [ ] On the PS3: slot 1 → Select-hold into TEST GROUNDS → rest at its checkpoint → the map at the surveyor → travel to Namula → Ilsa. *(PS3 log: `quest: checkpoint 8.0 lit`, `quest: rest at 8.0`, `quest: travel to 0.0`; fps ≈ 60)*
 - [ ] On the PS3: the hearth's crackle plays in Namula and nothing in TEST GROUNDS. *(the user listens)*

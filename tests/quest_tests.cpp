@@ -2044,6 +2044,28 @@ static void travelListsLitCheckpoints() {
     saveDelete(SAVE_FOLDER, 2);
 }
 
+static void travelPreviewsKeepTheCurrentAreaArt() {
+    Quest q;
+    startDev(q, "slot=3 world=1 area=19 bosses=e");
+    AreaLink spot = checkpointLocation(1, BOSS_CHECKPOINT);
+    standAt(q, spot.tileX, spot.tileY);
+    pressUp(q);
+    pressDown(q);
+    pressX(q);
+    CHECK(q.menu.kind == MENU_TRAVEL_WORLDS && q.menu.travelIds.size() == 4);
+    screenSetTarget(questPixels, QUEST_W, QUEST_H);
+    prepareWorldArt(1);
+    const uint32_t* sky = layerPixels(0);
+    std::vector<uint32_t> stationSky(sky, sky + LAYER_W);
+    for (int i = 0; i < 4; i++) {
+        pressDown(q);
+        questDraw(q);
+        CHECK(std::equal(stationSky.begin(), stationSky.end(), layerPixels(0)));
+    }
+    screenSetTarget(screenPixels, SCREEN_W, SCREEN_H);
+    saveDelete(SAVE_FOLDER, 2);
+}
+
 static void chestOpensOnceAndSaves() {
     Quest q;
     startDev(q, "slot=3 class=0 world=8 area=3 items=0,0,0,0,0,0");
@@ -2913,7 +2935,45 @@ static void renderAnims() {
     printf("quest anims: 4 lineups and 16 sheets in build/anims\n");
 }
 
+// Sample the four scenery layers into palette sprites for the compact checkpoint menu.
+static void writeTravelPreviews() {
+    const int width = 96, height = 40, step = 11;
+    puts("// Generated with build/tests/quest_tests --travel-previews. One sprite per world.");
+    puts("#pragma once\n#include \"sprites.h\"\n\nstatic const Sprite TRAVEL_PREVIEWS[] = {");
+    for (int world = 0; world < WORLD_COUNT; world++) {
+        const WorldArt* art = worldArt(world);
+        if (!art) {
+            puts("    {0, 0, nullptr},");
+            continue;
+        }
+        prepareWorldArt(world);
+        printf("    {%d, %d, // %s\n", width, height, worldDef(world).name);
+        for (int y = 0; y < height; y++) {
+            std::string row;
+            for (int x = 0; x < width; x++) {
+                int sx = (LAYER_W - width * step) / 2 + x * step;
+                int sy = (LAYER_H - height * step) / 2 + y * step;
+                int at = sy * LAYER_W + sx;
+                uint32_t color = layerPixels(0)[at];
+                for (int layer = 1; layer < 4; layer++) {
+                    uint32_t pixel = layerPixels(layer)[at];
+                    if (pixel) color = pixel;
+                }
+                const uint32_t* index = std::find(art->palette.c, art->palette.c + 16, color);
+                CHECK(index != art->palette.c + 16);
+                row += "0123456789abcdef"[index - art->palette.c];
+            }
+            printf("        \"%s\"%s\n", row.c_str(), y == height - 1 ? "}," : "");
+        }
+    }
+    puts("};");
+}
+
 int main(int argc, char** argv) {
+    if (argc > 1 && !strcmp(argv[1], "--travel-previews")) {
+        writeTravelPreviews();
+        return failures ? 1 : 0;
+    }
     if (argc > 1 && !strcmp(argv[1], "--maps")) {
         renderMaps();
         return 0;
@@ -2989,6 +3049,7 @@ int main(int argc, char** argv) {
     gearTierNeedsTheWorld();
     restHealsAndRespawnsEnemies();
     travelListsLitCheckpoints();
+    travelPreviewsKeepTheCurrentAreaArt();
     chestOpensOnceAndSaves();
     fullBagKeepsChestShut();
     gateWallOpens();

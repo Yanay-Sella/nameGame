@@ -621,7 +621,7 @@ A mentor of another class gives one flavour line about their craft.
   Thief 2/3/2 + `DOUBLE JUMP`), 2 lines of description (author). Selected card border `y`. Hint `X CHOOSE  O BACK`.
 - **Dialogue:** panel x 10, y 124, 300 x 52; name at (16, 128); lines at y 138, 147, 156, 165; a blinking `>` at
   (300, 168) when a page is complete.
-- **Travel:** show the highlighted world’s background, its name and the world or checkpoint list (§11).
+- **Travel:** show a small centered panel over the current area with a thumbnail of the highlighted world, its name and the world or checkpoint list (§11).
 - **Shop / level up / checkpoint / job:** use `drawMenu` (screen.cpp) when the content is a plain list;
   shops use a 240 x 130 panel: title, then rows `RED POTION  15  2/5` (unaffordable or full rows in `s`), hint
   `X BUY  O LEAVE`. Level up panel: `LEVEL 7 > 8`, `COST 299`, `NAMES 1022`, and `HP 160 > 174`, `MP`, `ATK`, `DEF`
