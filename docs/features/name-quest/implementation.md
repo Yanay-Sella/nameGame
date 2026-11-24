@@ -87,6 +87,7 @@ Movement is `moveHero`: grace timers, ladders, walking, jumping (buffered, coyot
 - `drawObject` mirrors NPCs toward the hero and anchors both idle frames to the tile floor. Drawing and dialogue share `surveyorId`, using the map marker's order within the world.
 
 ## Deviations from design
+- Death (user request, 2026-11-24): spec §20 freezes the play picture behind `YOU FADED`; instead `drawHero` dissolves the hero into rising motes and `drawPlay` darkens to black over the last 0.8 s. `enterAtCheckpoint` sets `Quest::spawnFade` and `questDraw` fades the frame in from black (`darkenScreen`); travel clears the rest's white frame.
 - D-072 replaces mini-boss respawns in the phase 4 plan. Rest and death clear the temporary enemy kills but keep saved mini-boss defeats.
 - D-074 replaces the single-target Frost Orb and 6 × 6 art in the phase 5b plan. `PROJ_ORB` uses its original 8 dp core against tiles so grounded casts clear the floor. On detonation, `hitCircle` applies one shared damage and slow event per target. Boss attack clocks, telegraphs and the Star Mage’s beam effects advance together during the slow.
 - `Hero` has two fields the plan didn't list: `dropTimer` (down + X drop-through) and `jumped` (for the jump sound).

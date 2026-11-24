@@ -52,6 +52,8 @@ Updated: 2026-11-23 (NAME QUEST boss arena and checkpoint travel).
 
 ## Session log (newest first; add a line per session: date, agent, what changed, what is next)
 
+- 2026-11-24, Claude — Death now evaporates the hero into drifting motes of its sprite colours while `YOU FADED` shows and the picture sinks to black; every checkpoint entry (death, travel, slot load) fades in from black (`Quest::spawnFade`, `SPAWN_FADE` 1.2 s; travel drops the rest's white frame). Departs from spec §20 "play picture frozen behind it"; the user asked for it. Quest tests pass, Mac captures checked. PS3 look and timing open.
+
 - 2026-11-24, Codex — Verified that NAME QUEST restores MP passively and grants 1 MP per R1 hit, with no bonus on kills. No gameplay changes.
 
 - 2026-11-24, Codex — Added NAME QUEST controller pulses for damage, hero death, and boss and mini-boss defeats. Quest tests and a Mac smoke run passed. The Classic suite reported its 50 known failures. Rumble strength and duration await a PS3 playtest.

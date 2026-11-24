@@ -20,7 +20,7 @@ const float WIND_PUSH = 40 * DP;                    // world 3 and 6: wind zones
 const float VENT_LIFT = 900 * DP, VENT_MAX_RISE = 160 * DP;   // net px/s² upward inside a vent's column, up to this rise speed
 const int VENT_REACH = 6;                           // tiles above a vent that still lift
 // Flow
-const float DEATH_TIME = 2.5f, STEP_TIME = 0.28f, LAND_SOUND_SPEED = 120 * DP;
+const float STEP_TIME = 0.28f, LAND_SOUND_SPEED = 120 * DP;
 const float LAND_TIME = 0.08f;   // s of the landing pose (drawing only)
 const float BANNER_TIME = 2;
 const float TRAUMA_DECAY = 1.5f, TRAUMA_DEATH = 0.6f;
@@ -325,6 +325,7 @@ static void enterAtCheckpoint(Quest& q) {
     enterArea(q, world, std::max(0, spot.area), spot.tileX, spot.tileY);
     q.mode = QMODE_PLAY;
     q.modeTimer = 0;
+    q.spawnFade = SPAWN_FADE;
 }
 
 static void die(Quest& q, const char* cause) {
@@ -708,6 +709,7 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
     q.chestTimer = fmaxf(0, q.chestTimer - dt);
     q.gateTimer = fmaxf(0, q.gateTimer - dt);
     q.fadeTimer = fmaxf(0, q.fadeTimer - dt);
+    q.spawnFade = fmaxf(0, q.spawnFade - dt);
     switch (q.mode) {
     case QMODE_SLOTS:
         if (a.up || a.down) {
@@ -1051,6 +1053,7 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
                 enterAtCheckpoint(q);
                 for (int k = 0; k < 3; k++) q.hero.buffTimers[k] = buffs[k];
                 rest(q, id);
+                q.fadeTimer = 0;   // the fade in from black replaces the rest's white frame
                 q.soundRequested[SOUND_Q_PORTAL] = true;
                 break;
             }

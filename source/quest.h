@@ -121,6 +121,7 @@ struct DamageNumber { float x, y, age; int value; uint32_t color; float life; bo
 // Short-lived shapes for drawing. x2/y2: a chain link's end or a basic impact's direction.
 enum EffectKind { FX_SWING, FX_ARC, FX_BURST, FX_CHAIN, FX_METEOR, FX_SPIN, FX_BEAM, FX_BALL, FX_SPARK, FX_ZONE, FX_GHOST,
                   FX_BLINK_MIST, FX_BASIC_IMPACT, FX_FROST_BURST };
+const float DEATH_TIME = 2.5f, SPAWN_FADE = 1.2f;   // s from death to the checkpoint; s of the fade in from black there
 const size_t PARTICLE_CAP = 200;   // no new particle while this many are alive (phase 5b readability)
 struct Effect { int kind; float x, y, w, h, x2, y2, age, life; bool flip; char color; int basicJob = 0; };
 
@@ -270,6 +271,7 @@ struct Quest {
     int chestTile; float chestTimer;    // the chest whose lid is opening, s left
     float gateTimer;                    // s left of the gate shaking and vanishing (spec §11)
     float fadeTimer;                    // s left of the rest's white fade
+    float spawnFade;                    // s left of the fade in from black after entering at a checkpoint
     int ambient;                        // the place for audioSetQuestSound: 0 off, 1 Namula, 2-8 worlds 1-7
     // Bosses (phase 4)
     std::vector<QuestBoss> bosses;
