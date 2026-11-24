@@ -40,6 +40,8 @@ def png(name, scale):
     out = os.path.join(PNG, f"{name}@{scale}.png")
     if not os.path.exists(out):
         image = Image.open(os.path.join(RAW, name + ".bmp")).convert("RGBA")
+        if name.startswith("area_"):   # scenery without the HUD's top and bottom bands
+            image = image.crop((0, 40, 640, 320))
         image.putdata([(0, 0, 0, 0) if p[:3] == KEY else p for p in image.getdata()])
         image.resize((image.width * scale, image.height * scale), Image.NEAREST).save(out)
     return "file://" + out
@@ -337,13 +339,13 @@ tr:nth-child(even) td { background: rgba(0,0,0,.035); }
 .move .tip::before { content: "TIP  "; font-family: 'Futura'; font-weight: 700; letter-spacing: 1px; }
 ul { margin: 0; padding-left: 4.5mm; } li { font-size: 9.6pt; line-height: 1.38; margin-bottom: 1mm; }
 .bars span { display: inline-block; width: 4mm; height: 2.6mm; border-radius: .8mm; margin-right: .6mm; background: #ddd; }
-.atlas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.6mm; }
+.atlas { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2.6mm; }
 .atlas .tile { background: rgba(10,12,26,.82); border-radius: 2mm; padding: 1.2mm; color: #eef; }
 .atlas img { width: 100%; display: block; border-radius: 1.2mm; image-rendering: pixelated; }
 .atlas .t { font-family: 'Futura'; font-weight: 700; font-size: 7.6pt; margin-top: .8mm; white-space: nowrap; overflow: hidden; }
 .atlas .n { font-size: 6.8pt; color: #b8bdd8; white-space: nowrap; overflow: hidden; }
-.person { display: flex; align-items: center; gap: 3mm; padding: 1.4mm 0; border-top: .3mm solid rgba(0,0,0,.08); }
-.person img { width: 13mm; flex: none; image-rendering: pixelated; }
+.person { display: flex; align-items: center; gap: 3mm; padding: .9mm 0; border-top: .3mm solid rgba(0,0,0,.08); }
+.person img { width: 10mm; flex: none; image-rendering: pixelated; }
 .person .pn { font-family: 'Futura'; font-weight: 700; font-size: 9.5pt; }
 .person .pd { font-size: 8.6pt; line-height: 1.3; color: #333; }
 .statgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2mm; }
@@ -560,7 +562,7 @@ def namula_page():
       the village <b>NAMULA</b> with the hearth in the middle, and <b>NAMULA CLIFFS</b> on the right, where the mentors stand and
       the Sky Stair waits. The hearth is your first checkpoint and is always lit.</p></div>
     <div class="row">{picture('area_0_02_0', 'Namula Shore: Tobin, the hut and the closed portals.')}{picture('area_0_00_0', 'Namula: the Hearth of Names, Ilsa, Marra, Brann and Lio.')}</div>
-    {picture('area_0_01_1', 'Namula Cliffs: the four mentors, Pell, Sela by the well, and the Gatekeeper by the Sky Stair.')}
+    <div class="row">{picture('area_0_01_0', 'Namula Cliffs: the four mentors, Pell and Sela by the well.')}{picture('area_0_01_1', 'The Gatekeeper and the Sky Stair, still closed.')}</div>
     <div class="card" style="padding:2.5mm 5mm"><div class="row"><div class="col" style="gap:0">{left}</div><div class="col" style="gap:0">{right}</div></div></div>
   </div>
   {footer('NAME QUEST · NAMULA')}
@@ -591,17 +593,17 @@ def area_tags(w, i, a):
     t = a["tiles"]
     tags = []
     if a["flags"] & 1:
-        tags.append(("MINI-BOSS", "#ff9a3a"))
+        tags.append(("MINI-BOSS", "#c060ff"))
     if a["flags"] & 2:
-        tags.append(("BOSS", "#ff5a5a"))
+        tags.append(("BOSS", "#ff3a3a"))
     if t["C"] or t["b"]:
-        tags.append(("CHECKPOINT", "#ffb050"))
+        tags.append(("CHECKPOINT", "#ff8a2a"))
     if t["g"]:
         tags.append(("GATE", "#c0c0c0"))
     if t["M"]:
         tags.append(("SURVEYOR", "#6fe0c0"))
     if t["T"]:
-        tags.append(("CHEST", "#ffd84a"))
+        tags.append(("CHEST", "#ffe14a"))
     if t["K"]:
         tags.append(("LEVER", "#a0a8c0"))
     if a["npcs"]:
@@ -613,8 +615,8 @@ def map_svg(w):
     W, areas = WORLDS[w], FACTS["worlds"][w]["areas"]
     cw, ch = 17, 11      # mm per map cell
     cols = max(a["mapX"] + (2 if a["wide"] else 1) for a in areas)
-    rows = max(a["mapY"] + (1 if a["wide"] else 2) for a in areas)
     top = min(a["mapY"] for a in areas)
+    rows = max(a["mapY"] + (1 if a["wide"] else 2) for a in areas) - top
 
     def box(a):
         x, y = a["mapX"] * cw, (a["mapY"] - top) * ch
@@ -648,8 +650,8 @@ def map_svg(w):
 
 def map_page(w):
     W, wd = WORLDS[w], FACTS["worlds"][w]
-    legend_items = [("CHECKPOINT", "#ffb050"), ("MINI-BOSS", "#ff9a3a"), ("BOSS", "#ff5a5a"), ("GATE", "#c0c0c0"),
-                    ("SURVEYOR", "#6fe0c0"), ("CHEST", "#ffd84a"), ("LEVER", "#a0a8c0"), ("PERSON", "#ff9ad0")]
+    legend_items = [("CHECKPOINT", "#ff8a2a"), ("MINI-BOSS", "#c060ff"), ("BOSS", "#ff3a3a"), ("GATE", "#c0c0c0"),
+                    ("SURVEYOR", "#6fe0c0"), ("CHEST", "#ffe14a"), ("LEVER", "#a0a8c0"), ("PERSON", "#ff9ad0")]
     legend = "".join(f"<span style='margin-right:3mm;white-space:nowrap'><span style='display:inline-block;width:2.6mm;height:2.6mm;"
                      f"border-radius:50%;background:{c};border:.2mm solid #000;vertical-align:middle'></span> {l}</span>" for l, c in legend_items)
     bands = "".join(f"<span style='margin-right:3mm'><span style='display:inline-block;width:4mm;height:2.6mm;border-radius:.6mm;"
@@ -713,10 +715,11 @@ def enemies_page(w):
     W, wd = WORLDS[w], FACTS["worlds"][w]
     rows = ""
     for slot, e in enumerate(wd["roster"]):
-        poses = img(f"enemy_{w}_{slot}", 13 if e["kind"] < 2 else 17)
+        size = f"max-height:{13 if e['kind'] < 2 else 17}mm;max-width:14.5mm;width:auto;height:auto"
+        poses = f'<img src="{sprite(f"enemy_{w}_{slot}")}" style="{size}">'
         for pose in ("tell", "attack"):
             if os.path.exists(os.path.join(RAW, f"enemy_{w}_{slot}_{pose}.bmp")):
-                poses += img(f"enemy_{w}_{slot}_{pose}", 13 if e["kind"] < 2 else 17, "opacity:.9")
+                poses += f'<img src="{sprite(f"enemy_{w}_{slot}_{pose}")}" style="{size}">'
         text = BEHAVIOUR[e["behaviour"]] + TRAITS.get(e["trait"], "")
         kind_colour = ["#b8e0a0", "#ffd080", "#ff9a8a"][e["kind"]]
         rows += f"""
@@ -725,6 +728,8 @@ def enemies_page(w):
         <div class="meta">HP {e['hp']} &nbsp;·&nbsp; hits for {e['atk']} before armour &nbsp;·&nbsp; {e['names']} names</div>
         <div style="font-size:9.4pt;line-height:1.35">{esc(text)}</div></div></div>"""
     ref = wd["ref"]
+    busiest = sorted(range(len(wd["areas"])), key=lambda i: -sum(wd["areas"][i]["tiles"][k] for k in "DEF"))[:2]
+    crowd = "".join(picture(f"area_{w}_{i:02d}_0", f"{wd['areas'][i]['name'].title()}: an intense area.", "flex:1") for i in busiest)
     return f"""
 <section class="page" style="background:linear-gradient(170deg, {W['dark']}, #05060c)">
   <div class="inner">
@@ -740,6 +745,7 @@ def enemies_page(w):
         intense areas the most monsters, up to three elites. Beaten monsters stay gone until you rest, travel or fade.
         The small poses beside each monster are its tell and its attack: learn them.</p></div></div>
     </div>
+    <div class="row">{crowd}</div>
   </div>
   {footer('NAME QUEST · WORLD ' + str(w) + ' · MONSTERS')}
 </section>"""
@@ -752,12 +758,13 @@ def boss_page(w, bid):
                     f"<div class='tip'>{esc(t)}</div></div></div>" for n, d, t in B["p1"])
     kind = "GREAT BOSS" if facts["big"] else "MINI-BOSS"
     shots = "".join(picture(n, c, "flex:1") for n, c in B["shots"])
+    poses = "".join(f"<div style='text-align:center'>{img(f'boss_{bid}_{pose}', 22)}<div class='meta' style='color:#cdd'>{label}</div></div>"
+                    for pose, label in (("idle", "IDLE"), ("tell", "TELL: GET READY"), ("attack", "ATTACK"), ("phase2", "PHASE 2")))
     return f"""
 <section class="page" style="background:linear-gradient(170deg, {W['dark']}, #05060c)">
   <div class="inner">
     <div style="display:flex;align-items:flex-end;gap:5mm">
       <div style="flex:none">{img(f'boss_{bid}_idle', 40)}</div>
-      <div style="flex:none">{img(f'boss_{bid}_phase2', 28, 'opacity:.95')}</div>
       <div style="flex:1"><div class="chapter-no" style="color:{W['accent']}">WORLD {w} · {kind} · {esc(B['where'])}</div>
         <h2 style="font-size:28pt">{esc(B['title'])}</h2><div class="tagline" style="font-size:12pt">{esc(B['tag'])}</div></div>
     </div>
@@ -778,6 +785,7 @@ def boss_page(w, bid):
         <p style="font-size:8.8pt">Never the same attack twice in a row. If you fade, it comes back at full HP.</p></div></div>
     </div>
     <div class="row">{shots}</div>
+    <div class="card dark" style="display:flex;justify-content:space-around;align-items:flex-end;padding:3mm">{poses}</div>
   </div>
   {footer('NAME QUEST · WORLD ' + str(w) + ' · ' + B['title'].upper())}
 </section>"""
