@@ -224,20 +224,7 @@ int main(int argc, char** argv) {
             for (int k = 0; k < 2; k++) {
                 q.camX = def.cols == WIDE_COLS ? (float)(k * (def.cols * TILE - QUEST_W)) : 0;
                 q.camY = def.cols == WIDE_COLS ? (float)(def.rows * TILE - QUEST_H) : (float)(k * (def.rows * TILE - QUEST_H));
-                // No HUD: the top and bottom bands come from two more draws with the camera 40 dp up and down.
-                static uint32_t clean[QUEST_W * QUEST_H];
-                const int BAND = 40 * DP;
-                float camY = q.camY;
-                q.camY = camY - BAND;
                 questDraw(q);
-                memcpy(clean, questPixels + BAND * QUEST_W, BAND * QUEST_W * sizeof(uint32_t));
-                q.camY = camY + BAND;
-                questDraw(q);
-                memcpy(clean + (QUEST_H - BAND) * QUEST_W, questPixels + (QUEST_H - 2 * BAND) * QUEST_W, BAND * QUEST_W * sizeof(uint32_t));
-                q.camY = camY;
-                questDraw(q);
-                memcpy(questPixels, clean, BAND * QUEST_W * sizeof(uint32_t));
-                memcpy(questPixels + (QUEST_H - BAND) * QUEST_W, clean + (QUEST_H - BAND) * QUEST_W, BAND * QUEST_W * sizeof(uint32_t));
                 snprintf(name, sizeof name, "area_%d_%02d_%d", w, i, k);
                 save(name);
             }
