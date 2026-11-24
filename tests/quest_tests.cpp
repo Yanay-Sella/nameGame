@@ -1815,6 +1815,7 @@ static void deathRespawnsEnemies() {
     CHECK(q.mode == QMODE_DEAD);
     play(q, Actions(), (int)(2.6f / DT));
     CHECK(q.mode == QMODE_PLAY && q.killed[WORLD_TEST][0] == 0 && q.hero.hp == q.stats.maxHp && q.hero.mp == q.stats.maxMp);
+    CHECK(q.spawnFade > 0 && q.spawnFade < SPAWN_FADE);   // the checkpoint fades in from black
     saveDelete(SAVE_FOLDER, 2);
 }
 

@@ -28,6 +28,7 @@ const uint32_t HEARTH_LIGHT = 0xFFA05018, BRAZIER_LIGHT = 0xFF804010, LANTERN_LI
 const int HEARTH_LIGHT_RADIUS = 48 * DP, BRAZIER_LIGHT_RADIUS = 28 * DP, LANTERN_LIGHT_RADIUS = 24 * DP;
 const float NPC_FRAME = 0.7f, POPUP_SHOWN = 1.5f, POPUP_RISE = 6 * DP, REST_FADE = 0.3f, FADE_DEPTH = 60 * DP, GATE_SHAKE = 0.5f;
 const int MAP_CELL_W = 12 * DP, MAP_CELL_H = 8 * DP;
+const float EVAPORATE_DELAY = 0.3f, EVAPORATE_SPREAD = 1.0f, MOTE_LIFE = 0.9f, DEATH_DARK_FROM = 1.7f, SPAWN_BLACK = 0.2f;
 static_assert(sizeof NPC_FRAMES / sizeof NPC_FRAMES[0] == NPC_DEV_TESTER, "Every story NPC needs two idle frames");
 // Boss frames: idle 1-2, tell, attack, hurt, phase 2 (spec §22); bosses of later phases have none yet.
 #define BOSS_ROW(N) {&BOSS_##N##_IDLE_1, &BOSS_##N##_IDLE_2, &BOSS_##N##_TELL, &BOSS_##N##_ATTACK, &BOSS_##N##_HURT, &BOSS_##N##_PHASE2}
@@ -407,6 +408,29 @@ static void drawHero(const Quest& q, int camX, int camY) {
             }
     }
     if (h.iframes > 0 && q.mode != QMODE_DEAD && (int)(h.iframes / IFRAME_BLINK) % 2) return;   // blinks during i-frames
+    if (q.mode == QMODE_DEAD) {   // the hero evaporates: each pixel lets go (top rows first) and every fourth drifts up as a mote
+        uint32_t tier = paletteColor(TRIM_BY_JOB[job]);
+        float t = q.modeTimer - EVAPORATE_DELAY;
+        for (int row = 0; row < sprite.h; row++)
+            for (int col = 0; col < sprite.w; col++) {
+                char c = sprite.pixels[row * sprite.w + col];
+                if (c == '.' || (c >= '1' && c <= '3' && job < c - '0')) continue;
+                uint32_t color = c == 'h' || (c >= '1' && c <= '3') ? tier : paletteColor(c);
+                uint32_t hash = ((uint32_t)row * 73856093u ^ (uint32_t)col * 19349663u) * 2654435761u;
+                float r = (hash >> 8 & 0xFFFF) / 65536.0f;
+                float age = t - (0.6f * r + 0.4f * row / sprite.h) * EVAPORATE_SPREAD;
+                int px = x + (h.facingLeft ? sprite.w - 1 - col : col), py = y + row;
+                if (age > 0) {
+                    if ((row | col) & 1 || age > MOTE_LIFE || bayer4(px, py) >= 16 * (1 - age / MOTE_LIFE)) continue;
+                    px += (int)((r - 0.5f) * 24 * DP * age + sinf(r * 40 + age * 6) * 2 * DP);
+                    py -= (int)((10 + 30 * r) * DP * age + 16 * DP * age * age);
+                    fillRect(px, py, (int)DP, (int)DP, color);
+                } else if (px >= 0 && px < QUEST_W && py >= 0 && py < QUEST_H) {
+                    questPixels[py * QUEST_W + px] = color;
+                }
+            }
+        return;
+    }
     drawHeroSprite(sprite, x, y, h.facingLeft, job);
     if (h.frozenTimer > 0)   // the Yeti's ice block around the hero
         drawDoubled(ICE_CUBE, (int)(h.x + HERO_W / 2) - ICE_CUBE.w * DP / 2 - camX, (int)(h.y + HERO_H) - ICE_CUBE.h * DP - camY, false);
@@ -930,6 +954,14 @@ static void shakePicture(const Quest& q) {
     }
 }
 
+// Scales every pixel's colour by brightness 0..1 (fades to and from black).
+static void darkenScreen(float brightness) {
+    if (brightness >= 1) return;
+    uint32_t m = (uint32_t)(brightness * 256);
+    for (uint32_t& p : questPixels)
+        p = 0xFF000000 | ((p & 0xFF00FF) * m >> 8 & 0xFF00FF) | ((p & 0x00FF00) * m >> 8 & 0x00FF00);
+}
+
 static void drawPlay(const Quest& q) {
     int camX = (int)floorf(q.camX), camY = (int)floorf(q.camY);
     const AreaDef& def = *q.area.def;
@@ -1122,7 +1154,11 @@ static void drawPlay(const Quest& q) {
         fillRect(0, 0, depth, QUEST_H, paletteColor('w'));
         fillRect(QUEST_W - depth, 0, depth, QUEST_H, paletteColor('w'));
     }
-    if (q.mode == QMODE_DEAD) drawCentred(80 * DP, "YOU FADED", paletteColor('r'), 2);
+    if (q.mode == QMODE_DEAD) {   // the world sinks to black behind the words before the checkpoint fades in
+        float k = fminf(1, fmaxf(0, (q.modeTimer - DEATH_DARK_FROM) / (DEATH_TIME - DEATH_DARK_FROM)));
+        darkenScreen(1 - k * k * (3 - 2 * k));
+        drawCentred(80 * DP, "YOU FADED", paletteColor('r'), 2);
+    }
 }
 
 static void drawSlots(const Quest& q) {
@@ -1437,5 +1473,9 @@ void questDraw(const Quest& q) {
     case QMODE_SHOP: drawPlay(q); drawShop(q); break;
     case QMODE_MAP: drawMap(q); break;
     case QMODE_CREDITS: break;   // phase 8
+    }
+    if (q.spawnFade > 0) {   // entering at a checkpoint: a moment of black, then the picture eases in
+        float k = fminf(1, (SPAWN_FADE - q.spawnFade - SPAWN_BLACK) / (SPAWN_FADE - SPAWN_BLACK));
+        darkenScreen(k <= 0 ? 0 : k * k * (3 - 2 * k));
     }
 }
