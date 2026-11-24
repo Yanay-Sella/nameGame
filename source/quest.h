@@ -271,8 +271,7 @@ struct Quest {
     std::string popup; float popupTimer, popupX, popupY;   // chest text over the chest (shown after the lid opens)
     int chestTile; float chestTimer;    // the chest whose lid is opening, s left
     float gateTimer;                    // s left of the gate shaking and vanishing (spec §11)
-    float fadeTimer;                    // s left of the rest's white fade
-    float spawnFade;                    // s left of the fade in from black after entering at a checkpoint
+    float spawnFade;                    // s left of the fade in from black after a rest or entering at a checkpoint
     int ambient;                        // the place for audioSetQuestSound: 0 off, 1 Namula, 2-8 worlds 1-7
     // Bosses (phase 4)
     std::vector<QuestBoss> bosses;

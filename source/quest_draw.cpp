@@ -28,7 +28,7 @@ const int ECHO_TRAIL_POINTS = 16;
 const char TRIM_BY_JOB[4] = {'h', 'b', 'Y', 'N'};
 const uint32_t HEARTH_LIGHT = 0xFFA05018, BRAZIER_LIGHT = 0xFF804010, LANTERN_LIGHT = 0xFF704018;
 const int HEARTH_LIGHT_RADIUS = 48 * DP, BRAZIER_LIGHT_RADIUS = 28 * DP, LANTERN_LIGHT_RADIUS = 24 * DP;
-const float NPC_FRAME = 0.7f, POPUP_SHOWN = 1.5f, POPUP_RISE = 6 * DP, REST_FADE = 0.3f, FADE_DEPTH = 60 * DP, GATE_SHAKE = 0.5f;
+const float NPC_FRAME = 0.7f, POPUP_SHOWN = 1.5f, POPUP_RISE = 6 * DP, GATE_SHAKE = 0.5f;
 const int MAP_CELL_W = 12 * DP, MAP_CELL_H = 8 * DP;
 const float EVAPORATE_DELAY = 0.3f, EVAPORATE_SPREAD = 1.0f, MOTE_LIFE = 0.9f, DEATH_DARK_FROM = 1.7f, SPAWN_BLACK = 0.2f;
 static_assert(sizeof NPC_FRAMES / sizeof NPC_FRAMES[0] == NPC_DEV_TESTER, "Every story NPC needs two idle frames");
@@ -1170,13 +1170,6 @@ static void drawPlay(const Quest& q) {
         char color = q.bannerColor ? q.bannerColor : q.bannerScale == 2 ? 'w' : 'b';
         drawCentred((q.bannerScale == 2 ? 40 : 30) * DP, q.banner, paletteColor(color), q.bannerScale);
     }
-    if (q.fadeTimer > 0) {   // the rest's white frame, growing in from the edges
-        int depth = (int)(FADE_DEPTH * (1 - q.fadeTimer / REST_FADE));
-        fillRect(0, 0, QUEST_W, depth, paletteColor('w'));
-        fillRect(0, QUEST_H - depth, QUEST_W, depth, paletteColor('w'));
-        fillRect(0, 0, depth, QUEST_H, paletteColor('w'));
-        fillRect(QUEST_W - depth, 0, depth, QUEST_H, paletteColor('w'));
-    }
     if (q.mode == QMODE_DEAD) {   // the world sinks to black behind the words before the checkpoint fades in
         float k = fminf(1, fmaxf(0, (q.modeTimer - DEATH_DARK_FROM) / (DEATH_TIME - DEATH_DARK_FROM)));
         darkenScreen(1 - k * k * (3 - 2 * k));
@@ -1497,7 +1490,7 @@ void questDraw(const Quest& q) {
     case QMODE_MAP: drawMap(q); break;
     case QMODE_CREDITS: break;   // phase 8
     }
-    if (q.spawnFade > 0) {   // entering at a checkpoint: a moment of black, then the picture eases in
+    if (q.spawnFade > 0) {   // a rest or entering at a checkpoint: a moment of black, then the picture eases in
         float k = fminf(1, (SPAWN_FADE - q.spawnFade - SPAWN_BLACK) / (SPAWN_FADE - SPAWN_BLACK));
         darkenScreen(k <= 0 ? 0 : k * k * (3 - 2 * k));
     }

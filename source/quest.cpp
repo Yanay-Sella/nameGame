@@ -29,7 +29,7 @@ const float SELECT_HOLD_TIME = 2;                   // dev: Select held this lon
 const float CAMERA_LEAD = 32 * DP, CAMERA_EASE_X = 5, CAMERA_EASE_Y = 6;
 // RPG systems (spec §10, §11, §14): how near Up must be (dp from the hero's centre, same floor), and the timings.
 const float NPC_REACH = 14 * DP, CHEST_REACH = 10 * DP, CHECKPOINT_REACH = 12 * DP, SURVEYOR_REACH = 20 * DP;
-const float KINDLE_BANNER_TIME = 1.5f, LID_TIME = 0.3f, POPUP_TIME = 1.5f, REST_FADE = 0.3f, GATE_ANIMATION = 1.0f;
+const float KINDLE_BANNER_TIME = 1.5f, LID_TIME = 0.3f, POPUP_TIME = 1.5f, GATE_ANIMATION = 1.0f;
 const float DRINK_TIME = 0.5f, BUFF_TIME = 120;
 const float POTION_HEAL[3] = {0.35f, 0.70f, 0.50f};   // RED and BIG: of max HP; MANA: of max MP
 
@@ -403,7 +403,7 @@ static void rest(Quest& q, int id) {
     questRefreshStats(q, true);
     q.save.checkpointWorld = q.area.world;
     q.save.checkpointId = id;
-    q.fadeTimer = q.reduceFlashing ? 0 : REST_FADE;
+    q.spawnFade = SPAWN_FADE;
     logLine(q, "quest: rest at %d.%d", q.area.world, id);
     questSave(q);
 }
@@ -710,7 +710,6 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
     q.popupTimer = fmaxf(0, q.popupTimer - dt);
     q.chestTimer = fmaxf(0, q.chestTimer - dt);
     q.gateTimer = fmaxf(0, q.gateTimer - dt);
-    q.fadeTimer = fmaxf(0, q.fadeTimer - dt);
     q.spawnFade = fmaxf(0, q.spawnFade - dt);
     switch (q.mode) {
     case QMODE_SLOTS:
@@ -1058,7 +1057,6 @@ void questUpdate(Quest& q, const Actions& a, float dt) {
                 enterAtCheckpoint(q);
                 for (int k = 0; k < 3; k++) q.hero.buffTimers[k] = buffs[k];
                 rest(q, id);
-                q.fadeTimer = 0;   // the fade in from black replaces the rest's white frame
                 q.soundRequested[SOUND_Q_PORTAL] = true;
                 break;
             }
